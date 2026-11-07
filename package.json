@@ -17,6 +17,7 @@
     "dist:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
     "jszip": "3.10.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
