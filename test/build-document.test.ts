@@ -109,11 +109,27 @@ describe('选项分列', () => {
 })
 
 describe('版式参数', () => {
-  it('学生版题后留白加在最后一段，并按行高换算', () => {
-    const q = createQuestion({ stem: [para('题')], layout: { studentSpaceLines: 5 } as Question['layout'] })
+  it('标题类段落与下段同页', () => {
+    const p = createEmptyProject()
+    p.blocks = [
+      { id: 'a', type: 'title', text: '大标题' },
+      { id: 'b', type: 'section', text: '课堂练习' },
+      { id: 'c', type: 'topic', text: '放缩圆' }
+    ]
+    expect(buildDocument(p, 'student').paragraphs.every((x) => x.keepNext === true)).toBe(true)
+  })
+
+  it('学生版作答留白为题末的固定高度空段，并与题目同页', () => {
+    const q = createQuestion({
+      stem: [para('题')],
+      layout: { studentSpaceLines: 5, keepTogether: false } as Question['layout']
+    })
     const ir = buildDocument(projectWith(q), 'student')
-    expect(ir.paragraphs.at(-1)?.extraSpaceAfterTwip).toBe(5 * 312)
-    expect(buildDocument(projectWith(q), 'teacher').paragraphs.at(-1)?.extraSpaceAfterTwip).toBeUndefined()
+    expect(ir.paragraphs.map((p) => [p.style, p.spacerTwip, p.keepNext ?? false])).toEqual([
+      ['question', undefined, true],
+      ['body', 5 * 312, false]
+    ])
+    expect(buildDocument(projectWith(q), 'teacher').paragraphs).toHaveLength(1)
   })
 
   it('防跨页：除最后一段外都与下段同页', () => {
@@ -148,6 +164,11 @@ describe('预览分页', () => {
 
   it('整组超过一页时逐段排', () => {
     expect(paginate([h(60, { keepNext: true }), h(60, { keepNext: true }), h(60)], 100)).toEqual([[0], [1], [2]])
+  })
+
+  it('页底段落的段后间距可以超出页面', () => {
+    expect(paginate([h(50), { height: 60, spaceAfter: 15 }], 100)).toEqual([[0, 1]])
+    expect(paginate([h(50), { height: 60, spaceAfter: 5 }], 100)).toEqual([[0], [1]])
   })
 
   it('段前分页', () => {

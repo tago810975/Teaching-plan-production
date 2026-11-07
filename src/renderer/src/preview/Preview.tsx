@@ -46,7 +46,8 @@ export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount 
     const items = ir.paragraphs.map((p, i) => {
       const top = els[i]?.offsetTop ?? 0
       const next = els[i + 1]?.offsetTop ?? bottom
-      return { height: next - top, keepNext: p.keepNext, pageBreakBefore: p.pageBreakBefore }
+      const spaceAfter = els[i] === undefined ? 0 : parseFloat(getComputedStyle(els[i]!).paddingBottom) || 0
+      return { height: next - top, spaceAfter, keepNext: p.keepNext, pageBreakBefore: p.pageBreakBefore }
     })
     const bodyHeightPx = twipToPt(frame.heightTwip) * PT_TO_PX
     setLayout({ ir, pages: paginate(items, bodyHeightPx) })

@@ -40,8 +40,12 @@ export interface DocParagraph {
    */
   label?: string
   runs: DocRun[]
-  /** 在样式间距之外额外增加的段后间距（twip），用于题后留白 */
-  extraSpaceAfterTwip?: number
+  /**
+   * 作答留白：本段是一个固定行高的空段落，高度为该值（twip）。
+   * Word 中实现为“行距固定值”的空段落；与题目之间用“与下段同页”相连，
+   * 保证题目和作答空间总在同一页。
+   */
+  spacerTwip?: number
   /** 与下段同页 */
   keepNext?: boolean
   /** 段中不分页 */

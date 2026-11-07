@@ -154,20 +154,30 @@ function buildQuestion(blockId: string, q: Question, no: number, variant: Varian
     for (let i = teacherStart; i < paras.length; i++) paras[i]!.shaded = true
   }
 
-  // 题后留白：加在本题最后一段的段后间距上
+  // 作答留白：在题目末尾追加一个固定高度的空段落。
+  // 不用段后间距实现，因为 Word 会在页底截掉段后间距，作答空间会凭空消失。
   const spaceLines = variant === 'student' ? q.layout.studentSpaceLines : q.layout.teacherSpaceLines
-  const last = paras[paras.length - 1]
-  if (last !== undefined && spaceLines > 0) {
-    last.extraSpaceAfterTwip = Math.round(spaceLines * BODY_LINE_HEIGHT_TWIP)
-  }
-
-  // 防跨页：除最后一段外都“与下段同页”，所有段“段中不分页”
-  if (q.layout.keepTogether) {
-    paras.forEach((p, i) => {
-      p.keepLines = true
-      if (i < paras.length - 1) p.keepNext = true
+  if (spaceLines > 0) {
+    push({
+      key: key('space'),
+      style: 'body',
+      runs: [],
+      spacerTwip: Math.round(spaceLines * BODY_LINE_HEIGHT_TWIP)
     })
   }
+
+  // 防跨页：除最后一段外都“与下段同页”，所有段“段中不分页”。
+  // 作答留白无论是否勾选防跨页，都与前一段同页。
+  paras.forEach((p, i) => {
+    const isLast = i === paras.length - 1
+    const nextIsSpacer = paras[i + 1]?.spacerTwip !== undefined
+    if (q.layout.keepTogether) {
+      p.keepLines = true
+      if (!isLast) p.keepNext = true
+    } else if (nextIsSpacer) {
+      p.keepNext = true
+    }
+  })
   if (q.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
 
   return paras
@@ -249,8 +259,9 @@ function toRuns(p: RichParagraph): DocRun[] {
   })
 }
 
+/** 标题类段落（大标题、栏目标题、题型分组）一律与下段同页，避免标题孤零零留在页底 */
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {
-  return { key: blockId, sourceBlockId: blockId, style, runs: [{ kind: 'text', text }] }
+  return { key: blockId, sourceBlockId: blockId, style, runs: [{ kind: 'text', text }], keepNext: true }
 }
 
 function fixedLabelPara(

@@ -30,9 +30,21 @@ export const DocParagraphView = memo(function DocParagraphView({
     textAlign: css.textAlign,
     lineHeight: css.lineHeight,
     paddingTop: css.marginTop,
-    paddingBottom: `calc(${css.marginBottom} + ${twipToPt(p.extraSpaceAfterTwip ?? 0)}pt)`,
+    paddingBottom: css.marginBottom,
     paddingLeft: css.paddingLeft,
     textIndent: css.textIndent
+  }
+
+  if (p.spacerTwip !== undefined) {
+    return (
+      <div
+        className={`para para--spacer${selected ? ' is-selected' : ''}`}
+        style={{ height: `${twipToPt(p.spacerTwip)}pt` }}
+        data-block-id={p.sourceBlockId}
+        title="作答留白"
+        onClick={onSelect === undefined ? undefined : () => onSelect(p.sourceBlockId)}
+      />
+    )
   }
 
   const hasHanging = spec.hangingTwip > 0

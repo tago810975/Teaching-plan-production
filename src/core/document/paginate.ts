@@ -6,12 +6,17 @@
  * - 不会把单个段落拆到两页（Word 在未设置“段中不分页”时会拆分）；
  * - 不处理孤行控制。
  * 这两点使预览偏保守：预览中同页的内容，在 Word 中不会被挤到下一页。
+ *
+ * 与 Word 一致的规则：页面最后一段的段后间距可以超出页底（被截掉），
+ * 不会因此把该段推到下一页。
  */
 import type { PageSetup } from './units'
 
 export interface MeasuredParagraph {
   /** 段落占用的高度（含段前段后间距），单位任意，与 pageHeight 一致即可 */
   height: number
+  /** 其中段后间距的高度；排在页底时这部分可以超出页面 */
+  spaceAfter?: number
   keepNext?: boolean
   pageBreakBefore?: boolean
 }
@@ -31,28 +36,33 @@ export function paginate(items: readonly MeasuredParagraph[], pageHeight: number
     used += items[i]!.height
   }
 
+  /** 从 used 开始依次放入 from..to，是否放得下（最后一段的段后间距不计） */
+  const fits = (from: number, to: number): boolean => {
+    let h = used
+    for (let k = from; k <= to; k++) h += items[k]!.height
+    return h - (items[to]!.spaceAfter ?? 0) <= pageHeight
+  }
+
   let i = 0
   while (i < items.length) {
     // “与下段同页”串起来的一组段落
     let end = i
-    let chainHeight = items[i]!.height
-    while (items[end]!.keepNext === true && end + 1 < items.length) {
-      end += 1
-      chainHeight += items[end]!.height
-    }
+    while (items[end]!.keepNext === true && end + 1 < items.length) end += 1
 
     if (items[i]!.pageBreakBefore === true) newPage()
 
-    if (used + chainHeight <= pageHeight) {
-      for (let k = i; k <= end; k++) place(k)
-    } else if (chainHeight <= pageHeight) {
-      newPage()
+    if (fits(i, end)) {
       for (let k = i; k <= end; k++) place(k)
     } else {
-      // 整组比一页还高，只能逐段排
-      for (let k = i; k <= end; k++) {
-        if (used + items[k]!.height > pageHeight) newPage()
-        place(k)
+      newPage()
+      if (fits(i, end)) {
+        for (let k = i; k <= end; k++) place(k)
+      } else {
+        // 整组比一页还高，只能逐段排
+        for (let k = i; k <= end; k++) {
+          if (!fits(k, k)) newPage()
+          place(k)
+        }
       }
     }
     i = end + 1

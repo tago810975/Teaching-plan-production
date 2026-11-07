@@ -140,6 +140,8 @@
 .math math {
   font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', math;
   font-size: 1em;
+  /* Word 的行内公式默认按显示样式排版，分数保持正常大小 */
+  math-style: normal;
 }
 
 .math-error {
@@ -154,4 +156,12 @@
   border: 0.5pt dashed #999;
   color: #777;
   font-size: 0.85em;
+}
+
+/* 作答留白：只在选中时显示范围 */
+.para--spacer {
+  padding: 0;
+}
+.page .para--spacer:hover {
+  background-color: rgba(47, 111, 181, 0.04);
 }
