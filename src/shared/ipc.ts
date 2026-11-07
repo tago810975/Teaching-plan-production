@@ -4,6 +4,7 @@
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
 import type { ProjectBundle } from '@core/model/types'
+import type { ProjectSummary } from '@core/project-file/codec'
 import type { TemplateDefaults } from '@core/template/defaults'
 
 export const IPC = {
@@ -13,6 +14,12 @@ export const IPC = {
   getStartupFile: 'app:get-startup-file',
   getAppInfo: 'app:get-info',
   getTemplateDefaults: 'template:get-defaults',
+  listProjects: 'library:list',
+  chooseLibraryDir: 'library:choose-dir',
+  chooseFolder: 'dialog:choose-folder',
+  createProject: 'project:create',
+  removeRecent: 'library:remove-recent',
+  revealInFolder: 'shell:reveal',
   setWindowState: 'window:set-state',
   confirmClose: 'window:confirm-close',
   /** 主进程 → 渲染进程：菜单命令 */
@@ -23,7 +30,7 @@ export const IPC = {
   openFileRequest: 'app:open-file-request'
 } as const
 
-export type MenuCommand = 'new' | 'open' | 'save' | 'save-as' | 'export-word'
+export type MenuCommand = 'new' | 'open' | 'save' | 'save-as' | 'export-word' | 'close'
 
 export interface OpenedProject {
   filePath: string
@@ -37,6 +44,27 @@ export interface SaveRequest {
   bundle: ProjectBundle
   /** 另存为对话框中的默认文件名（不含扩展名） */
   suggestedName: string
+}
+
+/** 首页列表中的一项 */
+export interface ProjectListItem {
+  filePath: string
+  /** 是否位于教学案库目录内 */
+  inLibrary: boolean
+  /** ok：正常；missing：最近打开过但文件已不存在；error：文件无法读取 */
+  status: 'ok' | 'missing' | 'error'
+  summary?: ProjectSummary
+  /** 文件修改时间 */
+  modifiedAt?: string
+  /** 最近一次在本软件中打开的时间 */
+  openedAt?: string
+  sizeBytes?: number
+  error?: string
+}
+
+export interface LibraryListing {
+  libraryDir: string
+  items: ProjectListItem[]
 }
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -55,6 +83,16 @@ export interface RendererApi {
   /** 弹出“打开”对话框；用户取消时返回 null */
   openProject(): Promise<Result<OpenedProject | null>>
   openProjectAt(filePath: string): Promise<Result<OpenedProject>>
+  /** 首页：列出教学案库与最近打开的教学案 */
+  listProjects(): Promise<Result<LibraryListing>>
+  /** 更换教学案库目录；用户取消时返回 null */
+  chooseLibraryDir(): Promise<Result<string | null>>
+  /** 选择一个文件夹（新建教学案时更改保存位置）；用户取消时返回 null */
+  chooseFolder(defaultPath: string): Promise<string | null>
+  /** 新建教学案并立即保存为文件；dir 为 null 时保存到教学案库 */
+  createProject(request: { title: string; dir: string | null; templateId: string }): Promise<Result<OpenedProject>>
+  removeRecent(filePath: string): Promise<void>
+  revealInFolder(filePath: string): void
   /** 保存；用户在“另存为”对话框中取消时返回 null，否则返回实际保存路径 */
   saveProject(request: SaveRequest): Promise<Result<string | null>>
   /** 启动时通过命令行（如双击 .tplan 文件）传入的工程路径 */

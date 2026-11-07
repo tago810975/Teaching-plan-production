@@ -15,8 +15,10 @@ import {
   ensureProjectExtension,
   isProjectFilePath,
   readProjectFile,
+  sanitizeFileName,
   writeProjectFile
 } from './project-io'
+import { addRecent, createProject, getLibraryDir, listProjects, removeRecent, setLibraryDir } from './library'
 
 const APP_DISPLAY_NAME = '教学案制作'
 const PROJECT_FILTER = { name: '教学案工程', extensions: [PROJECT_FILE_EXTENSION] }
@@ -163,13 +165,53 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.openProjectAt, (_event, filePath: string) => openAt(filePath))
 
+  ipcMain.handle(IPC.listProjects, async () => {
+    try {
+      return { ok: true, value: await listProjects() }
+    } catch (err) {
+      return { ok: false, error: `读取教学案列表失败：${describeError(err)}` }
+    }
+  })
+
+  ipcMain.handle(IPC.chooseLibraryDir, async (event) => {
+    const dir = await pickFolder(event.sender, '选择教学案库文件夹', await getLibraryDir())
+    if (dir === null) return { ok: true, value: null }
+    try {
+      await setLibraryDir(dir)
+      return { ok: true, value: dir }
+    } catch (err) {
+      return { ok: false, error: `无法使用该文件夹：${describeError(err)}` }
+    }
+  })
+
+  ipcMain.handle(IPC.chooseFolder, (event, defaultPath: string) =>
+    pickFolder(event.sender, '选择保存位置', defaultPath)
+  )
+
+  ipcMain.handle(
+    IPC.createProject,
+    async (_event, req: { title: string; dir: string | null; templateId: string }) => {
+      try {
+        return { ok: true, value: await createProject(req.title, req.dir, req.templateId) }
+      } catch (err) {
+        return { ok: false, error: `新建教学案失败：${describeError(err)}` }
+      }
+    }
+  )
+
+  ipcMain.handle(IPC.removeRecent, (_event, filePath: string) => removeRecent(filePath))
+
+  ipcMain.on(IPC.revealInFolder, (_event, filePath: string) => shell.showItemInFolder(filePath))
+
   ipcMain.handle(IPC.saveProject, async (event, req: SaveRequest): Promise<Result<string | null>> => {
     let target = req.filePath
     if (target === null || req.saveAs) {
       const win = BrowserWindow.fromWebContents(event.sender)
       const options = {
         title: '保存教学案',
-        defaultPath: req.filePath ?? `${sanitizeFileName(req.suggestedName)}.${PROJECT_FILE_EXTENSION}`,
+        defaultPath:
+          req.filePath ??
+          join(await getLibraryDir(), `${sanitizeFileName(req.suggestedName)}.${PROJECT_FILE_EXTENSION}`),
         filters: [PROJECT_FILTER]
       }
       const picked = win !== null ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
@@ -180,6 +222,7 @@ function registerIpc(): void {
     }
     try {
       await writeProjectFile(target, req.bundle, app.getVersion())
+      await addRecent(target)
       return { ok: true, value: target }
     } catch (err) {
       return { ok: false, error: `保存失败：${describeError(err)}` }
@@ -204,7 +247,7 @@ function registerIpc(): void {
 async function openAt(filePath: string): Promise<Result<OpenedProject>> {
   try {
     const bundle = await readProjectFile(filePath)
-    app.addRecentDocument(filePath)
+    await addRecent(filePath)
     return { ok: true, value: { filePath, bundle } }
   } catch (err) {
     return { ok: false, error: `无法打开“${basename(filePath)}”：${describeError(err)}` }
@@ -232,8 +275,9 @@ function findProjectArg(argv: readonly string[]): string | null {
   return argv.slice(1).find(isProjectFilePath) ?? null
 }
 
-/** 去掉 Windows / macOS 文件名中不允许的字符 */
-function sanitizeFileName(name: string): string {
-  const cleaned = name.replace(/[\\/:*?"<>|]/g, '_').trim()
-  return cleaned === '' ? '未命名教学案' : cleaned
+async function pickFolder(sender: Electron.WebContents, title: string, defaultPath: string): Promise<string | null> {
+  const win = BrowserWindow.fromWebContents(sender)
+  const options = { title, defaultPath, properties: ['openDirectory' as const, 'createDirectory' as const] }
+  const picked = win !== null ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+  return picked.canceled ? null : (picked.filePaths[0] ?? null)
 }

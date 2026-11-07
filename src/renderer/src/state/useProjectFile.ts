@@ -2,15 +2,19 @@
  * 文件相关操作：新建、打开、保存、另存为，以及响应菜单、关闭窗口、双击文件打开。
  */
 import { useCallback, useEffect, useRef, useState, type Dispatch } from 'react'
-import { createEmptyBundle } from '@core/model/factory'
-import type { ProjectBundle } from '@core/model/types'
 import type { MenuCommand } from '@shared/ipc'
 import type { EditorAction, EditorState } from './store'
 
 const DISCARD_PROMPT = '当前教学案有未保存的修改，确定要放弃这些修改吗？'
 
 export interface ProjectFileActions {
+  /** 新建：弹出新建对话框 */
   newProject(): void
+  /** 新建对话框中点击“创建” */
+  createProject(title: string, dir: string | null): Promise<void>
+  openAt(filePath: string): Promise<void>
+  /** 关闭当前教学案，回到首页 */
+  closeProject(): void
   openProject(): Promise<void>
   /** 返回是否保存成功（用户取消“另存为”时为 false） */
   save(saveAs?: boolean): Promise<boolean>
@@ -22,14 +26,15 @@ export interface ProjectFileActions {
 export interface ProjectFileOptions {
   /** 启动时没有通过文件关联传入工程文件时调用 */
   onNoStartupFile?: () => void
-  /** 新建工程的内容（如套用模板默认页眉）；不提供则为空工程 */
-  createNewBundle?: () => ProjectBundle
+  /** 请求新建教学案（显示新建对话框） */
+  onRequestNew?: () => void
+  templateId: string
 }
 
 export function useProjectFile(
   state: EditorState,
   dispatch: Dispatch<EditorAction>,
-  options: ProjectFileOptions = {}
+  options: ProjectFileOptions
 ): ProjectFileActions {
   const [error, setError] = useState<string | null>(null)
   // 事件回调中需要读取最新状态，用 ref 避免反复注册监听
@@ -38,11 +43,25 @@ export function useProjectFile(
 
   const confirmDiscard = (): boolean => !stateRef.current.dirty || window.confirm(DISCARD_PROMPT)
 
-  const createNewRef = useRef(options.createNewBundle)
-  createNewRef.current = options.createNewBundle
+  const requestNewRef = useRef(options.onRequestNew)
+  requestNewRef.current = options.onRequestNew
   const newProject = useCallback(() => {
     if (!confirmDiscard()) return
-    dispatch({ type: 'load', bundle: createNewRef.current?.() ?? createEmptyBundle(), filePath: null })
+    requestNewRef.current?.()
+  }, [])
+
+  const createProject = useCallback(
+    async (title: string, dir: string | null) => {
+      const result = await window.api.createProject({ title, dir, templateId: options.templateId })
+      if (result.ok) dispatch({ type: 'load', bundle: result.value.bundle, filePath: result.value.filePath })
+      else setError(result.error)
+    },
+    [dispatch, options.templateId]
+  )
+
+  const closeProject = useCallback(() => {
+    if (stateRef.current.screen === 'home' || !confirmDiscard()) return
+    dispatch({ type: 'close' })
   }, [dispatch])
 
   const openAt = useCallback(
@@ -96,17 +115,20 @@ export function useProjectFile(
           void openProject()
           break
         case 'save':
-          void save(false)
+          if (stateRef.current.screen === 'editor') void save(false)
           break
         case 'save-as':
-          void save(true)
+          if (stateRef.current.screen === 'editor') void save(true)
           break
         case 'export-word':
-          setError('导出 Word 功能尚在开发中。')
+          if (stateRef.current.screen === 'editor') setError('导出 Word 功能尚在开发中。')
+          break
+        case 'close':
+          closeProject()
           break
       }
     })
-  }, [newProject, openProject, save])
+  }, [newProject, openProject, save, closeProject])
 
   // 关闭窗口时选择了“保存”
   useEffect(() => {
@@ -133,10 +155,19 @@ export function useProjectFile(
   }, [openAt])
 
   // 同步窗口标题与“未保存”标记
-  const title = state.bundle.project.meta.title
+  const title = state.screen === 'home' ? '首页' : state.bundle.project.meta.title
   useEffect(() => {
     window.api.setWindowState({ title, dirty: state.dirty })
   }, [title, state.dirty])
 
-  return { newProject, openProject, save, error, dismissError: () => setError(null) }
+  return {
+    newProject,
+    createProject,
+    openAt,
+    closeProject,
+    openProject,
+    save,
+    error,
+    dismissError: () => setError(null)
+  }
 }

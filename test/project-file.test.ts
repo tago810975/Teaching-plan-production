@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { createEmptyBundle } from '@core/model/factory'
-import { createAsset, decodeBundle, encodeBundle, ProjectFileError } from '@core/project-file/codec'
+import { createAsset, decodeBundle, decodeSummary, encodeBundle, ProjectFileError } from '@core/project-file/codec'
 import { CURRENT_FORMAT_VERSION, PROJECT_FILE_MIMETYPE } from '@core/project-file/format'
 import { createDemoBundle } from '@core/sample/demo-project'
 
@@ -17,6 +17,17 @@ describe('工程文件编解码', () => {
       expect(decoded.assets[id]?.mime).toBe(asset.mime)
       expect(decoded.assets[id]?.data).toEqual(asset.data)
     }
+  })
+
+  it('摘要包含名称、题目数与时间', async () => {
+    const bundle = await createDemoBundle(undefined, new Date('2026-11-07T00:00:00Z'))
+    const summary = await decodeSummary(await encodeBundle(bundle, opts))
+    expect(summary).toEqual({
+      title: '动态圆专题',
+      questionCount: 3,
+      createdAt: '2026-11-07T00:00:00.000Z',
+      updatedAt: '2026-11-07T00:00:00.000Z'
+    })
   })
 
   it('mimetype 位于压缩包首位且不压缩', async () => {

@@ -15,6 +15,37 @@ npm run typecheck  # 类型检查
 npm run dist:win   # 打包 Windows 安装程序，输出到 release/
 ```
 
+## 常见问题
+
+**启动时报错 `Error: Electron uninstall`**
+
+Electron 的主程序（约 100 MB）在 `npm install` 的最后一步从 GitHub 下载，网络不通时会静默失败。指定国内镜像后单独重新下载即可：
+
+```bash
+# Git Bash / MSYS2
+export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+node node_modules/electron/install.js
+```
+
+```bat
+:: 命令提示符（cmd）
+set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+node node_modules\electron\install.js
+```
+
+成功后 `node_modules/electron/dist/` 下会出现 `electron.exe`。
+
+**PowerShell 提示“禁止运行脚本”**
+
+改用命令提示符（cmd），或在 PowerShell 中执行一次 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。
+
+## 使用说明
+
+- 启动后进入首页，列出“教学案库”（默认为“文档\教学案”）中的全部教学案，以及最近打开过的其他位置的教学案。
+- “新建教学案”只需输入名称，文件立即创建在教学案库中，并自动带入模板的页眉（Logo、电话、水印）。
+- 教学案库可以建子文件夹分类管理（最多两层），首页会一并列出。
+- 编辑时点击左上角“首页”或按 Ctrl+W 返回首页。
+
 ## 目录结构
 
 ```

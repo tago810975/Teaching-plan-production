@@ -2,6 +2,7 @@
  * 编辑器状态。工程数据为不可变对象，每次修改都生成新对象，
  * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
  */
+import { createEmptyBundle } from '@core/model/factory'
 import type { Asset, Block, PageHeader, ProjectBundle, Variant } from '@core/model/types'
 
 /** 选中页眉时 selectedBlockId 的取值 */
@@ -10,6 +11,8 @@ export const HEADER_SELECTION = '#header'
 export type HeaderImageSlot = 'logo' | 'phoneIcon' | 'watermark'
 
 export interface EditorState {
+  /** home：首页；editor：编辑某个教学案 */
+  screen: 'home' | 'editor'
   bundle: ProjectBundle
   /** 当前工程文件路径；新建未保存时为 null */
   filePath: string | null
@@ -22,6 +25,8 @@ export interface EditorState {
 
 export type EditorAction =
   | { type: 'load'; bundle: ProjectBundle; filePath: string | null }
+  /** 关闭当前教学案，回到首页 */
+  | { type: 'close' }
   | { type: 'saved'; filePath: string }
   | { type: 'set-variant'; variant: Variant }
   | { type: 'select'; blockId: string | null }
@@ -37,13 +42,22 @@ export type EditorAction =
     }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
-  return { bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null }
+  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null }
 }
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'load':
-      return { ...state, bundle: action.bundle, filePath: action.filePath, dirty: false, selectedBlockId: null }
+      return {
+        ...state,
+        screen: 'editor',
+        bundle: action.bundle,
+        filePath: action.filePath,
+        dirty: false,
+        selectedBlockId: null
+      }
+    case 'close':
+      return { ...initEditorState(createEmptyBundle()), variant: state.variant }
     case 'saved':
       return { ...state, filePath: action.filePath, dirty: false }
     case 'set-variant':

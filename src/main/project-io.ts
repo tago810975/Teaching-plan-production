@@ -66,3 +66,9 @@ export function ensureProjectExtension(filePath: string): string {
 export function isProjectFilePath(arg: string): boolean {
   return extname(arg).toLowerCase() === `.${PROJECT_FILE_EXTENSION}`
 }
+
+/** 去掉 Windows / macOS 文件名中不允许的字符 */
+export function sanitizeFileName(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]/g, '_').replace(/[. ]+$/, '').trim()
+  return cleaned === '' ? '未命名教学案' : cleaned
+}

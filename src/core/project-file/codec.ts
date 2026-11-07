@@ -87,6 +87,50 @@ export async function encodeBundle(
 
 /** 解码工程文件字节。格式不符、版本过新或数据损坏时抛出 ProjectFileError。 */
 export async function decodeBundle(bytes: Uint8Array): Promise<ProjectBundle> {
+  const { zip, project } = await openProjectZip(bytes)
+
+  const assets: Record<string, Asset> = {}
+  const entries = zip.folder('assets')?.filter((_, f) => !f.dir) ?? []
+  for (const file of entries) {
+    const name = file.name.slice('assets/'.length)
+    const dot = name.lastIndexOf('.')
+    const id = dot === -1 ? name : name.slice(0, dot)
+    const ext = dot === -1 ? '' : name.slice(dot + 1)
+    assets[id] = { id, mime: mimeForExt(ext), data: await file.async('uint8array') }
+  }
+
+  for (const id of collectAssetRefs(project)) {
+    if (assets[id] === undefined) {
+      throw new ProjectFileError(`工程文件缺少图片资源：${id}`)
+    }
+  }
+
+  return { project, assets }
+}
+
+/** 工程摘要：首页列表使用，不读取图片 */
+export interface ProjectSummary {
+  title: string
+  questionCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export function summarizeProject(project: Project): ProjectSummary {
+  return {
+    title: project.meta.title,
+    questionCount: project.blocks.filter((b) => b.type === 'question').length,
+    createdAt: project.meta.createdAt,
+    updatedAt: project.meta.updatedAt
+  }
+}
+
+/** 只读取工程摘要，比 decodeBundle 快得多（不解压图片） */
+export async function decodeSummary(bytes: Uint8Array): Promise<ProjectSummary> {
+  return summarizeProject((await openProjectZip(bytes)).project)
+}
+
+async function openProjectZip(bytes: Uint8Array): Promise<{ zip: JSZip; project: Project }> {
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(bytes)
@@ -116,25 +160,7 @@ export async function decodeBundle(bytes: Uint8Array): Promise<ProjectBundle> {
     const where = issue?.path.join('.') ?? ''
     throw new ProjectFileError(`工程数据格式有误（${where}）：${issue?.message ?? '未知错误'}`)
   }
-  const project: Project = parsed.data
-
-  const assets: Record<string, Asset> = {}
-  const entries = zip.folder('assets')?.filter((_, f) => !f.dir) ?? []
-  for (const file of entries) {
-    const name = file.name.slice('assets/'.length)
-    const dot = name.lastIndexOf('.')
-    const id = dot === -1 ? name : name.slice(0, dot)
-    const ext = dot === -1 ? '' : name.slice(dot + 1)
-    assets[id] = { id, mime: mimeForExt(ext), data: await file.async('uint8array') }
-  }
-
-  for (const id of collectAssetRefs(project)) {
-    if (assets[id] === undefined) {
-      throw new ProjectFileError(`工程文件缺少图片资源：${id}`)
-    }
-  }
-
-  return { project, assets }
+  return { zip, project: parsed.data }
 }
 
 async function readJson<T>(zip: JSZip, path: string): Promise<T> {
