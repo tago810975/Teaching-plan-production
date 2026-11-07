@@ -39,7 +39,9 @@ export function createEmptyBundle(now?: Date): ProjectBundle {
   return { project: createEmptyProject(now), assets: {} }
 }
 
-export function createQuestion(partial: Partial<Question> = {}): Question {
+export function createQuestion(
+  partial: Omit<Partial<Question>, 'layout'> & { layout?: Partial<QuestionLayout> } = {}
+): Question {
   return {
     id: newId(),
     kind: 'single-choice',

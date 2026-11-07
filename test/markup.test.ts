@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { markupToRichText, richTextToMarkup } from '@core/model/markup'
+import { fromEditable, toEditable } from '@core/model/markup'
+import type { RichText } from '@core/model/types'
 
-describe('文字 + $公式$ 标记', () => {
-  it('解析文字与公式', () => {
-    expect(markupToRichText('经过时间$t_0$刚好')).toEqual([
+const roundTrip = (rich: RichText): RichText => {
+  const e = toEditable(rich)
+  return fromEditable(e.text, e.objects)
+}
+
+describe('可编辑文本', () => {
+  it('文字与 $公式$', () => {
+    const e = toEditable([])
+    expect(fromEditable('经过时间$t_0$刚好', e.objects)).toEqual([
       {
         inlines: [
           { type: 'text', text: '经过时间' },
@@ -14,19 +21,41 @@ describe('文字 + $公式$ 标记', () => {
     ])
   })
 
-  it('多行对应多段，往返不变', () => {
-    const src = '第一段$\\frac{5}{4}t_0$\n价格\\$5\n$\\sqrt{2}$'
-    expect(richTextToMarkup(markupToRichText(src))).toBe(src)
+  it('导入的公式、图片显示为标记，往返后完整保留', () => {
+    const rich: RichText = [
+      {
+        inlines: [
+          { type: 'text', text: '已知' },
+          { type: 'math', omml: '<m:oMath/>' },
+          { type: 'image', assetId: 'x', widthEmu: 1, heightEmu: 1 }
+        ]
+      },
+      { inlines: [{ type: 'text', text: '第二段 \\$5' }] }
+    ]
+    const e = toEditable(rich)
+    expect(e.text).toBe('已知⟦公式1⟧⟦图2⟧\n第二段 \\\\$5')
+    expect(roundTrip(rich)).toEqual(rich)
+  })
+
+  it('带格式的文字：可改文字，格式保留', () => {
+    const rich: RichText = [
+      { inlines: [{ type: 'text', text: 'v' }, { type: 'text', text: '0', marks: { script: 'sub' } }] }
+    ]
+    const e = toEditable(rich)
+    expect(e.text).toBe('v⟦下标1:0⟧')
+    expect(fromEditable('u⟦下标1:1⟧', e.objects)).toEqual([
+      { inlines: [{ type: 'text', text: 'u' }, { type: 'text', text: '1', marks: { script: 'sub' } }] }
+    ])
+  })
+
+  it('删除标记即删除对应内容；无效编号按文字处理', () => {
+    const rich: RichText = [{ inlines: [{ type: 'math', omml: '<m:oMath/>' }] }]
+    const e = toEditable(rich)
+    expect(fromEditable('', e.objects)).toEqual([])
+    expect(fromEditable('⟦公式9⟧', e.objects)).toEqual([{ inlines: [{ type: 'text', text: '⟦公式9⟧' }] }])
   })
 
   it('未配对的 $ 视为文字', () => {
-    expect(markupToRichText('a$b')).toEqual([{ inlines: [{ type: 'text', text: 'a$b' }] }])
-  })
-
-  it('含图片或仅有 OMML 的公式时不可转换', () => {
-    expect(richTextToMarkup([{ inlines: [{ type: 'math', omml: '<m:oMath/>' }] }])).toBeNull()
-    expect(
-      richTextToMarkup([{ inlines: [{ type: 'image', assetId: 'x', widthEmu: 1, heightEmu: 1 }] }])
-    ).toBeNull()
+    expect(fromEditable('a$b', new Map())).toEqual([{ inlines: [{ type: 'text', text: 'a$b' }] }])
   })
 })

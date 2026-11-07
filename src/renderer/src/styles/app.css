@@ -603,3 +603,127 @@ button.link:hover:not(:disabled) {
   color: var(--ink-soft);
   font-size: 12px;
 }
+
+/* ---------- 题目表单补充 ---------- */
+
+.icon-button {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--ink-soft);
+  line-height: 1;
+}
+.group-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.checkbox--inline {
+  margin: 0;
+}
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+button.link.danger {
+  color: var(--red-pen);
+}
+
+.figure-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3e8e6;
+}
+.figure-thumb {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: #fff;
+}
+.figure-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.figure-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.figure-width {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.figure-width input {
+  width: 5em;
+}
+.figure-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- 导入说明、添加菜单 ---------- */
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #eaf1f8;
+  border-bottom: 1px solid #c9d8e8;
+}
+.notice-title {
+  margin: 2px 0;
+}
+.notice-list {
+  margin: 4px 0 2px;
+  padding-left: 1.4em;
+  color: var(--ink-soft);
+}
+
+.menu {
+  position: relative;
+}
+.menu-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--panel-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(31, 42, 46, 0.18);
+}
+.menu-popup button {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  text-align: left;
+  padding: 6px 10px;
+}
+.menu-popup button:hover,
+.menu-popup button:focus-visible {
+  background: #e6ebe9;
+}
+.menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--rule);
+}

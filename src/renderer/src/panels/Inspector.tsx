@@ -4,7 +4,9 @@
  * 过渡期用“文字 + $公式$”的文本框编辑；接入 TipTap + MathLive 后替换各个 MarkupField。
  */
 import { useId, useState, type Dispatch, type ReactNode } from 'react'
-import { markupToParagraph, markupToRichText, paragraphToMarkup, richTextToMarkup } from '@core/model/markup'
+import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
+import { newId } from '@core/model/factory'
+import { FigureList } from './FigureList'
 import type { Block, OptionColumns, Question, QuestionBlock, RichParagraph, RichText } from '@core/model/types'
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
@@ -46,7 +48,12 @@ export function Inspector({ block, header, assetUrls, dispatch }: Props) {
       {/* key 保证切换选中项时各输入框重新初始化 */}
       <div key={block.id} className="inspector-body">
         {block.type === 'question' ? (
-          <QuestionForm block={block} update={update as (fn: (b: QuestionBlock) => QuestionBlock) => void} />
+          <QuestionForm
+            block={block}
+            update={update as (fn: (b: QuestionBlock) => QuestionBlock) => void}
+            assetUrls={assetUrls}
+            dispatch={dispatch}
+          />
         ) : block.type === 'paragraph' ? (
           <Field label="内容">
             <RichTextField
@@ -77,10 +84,14 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
 
 function QuestionForm({
   block,
-  update
+  update,
+  assetUrls,
+  dispatch
 }: {
   block: QuestionBlock
   update: (fn: (b: QuestionBlock) => QuestionBlock) => void
+  assetUrls: ReadonlyMap<string, string>
+  dispatch: Dispatch<EditorAction>
 }) {
   const q = block.question
   const set = (patch: Partial<Question>): void => update((b) => ({ ...b, question: { ...b.question, ...patch } }))
@@ -92,43 +103,96 @@ function QuestionForm({
       <Field label="难度" hint="显示为题干开头的【B】，留空则不显示">
         <TextInput value={q.difficulty ?? ''} width="4em" onChange={(v) => set({ difficulty: v || undefined })} />
       </Field>
-      <Field label="题干">
+      <Field label="题干" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
         <RichTextField value={q.stem} rows={5} onChange={(stem) => set({ stem })} />
       </Field>
 
-      {q.options.length > 0 && (
-        <fieldset className="group">
-          <legend>选项</legend>
-          {q.options.map((opt, i) => (
-            <div key={i} className="option-row">
-              <span className="option-label">{opt.label}</span>
-              <ParagraphField
-                value={opt.content}
-                onChange={(content) =>
-                  set({ options: q.options.map((o, j) => (j === i ? { ...o, content } : o)) })
-                }
-              />
-            </div>
-          ))}
-        </fieldset>
-      )}
+      <FigureList
+        figures={q.figures}
+        assetUrls={assetUrls}
+        onChange={(figures) => set({ figures })}
+        onAddAsset={(asset) => dispatch({ type: 'add-asset', asset })}
+      />
 
-      {q.subQuestions.length > 0 && (
-        <fieldset className="group">
-          <legend>小问</legend>
-          {q.subQuestions.map((sq, i) => (
-            <Field key={sq.id} label={`(${i + 1})`}>
-              <RichTextField
-                value={sq.content}
-                rows={2}
-                onChange={(content) =>
-                  set({ subQuestions: q.subQuestions.map((s, j) => (j === i ? { ...s, content } : s)) })
-                }
+      <fieldset className="group">
+        <legend>选项</legend>
+        {q.options.length === 0 && <p className="field-hint">没有选项。选择题请添加选项。</p>}
+        {q.options.map((opt, i) => (
+          <div key={`${block.id}-${opt.label}-${q.options.length}`} className="option-row">
+            <span className="option-label">{opt.label}</span>
+            <ParagraphField
+              value={opt.content}
+              onChange={(content) => set({ options: q.options.map((o, j) => (j === i ? { ...o, content } : o)) })}
+            />
+            <button
+              type="button"
+              className="icon-button"
+              title={`删除选项 ${opt.label}`}
+              aria-label={`删除选项 ${opt.label}`}
+              onClick={() => set({ options: relabel(q.options.filter((_, j) => j !== i)) })}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <div className="group-actions">
+          <button
+            type="button"
+            disabled={q.options.length >= 8}
+            onClick={() =>
+              set({
+                options: [...q.options, { label: String.fromCharCode(65 + q.options.length), content: { inlines: [] } }],
+                kind: q.kind === 'solve' || q.kind === 'fill-blank' ? 'single-choice' : q.kind
+              })
+            }
+          >
+            添加选项
+          </button>
+          {q.options.length > 0 && (
+            <label className="checkbox checkbox--inline">
+              <input
+                type="checkbox"
+                checked={q.kind === 'multi-choice'}
+                onChange={(e) => set({ kind: e.target.checked ? 'multi-choice' : 'single-choice' })}
               />
-            </Field>
-          ))}
-        </fieldset>
-      )}
+              多选题
+            </label>
+          )}
+        </div>
+      </fieldset>
+
+      <fieldset className="group">
+        <legend>小问</legend>
+        {q.subQuestions.map((sq, i) => (
+          <div key={sq.id} className="field">
+            <div className="field-label-row">
+              <span className="field-label">({i + 1})</span>
+              <button
+                type="button"
+                className="link danger"
+                onClick={() => set({ subQuestions: q.subQuestions.filter((s) => s.id !== sq.id) })}
+              >
+                删除
+              </button>
+            </div>
+            <RichTextField
+              value={sq.content}
+              rows={2}
+              onChange={(content) =>
+                set({ subQuestions: q.subQuestions.map((s, j) => (j === i ? { ...s, content } : s)) })
+              }
+            />
+          </div>
+        ))}
+        <div className="group-actions">
+          <button
+            type="button"
+            onClick={() => set({ subQuestions: [...q.subQuestions, { id: newId(), content: [] }] })}
+          >
+            添加小问
+          </button>
+        </div>
+      </fieldset>
 
       <fieldset className="group group--teacher">
         <legend>仅教师版</legend>
@@ -211,42 +275,49 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-const READONLY_NOTICE = '这部分包含图片、带格式的文字或从 Word 导入的公式，富文本编辑器完成后才能在这里修改。'
+const EDIT_HINT = '公式写作 $LaTeX$，如 $\\frac{1}{2}mv^2$。⟦⟧ 中是从 Word 导入的公式、图片或带格式的文字，可以移动或删除。'
 
 /**
  * 多段富文本的文本框。输入框保留自己的草稿，只在挂载时从模型读取一次，
  * 避免“解析 → 再生成”把用户正在输入的内容改掉（例如还没配对的 $）。
  */
 function RichTextField({ value, rows, onChange }: { value: RichText; rows: number; onChange: (v: RichText) => void }) {
-  const [draft, setDraft] = useState(() => richTextToMarkup(value))
-  if (draft === null) return <p className="field-readonly">{READONLY_NOTICE}</p>
+  const [initial] = useState(() => toEditable(value))
+  const [draft, setDraft] = useState(initial.text)
   return (
     <textarea
       rows={rows}
       value={draft}
       spellCheck={false}
+      title={EDIT_HINT}
       onChange={(e) => {
         setDraft(e.target.value)
-        onChange(markupToRichText(e.target.value))
+        onChange(fromEditable(e.target.value, initial.objects))
       }}
     />
   )
 }
 
 function ParagraphField({ value, onChange }: { value: RichParagraph; onChange: (v: RichParagraph) => void }) {
-  const [draft, setDraft] = useState(() => paragraphToMarkup(value))
-  if (draft === null) return <p className="field-readonly">{READONLY_NOTICE}</p>
+  const [initial] = useState(() => paragraphToEditable(value))
+  const [draft, setDraft] = useState(initial.text)
   return (
     <input
       type="text"
       value={draft}
       spellCheck={false}
+      title={EDIT_HINT}
       onChange={(e) => {
         setDraft(e.target.value)
-        onChange(markupToParagraph(e.target.value))
+        onChange(paragraphFromEditable(e.target.value, initial.objects))
       }}
     />
   )
+}
+
+/** 删除选项后重新按 A、B、C…… 排序 */
+function relabel(options: Question['options']): Question['options'] {
+  return options.map((o, i) => ({ ...o, label: String.fromCharCode(65 + i) }))
 }
 
 function TextInput({ value, width, onChange }: { value: string; width?: string; onChange: (v: string) => void }) {

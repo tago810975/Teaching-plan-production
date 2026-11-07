@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import temml from 'temml'
+import { ommlToMathml } from '@core/math/omml-to-mathml'
 
 interface Props {
   latex?: string
@@ -7,9 +8,13 @@ interface Props {
   display?: boolean
 }
 
+/** 转换结果缓存：同一公式在预览和测量区各渲染一次，教学案中也常有重复公式 */
+const ommlCache = new Map<string, string>()
+
 /**
- * 公式显示。LaTeX 经 temml 转为 MathML，由 Chromium 原生渲染。
- * 仅有 OMML 的公式（从 Word 导入且未修改）待导入模块完成 OMML → MathML 后接入。
+ * 公式显示，由 Chromium 原生渲染 MathML。
+ * - 软件中新建或修改过的公式：LaTeX 经 temml 转换。
+ * - 从 Word 导入且未修改的公式：OMML 经 omml-to-mathml 转换。
  */
 export const MathView = memo(function MathView({ latex, omml, display }: Props) {
   if (latex !== undefined) {
@@ -25,9 +30,15 @@ export const MathView = memo(function MathView({ latex, omml, display }: Props) 
     }
     return <span className="math" dangerouslySetInnerHTML={{ __html: html }} />
   }
-  return (
-    <span className="math-pending" title={omml === undefined ? '' : '从 Word 导入的公式，显示功能开发中'}>
-      [公式]
-    </span>
-  )
+  if (omml !== undefined) {
+    const key = `${display === true ? 'D' : 'I'}${omml}`
+    let html = ommlCache.get(key)
+    if (html === undefined) {
+      html = ommlToMathml(omml, display === true).mathml
+      if (ommlCache.size > 5000) ommlCache.clear()
+      ommlCache.set(key, html)
+    }
+    return <span className={display === true ? 'math math--display' : 'math'} dangerouslySetInnerHTML={{ __html: html }} />
+  }
+  return null
 })

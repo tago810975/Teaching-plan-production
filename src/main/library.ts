@@ -13,6 +13,7 @@ import { createEmptyBundle } from '@core/model/factory'
 import { decodeSummary } from '@core/project-file/codec'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import { withTemplateDefaults } from '@core/template/defaults'
+import type { Asset, Block } from '@core/model/types'
 import type { LibraryListing, OpenedProject, ProjectListItem } from '@shared/ipc'
 import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project-io'
 import { readTemplateDefaults } from './template-io'
@@ -133,7 +134,12 @@ async function scanDir(dir: string, depth: number): Promise<string[]> {
 
 // ---------- 新建 ----------
 
-export async function createProject(title: string, dir: string | null, templateId: string): Promise<OpenedProject> {
+export async function createProject(
+  title: string,
+  dir: string | null,
+  templateId: string,
+  content?: { blocks: Block[]; assets: Record<string, Asset> }
+): Promise<OpenedProject> {
   const targetDir = dir ?? (await getLibraryDir())
   await mkdir(targetDir, { recursive: true })
   const filePath = await uniquePath(targetDir, sanitizeFileName(title))
@@ -142,6 +148,10 @@ export async function createProject(title: string, dir: string | null, templateI
   const bundle = withTemplateDefaults(createEmptyBundle(), defaults)
   bundle.project.meta.title = title.trim() === '' ? '未命名教学案' : title.trim()
   bundle.project.templateId = templateId
+  if (content !== undefined) {
+    bundle.project.blocks = content.blocks
+    bundle.assets = { ...bundle.assets, ...content.assets }
+  }
 
   await writeProjectFile(filePath, bundle, app.getVersion())
   await addRecent(filePath)

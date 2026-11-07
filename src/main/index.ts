@@ -7,10 +7,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { basename, join } from 'node:path'
 import { ProjectFileError } from '@core/project-file/codec'
+import { DocxReadError } from '@core/import/docx-reader'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import { IPC, type MenuCommand, type OpenedProject, type Result, type SaveRequest } from '@shared/ipc'
 import { buildAppMenu } from './menu'
 import { readTemplateDefaults } from './template-io'
+import { importDocxFiles } from './import-io'
 import {
   ensureProjectExtension,
   isProjectFilePath,
@@ -203,6 +205,29 @@ function registerIpc(): void {
 
   ipcMain.on(IPC.revealInFolder, (_event, filePath: string) => shell.showItemInFolder(filePath))
 
+  ipcMain.handle(IPC.importDocx, async (event) => {
+    const paths = await pickDocx(event.sender, true)
+    if (paths.length === 0) return { ok: true, value: null }
+    try {
+      return { ok: true, value: await importDocxFiles(paths) }
+    } catch (err) {
+      return { ok: false, error: describeError(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.createFromDocx, async (event, templateId: string) => {
+    const paths = await pickDocx(event.sender, false)
+    if (paths.length === 0) return { ok: true, value: null }
+    try {
+      const imported = await importDocxFiles(paths)
+      const title = imported.firstTitle ?? basename(paths[0]!).replace(/\.docx$/i, '')
+      const opened = await createProject(title, null, templateId, imported)
+      return { ok: true, value: { opened, report: imported.report } }
+    } catch (err) {
+      return { ok: false, error: describeError(err) }
+    }
+  })
+
   ipcMain.handle(IPC.saveProject, async (event, req: SaveRequest): Promise<Result<string | null>> => {
     let target = req.filePath
     if (target === null || req.saveAs) {
@@ -255,7 +280,7 @@ async function openAt(filePath: string): Promise<Result<OpenedProject>> {
 }
 
 function describeError(err: unknown): string {
-  if (err instanceof ProjectFileError) return err.message
+  if (err instanceof ProjectFileError || err instanceof DocxReadError) return err.message
   const code = (err as NodeJS.ErrnoException | undefined)?.code
   switch (code) {
     case 'ENOENT':
@@ -280,4 +305,15 @@ async function pickFolder(sender: Electron.WebContents, title: string, defaultPa
   const options = { title, defaultPath, properties: ['openDirectory' as const, 'createDirectory' as const] }
   const picked = win !== null ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
   return picked.canceled ? null : (picked.filePaths[0] ?? null)
+}
+
+async function pickDocx(sender: Electron.WebContents, multiple: boolean): Promise<string[]> {
+  const win = BrowserWindow.fromWebContents(sender)
+  const options: Electron.OpenDialogOptions = {
+    title: '选择 Word 题目文档',
+    filters: [{ name: 'Word 文档', extensions: ['docx'] }],
+    properties: multiple ? ['openFile', 'multiSelections'] : ['openFile']
+  }
+  const picked = win !== null ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+  return picked.canceled ? [] : picked.filePaths
 }

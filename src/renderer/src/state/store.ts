@@ -34,6 +34,10 @@ export type EditorAction =
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   | { type: 'delete-block'; blockId: string }
   | { type: 'set-title'; title: string }
+  /** 添加图片资源（题图等），不改变内容 */
+  | { type: 'add-asset'; asset: Asset }
+  /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
+  | { type: 'insert-blocks'; blocks: Block[]; assets?: Record<string, Asset>; afterBlockId: string | null }
   /** 修改页眉文字或图片；image 为 null 表示移除该图片，asset 为新图片的资源 */
   | {
       type: 'update-header'
@@ -93,6 +97,21 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       }
       const next = touch(state, { ...project, header })
       return { ...next, bundle: { ...next.bundle, assets: nextAssets } }
+    }
+    case 'add-asset':
+      return { ...state, bundle: { ...state.bundle, assets: { ...state.bundle.assets, [action.asset.id]: action.asset } } }
+    case 'insert-blocks': {
+      if (action.blocks.length === 0) return state
+      const next = withBlocks(state, (blocks) => {
+        const i = action.afterBlockId === null ? -1 : blocks.findIndex((b) => b.id === action.afterBlockId)
+        const at = i === -1 ? blocks.length : i + 1
+        return [...blocks.slice(0, at), ...action.blocks, ...blocks.slice(at)]
+      })
+      return {
+        ...next,
+        selectedBlockId: action.blocks[0]!.id,
+        bundle: { ...next.bundle, assets: { ...next.bundle.assets, ...action.assets } }
+      }
     }
     case 'set-title': {
       const { project } = state.bundle

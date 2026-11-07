@@ -80,12 +80,21 @@ export function Preview({
     return () => observer.disconnect()
   }, [pageWidthPt])
 
-  // 在大纲中选中时，把对应内容滚动到可见位置
+  // 在大纲中选中（或新添加）内容时，把它滚动到可见位置。
+  // 新内容要等重新排版后才出现在页面上，所以选中变化时先记下，排版完成后再滚动。
+  const pendingScrollRef = useRef<string | null>(null)
   useEffect(() => {
-    if (selectedBlockId === null) return
-    const target = scrollRef.current?.querySelector(`.page [data-block-id="${CSS.escape(selectedBlockId)}"]`)
-    target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    pendingScrollRef.current = selectedBlockId
   }, [selectedBlockId])
+  useEffect(() => {
+    const id = pendingScrollRef.current
+    if (id === null) return
+    const target = scrollRef.current?.querySelector(`.page [data-block-id="${CSS.escape(id)}"]`)
+    if (target !== null && target !== undefined) {
+      target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      pendingScrollRef.current = null
+    }
+  }, [selectedBlockId, layout])
 
   const bodyStyle: CSSProperties = {
     position: 'absolute',

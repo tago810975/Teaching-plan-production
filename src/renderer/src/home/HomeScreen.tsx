@@ -10,9 +10,10 @@ interface Props {
   onOpenOther: () => void
   onNew: () => void
   onOpenDemo: () => void
+  onCreateFromDocx: () => void
 }
 
-export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo }: Props) {
+export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFromDocx }: Props) {
   const [listing, setListing] = useState<LibraryListing | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -53,6 +54,9 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo }: Props) {
         <div className="home-actions">
           <button type="button" className="primary" onClick={onNew}>
             新建教学案
+          </button>
+          <button type="button" onClick={onCreateFromDocx} title="识别 Word 文档中的题目，生成一份新的教学案">
+            从 Word 文档新建…
           </button>
           <button type="button" onClick={onOpenOther}>
             打开其他位置的教学案…

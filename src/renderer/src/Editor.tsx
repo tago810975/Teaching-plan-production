@@ -4,7 +4,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
 import type { Variant } from '@core/model/types'
+import { AddMenu } from './AddMenu'
 import { ErrorBanner } from './ErrorBanner'
+import { ImportNotice } from './ImportNotice'
+import type { ImportReport } from '@shared/ipc'
+import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
@@ -18,6 +22,9 @@ interface Props {
   files: ProjectFileActions
   error: string | null
   onDismissError: () => void
+  importReport: ImportReport | null
+  onImportReport: (report: ImportReport | null) => void
+  onError: (message: string) => void
 }
 
 const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
@@ -25,7 +32,7 @@ const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
   ['student', '学生版（学案）']
 ]
 
-export function Editor({ state, dispatch, files, error, onDismissError }: Props) {
+export function Editor({ state, dispatch, files, error, onDismissError, importReport, onImportReport, onError }: Props) {
   const { project, assets } = state.bundle
 
   // 预览使用延迟值：快速输入时优先保证输入框流畅，预览稍后跟上
@@ -56,6 +63,19 @@ export function Editor({ state, dispatch, files, error, onDismissError }: Props)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [dispatch])
+
+  /** 插入位置：选中内容之后；未选中或选中页眉时放在末尾 */
+  const insertAfter = selectedBlock?.id ?? null
+  const addBlock = (block: Block): void => dispatch({ type: 'insert-blocks', blocks: [block], afterBlockId: insertAfter })
+  const importWord = async (): Promise<void> => {
+    const result = await window.api.importDocx()
+    if (!result.ok) onError(result.error)
+    else if (result.value !== null) {
+      const { blocks, assets, report } = result.value
+      dispatch({ type: 'insert-blocks', blocks, assets, afterBlockId: insertAfter })
+      onImportReport(report)
+    }
+  }
 
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
@@ -92,6 +112,10 @@ export function Editor({ state, dispatch, files, error, onDismissError }: Props)
         </div>
 
         <div className="toolbar-actions">
+          <AddMenu onAdd={addBlock} />
+          <button type="button" onClick={() => void importWord()} title="识别 Word 文档中的题目，插入到当前选中内容之后">
+            导入 Word 题目…
+          </button>
           <span className="page-count">共 {pageCount} 页</span>
           <button type="button" className="primary" onClick={() => void files.save()}>
             保存
@@ -100,6 +124,7 @@ export function Editor({ state, dispatch, files, error, onDismissError }: Props)
       </header>
 
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
+      {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
 
       <main className="workspace">
         <Outline
