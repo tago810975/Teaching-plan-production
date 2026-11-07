@@ -1,10 +1,12 @@
 /**
  * 编辑界面：工具栏 + 大纲 / 分页预览 / 属性面板。
  */
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type Dispatch } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
 import type { Variant } from '@core/model/types'
 import { AddMenu } from './AddMenu'
+import { Splitter } from './layout/Splitter'
+import { usePanelWidths } from './layout/usePanelWidths'
 import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
@@ -59,6 +61,24 @@ function EditorBody({
   onExportOpenChange
 }: Props) {
   const [exportedFiles, setExportedFiles] = useState<string[] | null>(null)
+  const { widths: panelWidths, setWidth: setPanelWidth, reset: resetPanel } = usePanelWidths()
+  const panelWidthsRef = useRef(panelWidths)
+  panelWidthsRef.current = panelWidths
+  const workspaceRef = useRef<HTMLElement>(null)
+  const [workspaceWidth, setWorkspaceWidth] = useState(0)
+  useEffect(() => {
+    const el = workspaceRef.current
+    if (el === null) return
+    const observer = new ResizeObserver(([entry]) => {
+      const total = entry?.contentRect.width ?? 0
+      setWorkspaceWidth(total)
+      // 窗口变窄时，两侧栏让出空间，保证预览区不被挤没
+      setPanelWidth('left', panelWidthsRef.current.left, total)
+      setPanelWidth('right', panelWidthsRef.current.right, total)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [setPanelWidth])
   const openFormula = useOpenFormulaEditor()
 
   /** 在预览中点击公式：打开编辑器。导入的公式先转为 LaTeX；未修改则保留原始 Word 公式 */
@@ -189,7 +209,11 @@ function EditorBody({
         />
       )}
 
-      <main className="workspace">
+      <main
+        ref={workspaceRef}
+        className="workspace"
+        style={{ gridTemplateColumns: `${panelWidths.left}px minmax(0, 1fr) ${panelWidths.right}px` }}
+      >
         <Outline
           blocks={project.blocks}
           questionNumbers={questionNumbers}
@@ -213,6 +237,20 @@ function EditorBody({
           assetUrls={assetUrls}
           dispatch={dispatch}
           revision={state.revision}
+        />
+        <Splitter
+          side="left"
+          width={panelWidths.left}
+          position={panelWidths.left}
+          onResize={(w, total) => setPanelWidth('left', w, total)}
+          onReset={() => resetPanel('left')}
+        />
+        <Splitter
+          side="right"
+          width={panelWidths.right}
+          position={workspaceWidth - panelWidths.right}
+          onResize={(w, total) => setPanelWidth('right', w, total)}
+          onReset={() => resetPanel('right')}
         />
       </main>
     </div>

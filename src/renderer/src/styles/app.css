@@ -153,10 +153,57 @@ textarea {
 }
 
 .workspace {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 250px 1fr 360px;
+  /* 列宽由 Editor 按可调宽度设置 */
+  grid-template-columns: 250px minmax(0, 1fr) 360px;
+}
+
+/* ---------- 栏间分隔条 ---------- */
+
+.splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 7px;
+  /* 拖拽区主要落在边界右侧：边界左侧是大纲栏与预览区的滚动条，避免误抓 */
+  margin-left: -1px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1px;
+  width: 1px;
+  background: transparent;
+  transition: background-color 0.12s;
+}
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter.is-dragging::after {
+  left: 0;
+  width: 3px;
+  background: var(--focus);
+}
+.splitter:focus-visible {
+  outline: none;
+}
+/* 拖动时整个窗口保持调整光标，且不选中文字 */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .splitter::after {
+    transition: none;
+  }
 }
 
 /* ---------- 面板 ---------- */
