@@ -113,8 +113,14 @@ function node(el: Element): string {
         .join('')
       return `<m:m><m:mPr><m:mcs><m:mc><m:mcPr><m:count m:val="${cols}"/><m:mcJc m:val="center"/></m:mcPr></m:mc></m:mcs></m:mPr>${mrs}</m:m>`
     }
-    case 'menclose':
+    case 'menclose': {
+      // temml 用 menclose 表示 \overline（top）与 \underline（bottom）
+      const notation = el.getAttribute('notation') ?? 'box'
+      if (notation === 'top' || notation === 'bottom') {
+        return `<m:bar><m:barPr><m:pos m:val="${notation === 'top' ? 'top' : 'bot'}"/></m:barPr><m:e>${seq(kids)}</m:e></m:bar>`
+      }
       return `<m:borderBox><m:e>${seq(kids)}</m:e></m:borderBox>`
+    }
     default:
       return seq(kids)
   }

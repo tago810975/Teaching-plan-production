@@ -218,3 +218,14 @@
   display: flow-root;
   clip-path: inset(0 -24pt 0 -24pt);
 }
+
+/* 预览中可编辑的公式 */
+.math--editable {
+  cursor: pointer;
+  border-radius: 2pt;
+}
+.math--editable:hover,
+.math--editable:focus-visible {
+  background-color: rgba(47, 111, 181, 0.12);
+  outline: 0.75pt solid rgba(47, 111, 181, 0.45);
+}

@@ -3,7 +3,8 @@
  * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
  */
 import { createEmptyBundle } from '@core/model/factory'
-import type { Asset, Block, PageHeader, ProjectBundle, ProjectLayout, Variant } from '@core/model/types'
+import type { InlineRef } from '@core/document/ir'
+import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, Variant } from '@core/model/types'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -23,6 +24,11 @@ export interface EditorState {
   /** 预览显示的版本 */
   variant: Variant
   selectedBlockId: string | null
+  /**
+   * 内容在属性面板之外被修改的次数（如在预览中编辑公式）。
+   * 属性面板的输入框以它作为 key 的一部分，变化时重新读取内容。
+   */
+  revision: number
 }
 
 export type EditorAction =
@@ -37,6 +43,8 @@ export type EditorAction =
   | { type: 'delete-block'; blockId: string }
   | { type: 'set-title'; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
+  /** 替换（inline 为 null 时删除）某个行内内容，如在预览中编辑的公式 */
+  | { type: 'replace-inline'; ref: InlineRef; inline: Inline | null }
   /** 添加图片资源（题图等），不改变内容 */
   | { type: 'add-asset'; asset: Asset }
   /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
@@ -49,7 +57,7 @@ export type EditorAction =
     }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
-  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null }
+  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0 }
 }
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
@@ -116,6 +124,13 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         bundle: { ...next.bundle, assets: { ...next.bundle.assets, ...action.assets } }
       }
     }
+    case 'replace-inline': {
+      const { ref, inline } = action
+      const next = withBlocks(state, (blocks) =>
+        blocks.map((b) => (b.id === ref.blockId ? (replaceAt(b, ref.path, inline) as Block) : b))
+      )
+      return { ...next, selectedBlockId: ref.blockId, revision: state.revision + 1 }
+    }
     case 'update-layout':
       return touch(state, { ...state.bundle.project, layout: action.layout })
     case 'set-title': {
@@ -141,4 +156,19 @@ function touch(state: EditorState, project: ProjectBundle['project']): EditorSta
       project: { ...project, meta: { ...project.meta, updatedAt: new Date().toISOString() } }
     }
   }
+}
+
+/**
+ * 按路径不可变地替换对象中的值。路径最后一项是数组下标时，value 为 null 表示删除该项。
+ */
+function replaceAt(obj: unknown, path: ReadonlyArray<string | number>, value: unknown): unknown {
+  const [head, ...rest] = path
+  if (head === undefined) return value
+  if (Array.isArray(obj)) {
+    const i = head as number
+    if (rest.length === 0 && value === null) return obj.filter((_, j) => j !== i)
+    return obj.map((item, j) => (j === i ? replaceAt(item, rest, value) : item))
+  }
+  const record = obj as Record<string, unknown>
+  return { ...record, [head]: replaceAt(record[head as string], rest, value) }
 }

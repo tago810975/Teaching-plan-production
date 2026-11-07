@@ -761,3 +761,105 @@ button.link.danger {
   display: flex;
   gap: 8px;
 }
+
+/* ---------- 公式编辑 ---------- */
+
+.text-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.text-field textarea {
+  align-self: stretch;
+}
+.text-field--inline {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.insert-formula.icon-button {
+  font-style: italic;
+  font-family: 'Times New Roman', serif;
+}
+
+.formula-dialog {
+  width: 640px;
+}
+.formula-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.formula-toolbar button {
+  min-width: 34px;
+  padding: 3px 6px;
+  font-family: 'Times New Roman', 'Cambria Math', serif;
+  font-size: 15px;
+}
+.formula-toolbar--symbols button {
+  min-width: 28px;
+  padding: 2px 4px;
+  font-size: 14px;
+}
+.formula-host {
+  margin: 8px 0;
+}
+.formula-field {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-size: 26px;
+}
+.formula-field:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.formula-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.formula-source {
+  margin-top: 8px;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 13px;
+}
+.dialog-actions-left {
+  margin-right: auto;
+}
+/*
+ * 数学键盘：弹窗打开时外面的内容不可点击，所以键盘放在弹窗内部的这个区域里。
+ * MathLive 的键盘需要容器有确定的尺寸。
+ */
+.formula-keyboard {
+  position: relative;
+  height: 0;
+  overflow: hidden;
+}
+.formula-keyboard {
+  /* MathLive 键盘的尺寸变量：按键稍矮，让整个键盘放进弹窗 */
+  --keycap-height: 38px;
+  --keycap-font-size: 18px;
+  --keycap-small-font-size: 13px;
+  --keyboard-padding-top: 4px;
+  --keyboard-padding-bottom: 6px;
+}
+.formula-keyboard.is-open {
+  height: 250px;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+.formula-dialog--keyboard {
+  width: 760px;
+  margin-top: 16px;
+}
+.formula-toolbar button {
+  white-space: nowrap;
+}

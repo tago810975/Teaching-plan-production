@@ -243,3 +243,18 @@ describe('预览分页', () => {
     ])
   })
 })
+
+describe('公式位置', () => {
+  it('预览中的公式记录了它在工程数据中的位置，可按位置找回原公式', async () => {
+    const { project } = await createDemoBundle()
+    const ir = buildDocument(project, 'teacher')
+    const refs = ir.paragraphs.flatMap((p) => p.runs.flatMap((r) => (r.kind === 'math' && r.ref !== undefined ? [r] : [])))
+    expect(refs.length).toBeGreaterThan(10)
+    for (const run of refs) {
+      const block = project.blocks.find((b) => b.id === run.ref!.blockId)!
+      let target: unknown = block
+      for (const key of run.ref!.path) target = (target as Record<string | number, unknown>)[key]
+      expect(target).toMatchObject({ type: 'math', latex: run.latex })
+    }
+  })
+})

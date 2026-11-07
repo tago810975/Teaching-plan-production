@@ -3,7 +3,8 @@
  *
  * 过渡期用“文字 + $公式$”的文本框编辑；接入 TipTap + MathLive 后替换各个 MarkupField。
  */
-import { useId, useState, type Dispatch, type ReactNode } from 'react'
+import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
+import { useOpenFormulaEditor } from '../formula/context'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { newId } from '@core/model/factory'
 import { FigureList } from './FigureList'
@@ -20,9 +21,11 @@ interface Props {
   layout: ProjectLayout | null
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
+  /** 内容在面板之外被修改时递增，用于让输入框重新读取内容 */
+  revision: number
 }
 
-export function Inspector({ block, header, layout, assetUrls, dispatch }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch, revision }: Props) {
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -58,7 +61,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch }: Props)
     <aside className="panel inspector" aria-label="属性">
       <h2 className="panel-title">{BLOCK_NAMES[block.type]}</h2>
       {/* key 保证切换选中项时各输入框重新初始化 */}
-      <div key={block.id} className="inspector-body">
+      <div key={`${block.id}:${revision}`} className="inspector-body">
         {block.type === 'question' ? (
           <QuestionForm
             block={block}
@@ -335,34 +338,79 @@ const EDIT_HINT = '公式写作 $LaTeX$，如 $\\frac{1}{2}mv^2$。⟦⟧ 中是
 function RichTextField({ value, rows, onChange }: { value: RichText; rows: number; onChange: (v: RichText) => void }) {
   const [initial] = useState(() => toEditable(value))
   const [draft, setDraft] = useState(initial.text)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const update = (text: string): void => {
+    setDraft(text)
+    onChange(fromEditable(text, initial.objects))
+  }
   return (
-    <textarea
-      rows={rows}
-      value={draft}
-      spellCheck={false}
-      title={EDIT_HINT}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        onChange(fromEditable(e.target.value, initial.objects))
-      }}
-    />
+    <div className="text-field">
+      <textarea
+        ref={ref}
+        rows={rows}
+        value={draft}
+        spellCheck={false}
+        title={EDIT_HINT}
+        onChange={(e) => update(e.target.value)}
+      />
+      <InsertFormulaButton target={ref} text={draft} onInsert={update} />
+    </div>
   )
 }
 
 function ParagraphField({ value, onChange }: { value: RichParagraph; onChange: (v: RichParagraph) => void }) {
   const [initial] = useState(() => paragraphToEditable(value))
   const [draft, setDraft] = useState(initial.text)
+  const ref = useRef<HTMLInputElement>(null)
+  const update = (text: string): void => {
+    setDraft(text)
+    onChange(paragraphFromEditable(text, initial.objects))
+  }
   return (
-    <input
-      type="text"
-      value={draft}
-      spellCheck={false}
-      title={EDIT_HINT}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        onChange(paragraphFromEditable(e.target.value, initial.objects))
+    <div className="text-field text-field--inline">
+      <input
+        ref={ref}
+        type="text"
+        value={draft}
+        spellCheck={false}
+        title={EDIT_HINT}
+        onChange={(e) => update(e.target.value)}
+      />
+      <InsertFormulaButton target={ref} text={draft} onInsert={update} compact />
+    </div>
+  )
+}
+
+/** 打开公式编辑器，把新公式以 $LaTeX$ 插入到光标位置 */
+function InsertFormulaButton(props: {
+  target: RefObject<HTMLTextAreaElement | HTMLInputElement | null>
+  text: string
+  onInsert: (text: string) => void
+  compact?: boolean
+}) {
+  const open = useOpenFormulaEditor()
+  if (open === null) return null
+  return (
+    <button
+      type="button"
+      className={props.compact === true ? 'icon-button insert-formula' : 'link insert-formula'}
+      title="插入公式"
+      aria-label="插入公式"
+      onClick={() => {
+        const el = props.target.current
+        const pos = el?.selectionStart ?? props.text.length
+        open({
+          mode: 'insert',
+          initialLatex: '',
+          initialDisplay: false,
+          onSave: (latex) => {
+            props.onInsert(`${props.text.slice(0, pos)}$${latex}$${props.text.slice(pos)}`)
+          }
+        })
       }}
-    />
+    >
+      {props.compact === true ? 'ƒx' : '插入公式…'}
+    </button>
   )
 }
 

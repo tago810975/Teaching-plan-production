@@ -8,6 +8,9 @@ import { AddMenu } from './AddMenu'
 import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
+import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
+import { ommlToLatex } from '@core/math/omml-to-latex'
+import type { MathRun } from './preview/DocParagraphView'
 import type { ImportReport } from '@shared/ipc'
 import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
@@ -35,7 +38,15 @@ const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
   ['student', '学生版（学案）']
 ]
 
-export function Editor({
+export function Editor(props: Props) {
+  return (
+    <FormulaEditorProvider>
+      <EditorBody {...props} />
+    </FormulaEditorProvider>
+  )
+}
+
+function EditorBody({
   state,
   dispatch,
   files,
@@ -48,6 +59,28 @@ export function Editor({
   onExportOpenChange
 }: Props) {
   const [exportedFiles, setExportedFiles] = useState<string[] | null>(null)
+  const openFormula = useOpenFormulaEditor()
+
+  /** 在预览中点击公式：打开编辑器。导入的公式先转为 LaTeX；未修改则保留原始 Word 公式 */
+  const editMath = useCallback(
+    (run: MathRun) => {
+      const ref = run.ref
+      if (ref === undefined || openFormula === null) return
+      const initialLatex = run.latex ?? (run.omml !== undefined ? ommlToLatex(run.omml).latex : '')
+      const initialDisplay = run.display === true
+      openFormula({
+        mode: 'edit',
+        initialLatex,
+        initialDisplay,
+        onSave: (latex, display) => {
+          if (latex === initialLatex && display === initialDisplay) return
+          dispatch({ type: 'replace-inline', ref, inline: { type: 'math', latex, ...(display ? { display: true } : {}) } })
+        },
+        onDelete: () => dispatch({ type: 'replace-inline', ref, inline: null })
+      })
+    },
+    [openFormula, dispatch]
+  )
   const { project, assets } = state.bundle
 
   // 预览使用延迟值：快速输入时优先保证输入框流畅，预览稍后跟上
@@ -171,6 +204,7 @@ export function Editor({
           onSelectHeader={selectHeader}
           headerSelected={headerSelected}
           onPageCount={setPageCount}
+          onEditMath={editMath}
         />
         <Inspector
           block={selectedBlock}
@@ -178,6 +212,7 @@ export function Editor({
           layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}
           dispatch={dispatch}
+          revision={state.revision}
         />
       </main>
     </div>

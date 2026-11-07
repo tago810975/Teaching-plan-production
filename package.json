@@ -19,6 +19,7 @@
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
     "jszip": "3.10.2",
+    "mathlive": "0.111.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "temml": "0.14.0",

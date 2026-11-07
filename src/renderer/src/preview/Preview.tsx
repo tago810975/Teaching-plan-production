@@ -10,7 +10,7 @@ import type { DocIR } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
-import { DocParagraphView } from './DocParagraphView'
+import { DocParagraphView, type MathRun } from './DocParagraphView'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
 const PT_TO_PX = 96 / 72
@@ -23,6 +23,7 @@ interface Props {
   onSelectHeader: () => void
   headerSelected: boolean
   onPageCount?: (count: number) => void
+  onEditMath?: (run: MathRun) => void
 }
 
 export function Preview({
@@ -32,7 +33,8 @@ export function Preview({
   onSelect,
   onSelectHeader,
   headerSelected,
-  onPageCount
+  onPageCount,
+  onEditMath
 }: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -155,6 +157,7 @@ export function Preview({
                     assetUrls={assetUrls}
                     selected={p.sourceBlockId === selectedBlockId}
                     onSelect={onSelect}
+                    {...(onEditMath !== undefined ? { onEditMath } : {})}
                   />
                 )
                 if (slice.from === 0 && slice.to === undefined) return view

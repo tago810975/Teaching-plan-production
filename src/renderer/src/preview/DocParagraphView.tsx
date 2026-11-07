@@ -12,13 +12,18 @@ interface Props {
   assetUrls: ReadonlyMap<string, string>
   selected: boolean
   onSelect?: (blockId: string) => void
+  /** 点击公式时调用；不提供则公式不可点击（如测量区） */
+  onEditMath?: (run: MathRun) => void
 }
+
+export type MathRun = Extract<DocRun, { kind: 'math' }>
 
 export const DocParagraphView = memo(function DocParagraphView({
   paragraph: p,
   assetUrls,
   selected,
-  onSelect
+  onSelect,
+  onEditMath
 }: Props) {
   const spec = STYLE_SPECS[p.style]
   const css = previewCss(spec)
@@ -91,9 +96,15 @@ export const DocParagraphView = memo(function DocParagraphView({
       {floating}
       {label}
       {p.tabStopsTwip === undefined ? (
-        renderRuns(p.runs, assetUrls)
+        renderRuns(p.runs, assetUrls, onEditMath)
       ) : (
-        <TabbedRuns runs={p.runs} stops={p.tabStopsTwip} indentTwip={spec.indentLeftTwip} assetUrls={assetUrls} />
+        <TabbedRuns
+          runs={p.runs}
+          stops={p.tabStopsTwip}
+          indentTwip={spec.indentLeftTwip}
+          assetUrls={assetUrls}
+          onEditMath={onEditMath}
+        />
       )}
     </div>
   )
@@ -105,6 +116,7 @@ function TabbedRuns(props: {
   stops: readonly number[]
   indentTwip: number
   assetUrls: ReadonlyMap<string, string>
+  onEditMath: ((run: MathRun) => void) | undefined
 }): ReactNode {
   const segments: DocRun[][] = [[]]
   for (const run of props.runs) {
@@ -122,7 +134,7 @@ function TabbedRuns(props: {
             className="tab-cell"
             style={width === undefined ? { flex: 1 } : { width: `${twipToPt(width)}pt` }}
           >
-            {renderRuns(seg, props.assetUrls)}
+            {renderRuns(seg, props.assetUrls, props.onEditMath)}
           </span>
         )
       })}
@@ -130,7 +142,11 @@ function TabbedRuns(props: {
   )
 }
 
-function renderRuns(runs: DocRun[], assetUrls: ReadonlyMap<string, string>): ReactNode[] {
+function renderRuns(
+  runs: DocRun[],
+  assetUrls: ReadonlyMap<string, string>,
+  onEditMath?: (run: MathRun) => void
+): ReactNode[] {
   return runs.map((run, i) => {
     switch (run.kind) {
       case 'text': {
@@ -150,7 +166,15 @@ function renderRuns(runs: DocRun[], assetUrls: ReadonlyMap<string, string>): Rea
         )
       }
       case 'math':
-        return <MathView key={i} latex={run.latex} omml={run.omml} display={run.display} />
+        return (
+          <MathView
+            key={i}
+            latex={run.latex}
+            omml={run.omml}
+            display={run.display}
+            {...(onEditMath !== undefined && run.ref !== undefined ? { onEdit: () => onEditMath(run) } : {})}
+          />
+        )
       case 'image':
         return (
           <img

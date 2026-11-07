@@ -44,7 +44,12 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
       case 'paragraph':
         if (block.onlyIn !== undefined && block.onlyIn !== variant) break
         block.content.forEach((p, i) => {
-          out.push({ key: `${block.id}:${i}`, sourceBlockId: block.id, style: 'body', runs: toRuns(p) })
+          out.push({
+            key: `${block.id}:${i}`,
+            sourceBlockId: block.id,
+            style: 'body',
+            runs: toRuns(p, { blockId: block.id, path: ['content', i] })
+          })
         })
         break
       case 'question':
@@ -75,6 +80,8 @@ function buildQuestion(
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
+  /** 题目中某段富文本的位置，供公式回写 */
+  const at = (...path: Array<string | number>): RefBase => ({ blockId, path: ['question', ...path] })
   const push = (p: Omit<DocParagraph, 'sourceBlockId'>): void => {
     paras.push({ ...p, sourceBlockId: blockId })
   }
@@ -82,7 +89,7 @@ function buildQuestion(
   // 题干：第一段带题号，难度标记写作【B】前缀
   const stem: RichText = q.stem.length > 0 ? q.stem : [{ inlines: [] }]
   stem.forEach((p, i) => {
-    const runs = toRuns(p)
+    const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined)
     if (i === 0 && q.difficulty !== undefined && q.difficulty !== '') {
       runs.unshift({ kind: 'text', text: `【${q.difficulty}】` })
     }
@@ -120,7 +127,7 @@ function buildQuestion(
       const runs: DocRun[] = []
       row.forEach((opt, j) => {
         if (j > 0) runs.push({ kind: 'tab' })
-        runs.push({ kind: 'text', text: `${opt.label}．` }, ...toRuns(opt.content))
+        runs.push({ kind: 'text', text: `${opt.label}．` }, ...toRuns(opt.content, at('options', q.options.indexOf(opt), 'content')))
       })
       push({
         key: key(`opt${i}`),
@@ -138,7 +145,7 @@ function buildQuestion(
         key: key(`sub${i}-${j}`),
         style: j === 0 ? 'subQuestion' : 'questionContinued',
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
-        runs: toRuns(p)
+        runs: toRuns(p, at('subQuestions', i, 'content', j))
       })
     })
   })
@@ -150,7 +157,12 @@ function buildQuestion(
   if (variant === 'teacher') {
     const teacherStart = paras.length
     q.answer.forEach((p, i) => {
-      push({ key: key(`ans${i}`), style: 'answer', ...(i === 0 ? { label: '【答案】' } : {}), runs: toRuns(p) })
+      push({
+        key: key(`ans${i}`),
+        style: 'answer',
+        ...(i === 0 ? { label: '【答案】' } : {}),
+        runs: toRuns(p, at('answer', i))
+      })
     })
     if (q.knowledgePoints.length > 0) {
       push(fixedLabelPara(key('kp'), 'knowledge', q.knowledgePoints.join('；')))
@@ -162,7 +174,7 @@ function buildQuestion(
       push(fixedLabelPara(key('diff'), 'difficultPoint', q.difficultPoint))
     }
     q.analysis.forEach((p, i) => {
-      push({ key: key(`ana${i}`), style: 'analysis', runs: toRuns(p) })
+      push({ key: key(`ana${i}`), style: 'analysis', runs: toRuns(p, at('analysis', i)) })
     })
     for (let i = teacherStart; i < paras.length; i++) paras[i]!.shaded = true
   }
@@ -256,14 +268,21 @@ function textWidth(text: string): number {
 
 // ---------------- 工具函数 ----------------
 
-function toRuns(p: RichParagraph): DocRun[] {
-  return p.inlines.map((i): DocRun => {
+interface RefBase {
+  blockId: string
+  path: Array<string | number>
+}
+
+/** 行内内容 → DocRun；提供 base 时为公式记下其在工程数据中的位置 */
+function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
+  return p.inlines.map((i, index): DocRun => {
     switch (i.type) {
       case 'text':
         return { kind: 'text', text: i.text, ...(i.marks !== undefined ? { marks: i.marks } : {}) }
       case 'math': {
         const { type: _type, ...rest } = i
-        return { kind: 'math', ...rest }
+        const ref = base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }
+        return { kind: 'math', ...rest, ...(ref !== undefined ? { ref } : {}) }
       }
       case 'image':
         return { kind: 'image', assetId: i.assetId, widthEmu: i.widthEmu, heightEmu: i.heightEmu }

@@ -12,9 +12,18 @@ import type { MathInline, PageHeader, TextMarks, Variant } from '../model/types'
 import type { StyleKey } from './styles'
 import type { PageSetup } from './units'
 
+/**
+ * 行内内容在工程数据中的位置：所在块的 ID，以及从块对象出发的属性路径，
+ * 如 ['question', 'stem', 0, 'inlines', 3]。用于在预览中点击公式后修改原数据。
+ */
+export interface InlineRef {
+  blockId: string
+  path: ReadonlyArray<string | number>
+}
+
 export type DocRun =
   | { kind: 'text'; text: string; marks?: TextMarks }
-  | ({ kind: 'math' } & Omit<MathInline, 'type'>)
+  | ({ kind: 'math'; ref?: InlineRef } & Omit<MathInline, 'type'>)
   | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number }
   | { kind: 'blank'; widthChars: number }
   /** 制表符，用于选项分列 */
