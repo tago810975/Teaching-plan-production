@@ -5,6 +5,7 @@ import { readDocx } from '@core/import/docx-reader'
 import { latexToOmml } from '@core/math/mathml-to-omml'
 import { ommlToLatex } from '@core/math/omml-to-latex'
 import { ommlToMathml } from '@core/math/omml-to-mathml'
+import { TEMPLATE_GROUPS, templateFilled, templatePreview } from '@core/math/templates'
 
 /** 公式中可见的文字（字母、数字、符号），用于比较往返前后是否丢失内容 */
 const visible = (omml: string): string =>
@@ -59,5 +60,28 @@ describe('LaTeX → OMML', () => {
   it('上划线与下划线', () => {
     expect(latexToOmml('\\overline{AB}')).toContain('<m:pos m:val="top"/>')
     expect(latexToOmml('\\underline{AB}')).toContain('<m:pos m:val="bot"/>')
+  })
+})
+
+
+describe('公式模板库', () => {
+  const all = TEMPLATE_GROUPS.flatMap((g) => [
+    { group: g.label, latex: g.icon, title: '（图标）' },
+    ...g.templates.map((tpl) => ({ group: g.label, ...tpl }))
+  ])
+
+  it('分类与 WPS 一致且没有重复的 id', () => {
+    expect(new Set(TEMPLATE_GROUPS.map((g) => g.id)).size).toBe(TEMPLATE_GROUPS.length)
+    expect(TEMPLATE_GROUPS.map((g) => g.label)).toEqual([
+      '常用公式', '分数', '上下标', '根式', '积分', '大型运算符', '括号',
+      '函数', '导数符号', '极限和对数', '运算符', '箭头', '希腊字母', '矩阵'
+    ])
+  })
+
+  it.each(all)('$group · $title：预览可渲染，填写后可导出为 Word 公式', ({ latex }) => {
+    expect(() => temml.renderToString(templatePreview(latex), { throwOnError: true })).not.toThrow()
+    const filled = templateFilled(latex)
+    const omml = latexToOmml(filled)
+    expect(ommlToMathml(omml).unknown).toEqual([])
   })
 })

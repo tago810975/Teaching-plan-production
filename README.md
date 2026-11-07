@@ -17,6 +17,10 @@ npm run dist:win   # 打包 Windows 安装程序，输出到 release/
 
 ## 常见问题
 
+**启动时报错 `Failed to resolve import "xxx"`**
+
+代码新增了依赖库，而本地还没有安装。每次 `git pull` 之后都执行一次 `npm install`（依赖没有变化时几秒钟就结束）。
+
 **启动时报错 `Error: Electron uninstall`**
 
 Electron 的主程序（约 100 MB）在 `npm install` 的最后一步从 GitHub 下载，网络不通时会静默失败。指定国内镜像后单独重新下载即可：

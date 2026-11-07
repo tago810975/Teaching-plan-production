@@ -786,24 +786,107 @@ button.link.danger {
 }
 
 .formula-dialog {
-  width: 640px;
+  width: 960px;
+  max-width: calc(100vw - 32px);
+  /* 模板面板会伸出弹窗底部，不能被裁切 */
+  overflow: visible;
 }
-.formula-toolbar {
+
+/* ---------- 公式工具栏（仿 WPS） ---------- */
+
+.ftb {
+  position: relative;
+  margin: 0 -8px 4px;
+}
+.ftb-groups {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.ftb-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 50px;
+  padding: 4px 4px 3px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+}
+.ftb-group:hover,
+.ftb-group.is-open {
+  background: #e6ebe9;
+}
+.ftb-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  color: var(--ink);
+}
+.ftb-icon .ftb-math {
+  font-size: 17px;
+}
+/* 矩阵、求和等图标较高，缩小一些以免撑高按钮 */
+.ftb-icon math {
+  max-height: 30px;
+}
+.ftb-label {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.ftb-caret {
+  margin-left: 2px;
+  font-size: 10px;
+  color: var(--ink-soft);
+}
+.ftb-math math {
+  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', math;
+}
+
+.ftb-panel {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 8px;
+  z-index: 30;
+  max-width: calc(100% - 16px);
+  padding: 8px 10px 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(31, 42, 46, 0.2);
+}
+.ftb-panel-title {
   margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
 }
-.formula-toolbar button {
-  min-width: 34px;
-  padding: 3px 6px;
-  font-family: 'Times New Roman', 'Cambria Math', serif;
-  font-size: 15px;
+.ftb-grid {
+  display: grid;
+  gap: 4px;
 }
-.formula-toolbar--symbols button {
-  min-width: 28px;
-  padding: 2px 4px;
-  font-size: 14px;
+.ftb-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #f6f8f7;
+}
+.ftb-item:hover,
+.ftb-item:focus-visible {
+  border-color: var(--rule);
+  background: #fff;
+}
+.ftb-item .ftb-math {
+  font-size: 17px;
 }
 .formula-host {
   margin: 8px 0;
@@ -861,6 +944,7 @@ button.link.danger {
   width: 760px;
   margin-top: 16px;
 }
-.formula-toolbar button {
-  white-space: nowrap;
+/* 面板中的模板用正常大小的分数、上下限，便于辨认（工具栏图标保持紧凑） */
+.ftb-item math {
+  math-style: normal;
 }

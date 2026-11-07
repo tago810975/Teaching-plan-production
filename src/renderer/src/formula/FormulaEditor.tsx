@@ -1,13 +1,14 @@
 /**
  * 公式编辑器：基于 MathLive 的可视化编辑，所见即所得。
  *
- * - 常用模板按钮：分数、根号、上下标、矢量、上划线，以及物理常用符号；
+ * - 工具栏仿照 WPS 公式编辑器：按类别展开模板面板，模板直接显示为公式；
  * - 数学键盘：屏幕上的符号键盘，可随时打开；
  * - LaTeX 源码：熟悉 LaTeX 时可直接修改，与可视化编辑同步。
  */
 import { useEffect, useRef, useState } from 'react'
 import { MathfieldElement } from 'mathlive'
 import 'mathlive/fonts.css'
+import { FormulaToolbar } from './FormulaToolbar'
 
 // 字体由上面的 CSS 随程序一起打包，不再动态加载；不使用按键音效
 MathfieldElement.fontsDirectory = null
@@ -24,53 +25,6 @@ export interface FormulaEditorProps {
   onCancel: () => void
 }
 
-/** 模板按钮：#? 为占位符，#@ 表示当前选中的内容 */
-const TEMPLATES: ReadonlyArray<readonly [label: string, latex: string, title: string]> = [
-  ['a⁄b', '\\frac{#@}{#?}', '分数'],
-  ['√', '\\sqrt{#@}', '根号'],
-  ['ⁿ√', '\\sqrt[#?]{#@}', 'n 次根号'],
-  ['x²', '#@^{#?}', '上标'],
-  ['x₂', '#@_{#?}', '下标'],
-  ['矢量', '\\vec{#@}', '矢量'],
-  ['线段', '\\overline{#@}', '上划线（线段）'],
-  ['( )', '\\left(#@\\right)', '括号'],
-  ['Σ', '\\sum_{#?}^{#?}#?', '求和'],
-  ['∫', '\\int_{#?}^{#?}#?', '积分'],
-  ['sin', '\\sin #?', '正弦'],
-  ['cos', '\\cos #?', '余弦']
-]
-
-const SYMBOLS: ReadonlyArray<readonly [label: string, latex: string]> = [
-  ['×', '\\times'],
-  ['·', '\\cdot'],
-  ['÷', '\\div'],
-  ['±', '\\pm'],
-  ['≤', '\\le'],
-  ['≥', '\\ge'],
-  ['≠', '\\ne'],
-  ['≈', '\\approx'],
-  ['∝', '\\propto'],
-  ['°', '^{\\circ}'],
-  ['→', '\\rightarrow'],
-  ['∞', '\\infty'],
-  ['Δ', '\\Delta'],
-  ['θ', '\\theta'],
-  ['α', '\\alpha'],
-  ['β', '\\beta'],
-  ['γ', '\\gamma'],
-  ['λ', '\\lambda'],
-  ['μ', '\\mu'],
-  ['ρ', '\\rho'],
-  ['ω', '\\omega'],
-  ['φ', '\\varphi'],
-  ['ε', '\\varepsilon'],
-  ['π', '\\pi'],
-  ['Ω', '\\Omega']
-]
-
-/** 点击模板按钮时不让公式框失去焦点，插入后可以直接继续输入 */
-const keepFocus = (e: { preventDefault: () => void }): void => e.preventDefault()
-
 export function FormulaEditor({ initialLatex, initialDisplay, mode, onSave, onDelete, onCancel }: FormulaEditorProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
@@ -80,6 +34,9 @@ export function FormulaEditor({ initialLatex, initialDisplay, mode, onSave, onDe
   const [display, setDisplay] = useState(initialDisplay)
   const [showSource, setShowSource] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  /** 模板面板打开时，Esc 只关闭面板，不关闭整个弹窗 */
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [closePanels, setClosePanels] = useState(0)
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -130,6 +87,13 @@ export function FormulaEditor({ initialLatex, initialDisplay, mode, onSave, onDe
     }
   }
 
+  /** Esc 逐层退出：先关模板面板，再收起数学键盘，最后关闭编辑器 */
+  const escape = (): void => {
+    if (panelOpen) setClosePanels((n) => n + 1)
+    else if (keyboardOpen) toggleKeyboard()
+    else onCancel()
+  }
+
   const empty = latex.trim() === ''
 
   return (
@@ -139,25 +103,19 @@ export function FormulaEditor({ initialLatex, initialDisplay, mode, onSave, onDe
       aria-labelledby="formula-title"
       onCancel={(e) => {
         e.preventDefault()
-        onCancel()
+        escape()
+      }}
+      onKeyDownCapture={(e) => {
+        // 公式框获得焦点时 MathLive 会自行处理 Esc，所以在捕获阶段先拦下
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        e.stopPropagation()
+        escape()
       }}
     >
       <h2 id="formula-title">{mode === 'insert' ? '插入公式' : '编辑公式'}</h2>
 
-      <div className="formula-toolbar" role="toolbar" aria-label="公式模板">
-        {TEMPLATES.map(([label, tex, title]) => (
-          <button key={title} type="button" title={title} aria-label={title} onMouseDown={keepFocus} onClick={() => insert(tex)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="formula-toolbar formula-toolbar--symbols" role="toolbar" aria-label="常用符号">
-        {SYMBOLS.map(([label, tex]) => (
-          <button key={tex} type="button" title={tex} onMouseDown={keepFocus} onClick={() => insert(tex)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <FormulaToolbar onInsert={insert} onOpenChange={setPanelOpen} closeRequest={closePanels} />
 
       <div ref={hostRef} className="formula-host" />
 
