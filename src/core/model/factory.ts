@@ -28,13 +28,8 @@ export const DEFAULT_QUESTION_LAYOUT: Readonly<QuestionLayout> = Object.freeze({
 export function createEmptyProject(now: Date = new Date()): Project {
   const stamp = now.toISOString()
   return {
-    meta: {
-      title: '未命名教学案',
-      headerLeft: '',
-      headerRight: '',
-      createdAt: stamp,
-      updatedAt: stamp
-    },
+    meta: { title: '未命名教学案', createdAt: stamp, updatedAt: stamp },
+    header: { left: '', phone: '', right: '' },
     templateId: DEFAULT_TEMPLATE_ID,
     blocks: []
   }

@@ -9,7 +9,7 @@ const opts = { appVersion: '0.1.0-test', now: new Date('2026-11-07T00:00:00Z') }
 
 describe('工程文件编解码', () => {
   it('演示工程保存后再读取，内容完全一致', async () => {
-    const bundle = await createDemoBundle(new Date('2026-11-07T00:00:00Z'))
+    const bundle = await createDemoBundle(undefined, new Date('2026-11-07T00:00:00Z'))
     const decoded = await decodeBundle(await encodeBundle(bundle, opts))
     expect(decoded.project).toEqual(bundle.project)
     expect(Object.keys(decoded.assets)).toEqual(Object.keys(bundle.assets))
@@ -26,6 +26,16 @@ describe('工程文件编解码', () => {
     expect(view.getUint16(8, true)).toBe(0)
     const nameLen = view.getUint16(26, true)
     expect(new TextDecoder().decode(bytes.subarray(30, 30 + nameLen))).toBe('mimetype')
+  })
+
+  it('页眉图片随工程保存', async () => {
+    const bundle = createEmptyBundle()
+    const logo = await createAsset(new Uint8Array([9, 9, 9]), 'image/png')
+    bundle.assets[logo.id] = logo
+    bundle.project.header.logo = { assetId: logo.id, widthEmu: 100, heightEmu: 50 }
+    const decoded = await decodeBundle(await encodeBundle(bundle, opts))
+    expect(decoded.assets[logo.id]?.data).toEqual(logo.data)
+    expect(decoded.project.header.logo).toEqual(bundle.project.header.logo)
   })
 
   it('保存时丢弃未被引用的资源', async () => {

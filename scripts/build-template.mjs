@@ -3,7 +3,9 @@
  *
  * 处理内容：
  * 1. 清空正文，只保留分节设置（纸张、页边距、页眉页脚引用）；
- * 2. 把页眉中的机构与课程文字替换为占位符 {{headerLeft}}、{{headerRight}}；
+ * 2. 把页眉文字替换为占位符 {{headerLeft}}、{{phone}}、{{headerRight}}，
+ *    并给页眉中的三张图片标上名称 tp:logo、tp:phone-icon、tp:watermark，
+ *    导出时据此替换为工程中的图片，或在工程未设置时删除；
  * 3. 删除正文图片及其关系，只保留页眉页脚用到的图片（Logo、水印）。
  *
  * 用法：node scripts/build-template.mjs
@@ -32,6 +34,15 @@ const headerPath = 'word/header1.xml'
 let header = await zip.file(headerPath).async('string')
 header = replaceRunTexts(header, ['墨帝教育', '秋', '季学期'], '{{headerLeft}}')
 header = replaceRunTexts(header, ['高二物理', '勤敏', '(', '教', '案)'], '{{headerRight}}')
+header = replaceRunTexts(header, ['134-8210-2204'], '{{phone}}')
+for (const [from, to] of [
+  ['图片 1', 'tp:logo'],
+  ['图片 2', 'tp:phone-icon'],
+  ['WordPictureWatermark56565', 'tp:watermark']
+]) {
+  if (!header.includes(`name="${from}"`)) throw new Error(`页眉中未找到图片：${from}`)
+  header = header.replace(`name="${from}"`, `name="${to}"`)
+}
 zip.file(headerPath, header)
 
 // 3. 只保留正文以外仍被引用的关系

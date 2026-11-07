@@ -8,7 +8,7 @@
  * 预览（React）和 Word 导出都只消费 DocIR，不再各自解释工程数据，
  * 这是保证“预览所见即导出所得”的核心约束：任何排版规则只能写在 build.ts 里。
  */
-import type { MathInline, TextMarks, Variant } from '../model/types'
+import type { MathInline, PageHeader, TextMarks, Variant } from '../model/types'
 import type { StyleKey } from './styles'
 import type { PageSetup } from './units'
 
@@ -63,6 +63,9 @@ export interface DocParagraph {
 export interface DocIR {
   variant: Variant
   page: PageSetup
-  header: { left: string; right: string }
+  /** 页眉；右侧文字已追加“(教案)”或“(学案)” */
+  header: PageHeader
+  /** 正文起点（twip），由页眉高度决定 */
+  bodyTopTwip: number
   paragraphs: DocParagraph[]
 }

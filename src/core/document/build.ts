@@ -14,6 +14,7 @@ import type {
   RichText,
   Variant
 } from '../model/types'
+import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun } from './ir'
 import { BODY_LINE_HEIGHT_TWIP, OPTION_TAB_STOPS, STYLE_SPECS, type StyleKey } from './styles'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
@@ -49,13 +50,12 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
     }
   }
 
+  const { header } = project
   return {
     variant,
     page: A4_PAGE,
-    header: {
-      left: project.meta.headerLeft,
-      right: project.meta.headerRight === '' ? '' : project.meta.headerRight + VARIANT_SUFFIX[variant]
-    },
+    header: { ...header, right: header.right === '' ? '' : header.right + VARIANT_SUFFIX[variant] },
+    bodyTopTwip: bodyTopTwip(header, A4_PAGE),
     paragraphs: out
   }
 }

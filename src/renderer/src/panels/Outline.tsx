@@ -4,7 +4,7 @@
 import type { Dispatch } from 'react'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
-import type { EditorAction } from '../state/store'
+import { HEADER_SELECTION, type EditorAction } from '../state/store'
 
 interface Props {
   blocks: Block[]
@@ -20,6 +20,15 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
   return (
     <nav className="panel outline" aria-label="大纲">
       <h2 className="panel-title">大纲</h2>
+      <div className="outline-fixed">
+        <button
+          type="button"
+          className={`outline-item outline-item--header${selectedBlockId === HEADER_SELECTION ? ' is-selected' : ''}`}
+          onClick={() => dispatch({ type: 'select', blockId: HEADER_SELECTION })}
+        >
+          <span className="outline-text">页眉与水印</span>
+        </button>
+      </div>
       {blocks.length === 0 ? (
         <p className="panel-empty">还没有内容。导入题目文档的功能完成后，可以从这里开始。</p>
       ) : (

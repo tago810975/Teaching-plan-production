@@ -6,6 +6,7 @@ import { createEmptyProject, createQuestion, newId, para } from '../model/factor
 import type { MathInline, ProjectBundle } from '../model/types'
 import { createAsset } from '../project-file/codec'
 import { cmToEmu } from '../document/units'
+import { withTemplateDefaults, type TemplateDefaults } from '../template/defaults'
 
 const m = (latex: string): MathInline => ({ type: 'math', latex })
 
@@ -27,11 +28,10 @@ ${[0, 1, 2, 3]
 <polygon points="68,90 78,95 68,100" fill="#2a7fd4"/>
 </svg>`
 
-export async function createDemoBundle(now?: Date): Promise<ProjectBundle> {
+/** defaults 为模板默认页眉；不传则页眉为空（测试中使用） */
+export async function createDemoBundle(defaults?: TemplateDefaults, now?: Date): Promise<ProjectBundle> {
   const project = createEmptyProject(now)
   project.meta.title = '动态圆专题'
-  project.meta.headerLeft = '墨帝教育秋季学期'
-  project.meta.headerRight = '高二物理勤敏'
 
   const figure = await createAsset(new TextEncoder().encode(FIGURE_SVG), 'image/svg+xml')
 
@@ -139,5 +139,6 @@ export async function createDemoBundle(now?: Date): Promise<ProjectBundle> {
     }
   ]
 
-  return { project, assets: { [figure.id]: figure } }
+  const bundle: ProjectBundle = { project, assets: { [figure.id]: figure } }
+  return defaults === undefined ? bundle : withTemplateDefaults(bundle, defaults)
 }

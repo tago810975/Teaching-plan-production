@@ -10,8 +10,6 @@
  * 与 Word 一致的规则：页面最后一段的段后间距可以超出页底（被截掉），
  * 不会因此把该段推到下一页。
  */
-import type { PageSetup } from './units'
-
 export interface MeasuredParagraph {
   /** 段落占用的高度（含段前段后间距），单位任意，与 pageHeight 一致即可 */
   height: number
@@ -68,16 +66,4 @@ export function paginate(items: readonly MeasuredParagraph[], pageHeight: number
     i = end + 1
   }
   return pages
-}
-
-/**
- * 预览中正文区域的位置（twip）。
- *
- * Word 中页眉较高时会把正文往下推，实际正文起点并不等于上页边距。
- * 以下数值按参考样例的页眉（含机构 Logo）实测得出，接入模板后改为按模板计算。
- */
-export function previewBodyFrame(page: PageSetup): { topTwip: number; bottomTwip: number; heightTwip: number } {
-  const topTwip = 1800
-  const bottomTwip = page.marginBottomTwip
-  return { topTwip, bottomTwip, heightTwip: page.heightTwip - topTwip - bottomTwip }
 }

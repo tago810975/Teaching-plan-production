@@ -10,6 +10,7 @@ import { ProjectFileError } from '@core/project-file/codec'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import { IPC, type MenuCommand, type OpenedProject, type Result, type SaveRequest } from '@shared/ipc'
 import { buildAppMenu } from './menu'
+import { readTemplateDefaults } from './template-io'
 import {
   ensureProjectExtension,
   isProjectFilePath,
@@ -132,6 +133,14 @@ function createWindow(): void {
 
 function registerIpc(): void {
   ipcMain.handle(IPC.getAppInfo, () => ({ version: app.getVersion(), platform: process.platform }))
+
+  ipcMain.handle(IPC.getTemplateDefaults, async (_event, templateId: string) => {
+    try {
+      return { ok: true, value: await readTemplateDefaults(templateId) }
+    } catch (err) {
+      return { ok: false, error: `读取模板“${templateId}”失败：${describeError(err)}` }
+    }
+  })
 
   ipcMain.handle(IPC.getStartupFile, () => {
     const file = pendingFile

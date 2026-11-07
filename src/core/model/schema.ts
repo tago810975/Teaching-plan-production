@@ -93,13 +93,25 @@ const block = z.discriminatedUnion('type', [
   z.object({ id: z.string(), type: z.literal('question'), question })
 ])
 
+const headerImage = z.object({
+  assetId: z.string(),
+  widthEmu: z.number().positive(),
+  heightEmu: z.number().positive()
+})
+
 export const projectSchema = z.object({
   meta: z.object({
     title: z.string(),
-    headerLeft: z.string(),
-    headerRight: z.string(),
     createdAt: z.string(),
     updatedAt: z.string()
+  }),
+  header: z.object({
+    logo: headerImage.optional(),
+    left: z.string(),
+    phoneIcon: headerImage.optional(),
+    phone: z.string(),
+    right: z.string(),
+    watermark: headerImage.optional()
   }),
   templateId: z.string(),
   blocks: z.array(block)

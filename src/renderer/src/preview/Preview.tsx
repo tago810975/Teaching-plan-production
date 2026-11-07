@@ -7,9 +7,10 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { DocIR } from '@core/document/ir'
-import { paginate, previewBodyFrame } from '@core/document/paginate'
+import { paginate } from '@core/document/paginate'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
 import { DocParagraphView } from './DocParagraphView'
+import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
 const PT_TO_PX = 96 / 72
 
@@ -18,10 +19,20 @@ interface Props {
   assetUrls: ReadonlyMap<string, string>
   selectedBlockId: string | null
   onSelect: (blockId: string) => void
+  onSelectHeader: () => void
+  headerSelected: boolean
   onPageCount?: (count: number) => void
 }
 
-export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount }: Props) {
+export function Preview({
+  ir,
+  assetUrls,
+  selectedBlockId,
+  onSelect,
+  onSelectHeader,
+  headerSelected,
+  onPageCount
+}: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<{ ir: DocIR; pages: number[][] } | null>(null)
@@ -29,7 +40,7 @@ export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount 
   const [zoom, setZoom] = useState(1)
 
   const { page } = ir
-  const frame = previewBodyFrame(page)
+  const bodyHeightTwip = page.heightTwip - ir.bodyTopTwip - page.marginBottomTwip
   const pageWidthPt = twipToPt(page.widthTwip)
   const pageHeightPt = twipToPt(page.heightTwip)
 
@@ -49,9 +60,9 @@ export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount 
       const spaceAfter = els[i] === undefined ? 0 : parseFloat(getComputedStyle(els[i]!).paddingBottom) || 0
       return { height: next - top, spaceAfter, keepNext: p.keepNext, pageBreakBefore: p.pageBreakBefore }
     })
-    const bodyHeightPx = twipToPt(frame.heightTwip) * PT_TO_PX
+    const bodyHeightPx = twipToPt(bodyHeightTwip) * PT_TO_PX
     setLayout({ ir, pages: paginate(items, bodyHeightPx) })
-  }, [ir, fontsReady, frame.heightTwip])
+  }, [ir, fontsReady, bodyHeightTwip])
 
   const pageCount = layout?.pages.length ?? 1
   useEffect(() => onPageCount?.(pageCount), [pageCount, onPageCount])
@@ -78,7 +89,7 @@ export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount 
 
   const bodyStyle: CSSProperties = {
     position: 'absolute',
-    top: `${twipToPt(frame.topTwip)}pt`,
+    top: `${twipToPt(ir.bodyTopTwip)}pt`,
     left: `${twipToPt(page.marginLeftTwip)}pt`,
     width: `${twipToPt(contentWidthTwip(page))}pt`
   }
@@ -104,16 +115,14 @@ export function Preview({ ir, assetUrls, selectedBlockId, onSelect, onPageCount 
             aria-label={`第 ${pageIndex + 1} 页`}
             style={{ width: `${pageWidthPt}pt`, height: `${pageHeightPt}pt` }}
           >
-            <header
-              className="page-header"
-              style={{
-                left: `${twipToPt(page.marginLeftTwip)}pt`,
-                right: `${twipToPt(page.marginRightTwip)}pt`
-              }}
-            >
-              <span>{ir.header.left}</span>
-              <span>{ir.header.right}</span>
-            </header>
+            <PageWatermark header={ir.header} page={page} assetUrls={assetUrls} />
+            <PageHeaderView
+              header={ir.header}
+              page={page}
+              assetUrls={assetUrls}
+              selected={headerSelected}
+              onSelect={onSelectHeader}
+            />
             <div style={bodyStyle}>
               {indices.map((i) => {
                 const p = ir.paragraphs[i]

@@ -29,3 +29,7 @@ mac:
       arch: [x64, arm64]
   category: public.app-category.education
   artifactName: 教学案制作-${version}-${arch}.${ext}
+extraResources:
+  # 模板（Word 样式、默认页眉图片），运行时从安装目录的 resources/resources 读取
+  - from: resources
+    to: resources

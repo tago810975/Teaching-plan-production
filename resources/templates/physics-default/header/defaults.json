@@ -1,0 +1,9 @@
+{
+  "comment": "新建工程时页眉的默认内容。尺寸单位为 EMU（1 cm = 360000），取自参考样例。",
+  "left": "墨帝教育秋季学期",
+  "phone": "134-8210-2204",
+  "right": "高二物理勤敏",
+  "logo": { "file": "logo.png", "widthEmu": 1063625, "heightEmu": 304800 },
+  "phoneIcon": { "file": "phone-icon.png", "widthEmu": 111125, "heightEmu": 111125 },
+  "watermark": { "file": "watermark.png", "widthEmu": 6352540, "heightEmu": 8021320 }
+}

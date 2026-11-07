@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type Dispatch } from 'react'
 import { createEmptyBundle } from '@core/model/factory'
+import type { ProjectBundle } from '@core/model/types'
 import type { MenuCommand } from '@shared/ipc'
 import type { EditorAction, EditorState } from './store'
 
@@ -21,6 +22,8 @@ export interface ProjectFileActions {
 export interface ProjectFileOptions {
   /** 启动时没有通过文件关联传入工程文件时调用 */
   onNoStartupFile?: () => void
+  /** 新建工程的内容（如套用模板默认页眉）；不提供则为空工程 */
+  createNewBundle?: () => ProjectBundle
 }
 
 export function useProjectFile(
@@ -35,9 +38,11 @@ export function useProjectFile(
 
   const confirmDiscard = (): boolean => !stateRef.current.dirty || window.confirm(DISCARD_PROMPT)
 
+  const createNewRef = useRef(options.createNewBundle)
+  createNewRef.current = options.createNewBundle
   const newProject = useCallback(() => {
     if (!confirmDiscard()) return
-    dispatch({ type: 'load', bundle: createEmptyBundle(), filePath: null })
+    dispatch({ type: 'load', bundle: createNewRef.current?.() ?? createEmptyBundle(), filePath: null })
   }, [dispatch])
 
   const openAt = useCallback(

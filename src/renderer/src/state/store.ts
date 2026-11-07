@@ -2,7 +2,12 @@
  * 编辑器状态。工程数据为不可变对象，每次修改都生成新对象，
  * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
  */
-import type { Block, ProjectBundle, Variant } from '@core/model/types'
+import type { Asset, Block, PageHeader, ProjectBundle, Variant } from '@core/model/types'
+
+/** 选中页眉时 selectedBlockId 的取值 */
+export const HEADER_SELECTION = '#header'
+
+export type HeaderImageSlot = 'logo' | 'phoneIcon' | 'watermark'
 
 export interface EditorState {
   bundle: ProjectBundle
@@ -24,6 +29,12 @@ export type EditorAction =
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   | { type: 'delete-block'; blockId: string }
   | { type: 'set-title'; title: string }
+  /** 修改页眉文字或图片；image 为 null 表示移除该图片，asset 为新图片的资源 */
+  | {
+      type: 'update-header'
+      patch?: Partial<Pick<PageHeader, 'left' | 'phone' | 'right'>>
+      image?: { slot: HeaderImageSlot; value: PageHeader[HeaderImageSlot] | null; asset?: Asset }
+    }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
   return { bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null }
@@ -55,6 +66,19 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'delete-block': {
       const next = withBlocks(state, (blocks) => blocks.filter((b) => b.id !== action.blockId))
       return next.selectedBlockId === action.blockId ? { ...next, selectedBlockId: null } : next
+    }
+    case 'update-header': {
+      const { project, assets } = state.bundle
+      const header: PageHeader = { ...project.header, ...action.patch }
+      let nextAssets = assets
+      if (action.image !== undefined) {
+        const { slot, value, asset } = action.image
+        if (value === null) delete header[slot]
+        else if (value !== undefined) header[slot] = value
+        if (asset !== undefined) nextAssets = { ...assets, [asset.id]: asset }
+      }
+      const next = touch(state, { ...project, header })
+      return { ...next, bundle: { ...next.bundle, assets: nextAssets } }
     }
     case 'set-title': {
       const { project } = state.bundle

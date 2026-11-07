@@ -41,6 +41,7 @@ export function collectAssetRefs(project: Project): Set<string> {
       Object.values(obj).forEach(visit)
     }
   }
+  visit(project.header)
   visit(project.blocks)
   return refs
 }

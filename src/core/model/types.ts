@@ -180,16 +180,38 @@ export type Variant = 'teacher' | 'student'
 
 export interface ProjectMeta {
   title: string
-  /** 页眉左侧文字，如“墨帝教育秋季学期” */
-  headerLeft: string
-  /** 页眉右侧文字，如“高二物理勤敏”；导出时自动追加“(教案)”或“(学案)” */
-  headerRight: string
   createdAt: string
   updatedAt: string
 }
 
+/** 页眉中的图片 */
+export interface HeaderImage {
+  assetId: string
+  widthEmu: number
+  heightEmu: number
+}
+
+/**
+ * 页眉。布局沿用参考样例：
+ *   第一行：机构 Logo
+ *   第二行：左侧文字　　　电话图标 + 电话（居中）　　　右侧文字
+ *   水印：铺满页面、衬于文字下方的图片
+ * 各项留空或不设置时，导出的 Word 中对应元素会被删除。
+ */
+export interface PageHeader {
+  logo?: HeaderImage
+  /** 如“墨帝教育秋季学期” */
+  left: string
+  phoneIcon?: HeaderImage
+  phone: string
+  /** 如“高二物理勤敏”；导出时自动追加“(教案)”或“(学案)” */
+  right: string
+  watermark?: HeaderImage
+}
+
 export interface Project {
   meta: ProjectMeta
+  header: PageHeader
   /** 使用的 Word 模板标识，对应 resources/templates 下的目录名 */
   templateId: string
   blocks: Block[]

@@ -44,7 +44,7 @@ describe('教师版与学生版', () => {
 
   it('页眉右侧自动追加版本名', () => {
     const p = createEmptyProject()
-    p.meta.headerRight = '高二物理勤敏'
+    p.header.right = '高二物理勤敏'
     expect(buildDocument(p, 'teacher').header.right).toBe('高二物理勤敏(教案)')
     expect(buildDocument(p, 'student').header.right).toBe('高二物理勤敏(学案)')
   })

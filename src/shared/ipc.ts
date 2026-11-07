@@ -4,6 +4,7 @@
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
 import type { ProjectBundle } from '@core/model/types'
+import type { TemplateDefaults } from '@core/template/defaults'
 
 export const IPC = {
   openProject: 'project:open',
@@ -11,6 +12,7 @@ export const IPC = {
   saveProject: 'project:save',
   getStartupFile: 'app:get-startup-file',
   getAppInfo: 'app:get-info',
+  getTemplateDefaults: 'template:get-defaults',
   setWindowState: 'window:set-state',
   confirmClose: 'window:confirm-close',
   /** 主进程 → 渲染进程：菜单命令 */
@@ -48,6 +50,8 @@ export interface AppInfo {
 /** 预加载脚本暴露给渲染进程的 API：window.api */
 export interface RendererApi {
   getAppInfo(): Promise<AppInfo>
+  /** 读取模板的默认页眉（Logo、电话、水印等） */
+  getTemplateDefaults(templateId: string): Promise<Result<TemplateDefaults>>
   /** 弹出“打开”对话框；用户取消时返回 null */
   openProject(): Promise<Result<OpenedProject | null>>
   openProjectAt(filePath: string): Promise<Result<OpenedProject>>

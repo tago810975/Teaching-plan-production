@@ -7,13 +7,28 @@ import { useId, useState, type Dispatch, type ReactNode } from 'react'
 import { markupToParagraph, markupToRichText, paragraphToMarkup, richTextToMarkup } from '@core/model/markup'
 import type { Block, OptionColumns, Question, QuestionBlock, RichParagraph, RichText } from '@core/model/types'
 import type { EditorAction } from '../state/store'
+import { HeaderForm } from './HeaderForm'
+import type { PageHeader } from '@core/model/types'
 
 interface Props {
   block: Block | null
+  /** 不为 null 时表示正在编辑页眉 */
+  header: PageHeader | null
+  assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
 }
 
-export function Inspector({ block, dispatch }: Props) {
+export function Inspector({ block, header, assetUrls, dispatch }: Props) {
+  if (header !== null) {
+    return (
+      <aside className="panel inspector" aria-label="属性">
+        <h2 className="panel-title">页眉</h2>
+        <div className="inspector-body">
+          <HeaderForm header={header} assetUrls={assetUrls} dispatch={dispatch} />
+        </div>
+      </aside>
+    )
+  }
   if (block === null) {
     return (
       <aside className="panel inspector" aria-label="属性">

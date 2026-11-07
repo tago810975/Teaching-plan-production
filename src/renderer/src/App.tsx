@@ -1,23 +1,46 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { buildDocument } from '@core/document/build'
 import { createEmptyBundle } from '@core/model/factory'
-import type { Variant } from '@core/model/types'
+import type { ProjectBundle, Variant } from '@core/model/types'
 import { createDemoBundle } from '@core/sample/demo-project'
+import { withTemplateDefaults, type TemplateDefaults } from '@core/template/defaults'
 import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
-import { editorReducer, initEditorState } from './state/store'
+import { editorReducer, HEADER_SELECTION, initEditorState } from './state/store'
 import { useProjectFile } from './state/useProjectFile'
 
 export function App() {
   const [state, dispatch] = useReducer(editorReducer, createEmptyBundle(), initEditorState)
   const { project, assets } = state.bundle
 
+  // 模板默认页眉：启动时读取一次，新建工程和演示内容都会用到
+  const defaultsRef = useRef<Promise<TemplateDefaults | undefined> | null>(null)
+  const [defaults, setDefaults] = useState<TemplateDefaults | undefined>(undefined)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadDefaults = useCallback((): Promise<TemplateDefaults | undefined> => {
+    defaultsRef.current ??= window.api.getTemplateDefaults(project.templateId).then((r) => {
+      if (r.ok) {
+        setDefaults(r.value)
+        return r.value
+      }
+      setLoadError(r.error)
+      return undefined
+    })
+    return defaultsRef.current
+  }, [project.templateId])
+
   const loadDemo = useCallback(() => {
-    void createDemoBundle().then((bundle) => dispatch({ type: 'load', bundle, filePath: null }))
-  }, [])
-  const files = useProjectFile(state, dispatch, { onNoStartupFile: loadDemo })
+    void loadDefaults()
+      .then((d) => createDemoBundle(d))
+      .then((bundle) => dispatch({ type: 'load', bundle, filePath: null }))
+  }, [loadDefaults])
+  const createNewBundle = useCallback(
+    (): ProjectBundle => (defaults === undefined ? createEmptyBundle() : withTemplateDefaults(createEmptyBundle(), defaults)),
+    [defaults]
+  )
+  const files = useProjectFile(state, dispatch, { onNoStartupFile: loadDemo, createNewBundle })
 
   // 预览使用延迟值：快速输入时优先保证输入框流畅，预览稍后跟上
   const deferredProject = useDeferredValue(project)
@@ -37,6 +60,8 @@ export function App() {
 
   const selectedBlock = project.blocks.find((b) => b.id === state.selectedBlockId) ?? null
   const select = useCallback((blockId: string) => dispatch({ type: 'select', blockId }), [])
+  const selectHeader = useCallback(() => dispatch({ type: 'select', blockId: HEADER_SELECTION }), [])
+  const headerSelected = state.selectedBlockId === HEADER_SELECTION
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -91,10 +116,16 @@ export function App() {
         </div>
       </header>
 
-      {files.error !== null && (
+      {(files.error ?? loadError) !== null && (
         <div className="banner" role="alert">
-          <span>{files.error}</span>
-          <button type="button" onClick={files.dismissError}>
+          <span>{files.error ?? loadError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              files.dismissError()
+              setLoadError(null)
+            }}
+          >
             知道了
           </button>
         </div>
@@ -112,9 +143,16 @@ export function App() {
           assetUrls={assetUrls}
           selectedBlockId={state.selectedBlockId}
           onSelect={select}
+          onSelectHeader={selectHeader}
+          headerSelected={headerSelected}
           onPageCount={setPageCount}
         />
-        <Inspector block={selectedBlock} dispatch={dispatch} />
+        <Inspector
+          block={selectedBlock}
+          header={headerSelected ? project.header : null}
+          assetUrls={assetUrls}
+          dispatch={dispatch}
+        />
       </main>
     </div>
   )

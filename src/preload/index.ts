@@ -18,6 +18,7 @@ function subscribe<T extends unknown[]>(
 
 const api: RendererApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
+  getTemplateDefaults: (templateId) => ipcRenderer.invoke(IPC.getTemplateDefaults, templateId),
   openProject: () => ipcRenderer.invoke(IPC.openProject),
   openProjectAt: (filePath) => ipcRenderer.invoke(IPC.openProjectAt, filePath),
   saveProject: (request) => ipcRenderer.invoke(IPC.saveProject, request),
