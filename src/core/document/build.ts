@@ -28,8 +28,12 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   for (const block of project.blocks) {
     switch (block.type) {
       case 'title':
-        if (block.restartNumbering === true) questionNo = 0
-        out.push(textPara(block.id, 'title', block.text))
+        if (block.restartNumbering === true) {
+          questionNo = 0
+          out.push({ ...textPara(block.id, 'title', block.text), restartNumbering: true })
+        } else {
+          out.push(textPara(block.id, 'title', block.text))
+        }
         break
       case 'section':
         out.push(textPara(block.id, 'section', block.text))
@@ -78,7 +82,7 @@ function buildQuestion(blockId: string, q: Question, no: number, variant: Varian
     }
     push({
       key: key(`stem${i}`),
-      style: i === 0 ? 'question' : 'subQuestion',
+      style: i === 0 ? 'question' : 'questionContinued',
       ...(i === 0 ? { label: `${no}.` } : {}),
       runs
     })
@@ -126,7 +130,7 @@ function buildQuestion(blockId: string, q: Question, no: number, variant: Varian
     sq.content.forEach((p, j) => {
       push({
         key: key(`sub${i}-${j}`),
-        style: 'subQuestion',
+        style: j === 0 ? 'subQuestion' : 'questionContinued',
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
         runs: toRuns(p)
       })

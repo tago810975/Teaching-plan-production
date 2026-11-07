@@ -28,6 +28,8 @@ export interface ProjectFileOptions {
   onNoStartupFile?: () => void
   /** 请求新建教学案（显示新建对话框） */
   onRequestNew?: () => void
+  /** 请求导出 Word（显示导出对话框） */
+  onRequestExport?: () => void
   templateId: string
 }
 
@@ -45,6 +47,8 @@ export function useProjectFile(
 
   const requestNewRef = useRef(options.onRequestNew)
   requestNewRef.current = options.onRequestNew
+  const requestExportRef = useRef(options.onRequestExport)
+  requestExportRef.current = options.onRequestExport
   const newProject = useCallback(() => {
     if (!confirmDiscard()) return
     requestNewRef.current?.()
@@ -121,7 +125,7 @@ export function useProjectFile(
           if (stateRef.current.screen === 'editor') void save(true)
           break
         case 'export-word':
-          if (stateRef.current.screen === 'editor') setError('导出 Word 功能尚在开发中。')
+          if (stateRef.current.screen === 'editor') requestExportRef.current?.()
           break
         case 'close':
           closeProject()

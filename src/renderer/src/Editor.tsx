@@ -7,6 +7,7 @@ import type { Variant } from '@core/model/types'
 import { AddMenu } from './AddMenu'
 import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
+import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import type { ImportReport } from '@shared/ipc'
 import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
@@ -25,6 +26,8 @@ interface Props {
   importReport: ImportReport | null
   onImportReport: (report: ImportReport | null) => void
   onError: (message: string) => void
+  exportOpen: boolean
+  onExportOpenChange: (open: boolean) => void
 }
 
 const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
@@ -32,7 +35,19 @@ const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
   ['student', '学生版（学案）']
 ]
 
-export function Editor({ state, dispatch, files, error, onDismissError, importReport, onImportReport, onError }: Props) {
+export function Editor({
+  state,
+  dispatch,
+  files,
+  error,
+  onDismissError,
+  importReport,
+  onImportReport,
+  onError,
+  exportOpen,
+  onExportOpenChange
+}: Props) {
+  const [exportedFiles, setExportedFiles] = useState<string[] | null>(null)
   const { project, assets } = state.bundle
 
   // 预览使用延迟值：快速输入时优先保证输入框流畅，预览稍后跟上
@@ -117,6 +132,9 @@ export function Editor({ state, dispatch, files, error, onDismissError, importRe
             导入 Word 题目…
           </button>
           <span className="page-count">共 {pageCount} 页</span>
+          <button type="button" onClick={() => onExportOpenChange(true)} title="导出教案与学案 Word 文档（Ctrl+E）">
+            导出 Word…
+          </button>
           <button type="button" className="primary" onClick={() => void files.save()}>
             保存
           </button>
@@ -125,6 +143,18 @@ export function Editor({ state, dispatch, files, error, onDismissError, importRe
 
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
+      {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
+      {exportOpen && (
+        <ExportDialog
+          bundle={state.bundle}
+          projectPath={state.filePath}
+          onCancel={() => onExportOpenChange(false)}
+          onDone={(f) => {
+            onExportOpenChange(false)
+            setExportedFiles(f)
+          }}
+        />
+      )}
 
       <main className="workspace">
         <Outline

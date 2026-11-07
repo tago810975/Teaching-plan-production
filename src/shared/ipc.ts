@@ -3,7 +3,7 @@
  *
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
-import type { Asset, Block, ProjectBundle } from '@core/model/types'
+import type { Asset, Block, ProjectBundle, Variant } from '@core/model/types'
 import type { ProjectSummary } from '@core/project-file/codec'
 import type { TemplateDefaults } from '@core/template/defaults'
 
@@ -22,6 +22,10 @@ export const IPC = {
   revealInFolder: 'shell:reveal',
   importDocx: 'import:docx',
   createFromDocx: 'project:create-from-docx',
+  exportCheck: 'export:check',
+  exportWord: 'export:word',
+  defaultExportDir: 'export:default-dir',
+  openPath: 'shell:open-path',
   setWindowState: 'window:set-state',
   confirmClose: 'window:confirm-close',
   /** 主进程 → 渲染进程：菜单命令 */
@@ -59,6 +63,20 @@ export interface ImportedContent {
   blocks: Block[]
   assets: Record<string, Asset>
   report: ImportReport
+}
+
+export interface ExportRequest {
+  bundle: ProjectBundle
+  variants: Variant[]
+  dir: string
+  /** 文件名主体，如“动态圆专题”，实际文件名为“动态圆专题（教案）.docx” */
+  baseName: string
+  /** Word 不支持的图片（SVG、WebP）在界面中转成的 PNG，按原资源 ID 替换 */
+  replacementAssets: Record<string, Asset>
+}
+
+export interface ExportResult {
+  files: string[]
 }
 
 /** 首页列表中的一项 */
@@ -111,6 +129,13 @@ export interface RendererApi {
   importDocx(): Promise<Result<ImportedContent | null>>
   /** 选择一个 Word 文档，以其内容新建教学案；用户取消时返回 null */
   createFromDocx(templateId: string): Promise<Result<{ opened: OpenedProject; report: ImportReport } | null>>
+  /** 导出的默认位置：工程文件所在文件夹，未保存时为教学案库 */
+  defaultExportDir(projectPath: string | null): Promise<string>
+  /** 目标位置已存在的同名文件 */
+  exportCheck(dir: string, baseName: string, variants: Variant[]): Promise<string[]>
+  exportWord(request: ExportRequest): Promise<Result<ExportResult>>
+  /** 用系统默认程序打开文件（如 Word） */
+  openPath(path: string): Promise<string | null>
   revealInFolder(filePath: string): void
   /** 保存；用户在“另存为”对话框中取消时返回 null，否则返回实际保存路径 */
   saveProject(request: SaveRequest): Promise<Result<string | null>>

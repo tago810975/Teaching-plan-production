@@ -56,6 +56,8 @@ export interface DocParagraph {
   shaded?: boolean
   /** 制表位（twip，相对页边距），用于选项分列 */
   tabStopsTwip?: readonly number[]
+  /** 从本段之后重新开始题号（如“作业单”大标题） */
+  restartNumbering?: boolean
   /** 锚定在本段的浮动图片 */
   floatingImage?: FloatingImage
 }

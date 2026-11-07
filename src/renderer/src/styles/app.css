@@ -727,3 +727,37 @@ button.link.danger {
   margin: 4px 6px;
   background: var(--rule);
 }
+
+/* ---------- 导出 ---------- */
+
+.export-version {
+  align-items: flex-start;
+}
+.export-version input {
+  margin-top: 3px;
+}
+.export-version-hint {
+  display: block;
+  margin: 0;
+}
+.notice--success {
+  background: #eaf4ee;
+  border-bottom-color: #c5ddcd;
+}
+.notice-files {
+  margin: 4px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+.notice-files li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.notice-file-name {
+  font-weight: 600;
+}
+.notice-actions {
+  display: flex;
+  gap: 8px;
+}

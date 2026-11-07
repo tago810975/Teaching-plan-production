@@ -1,0 +1,147 @@
+import { readFileSync } from 'node:fs'
+import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
+import { buildDocument } from '@core/document/build'
+import { writeDocx, DocxExportError } from '@core/export/docx-writer'
+import { importDocx } from '@core/import/import-docx'
+import { latexToOmml } from '@core/math/mathml-to-omml'
+import { ommlToMathml } from '@core/math/omml-to-mathml'
+import { createEmptyBundle, createQuestion, newId, para } from '@core/model/factory'
+import type { ProjectBundle, Variant } from '@core/model/types'
+import { createAsset } from '@core/project-file/codec'
+
+const template = new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
+const PNG = new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png'))
+
+async function exportParts(bundle: ProjectBundle, variant: Variant) {
+  const bytes = await writeDocx({ ir: buildDocument(bundle.project, variant), assets: bundle.assets, title: bundle.project.meta.title, template })
+  const zip = await JSZip.loadAsync(bytes)
+  const read = (p: string) => zip.file(p)!.async('string')
+  return { zip, doc: await read('word/document.xml'), header: await read('word/header1.xml'), numbering: await read('word/numbering.xml'), rels: await read('word/_rels/document.xml.rels'), headerRels: await read('word/_rels/header1.xml.rels'), core: await read('docProps/core.xml') }
+}
+
+async function bundleWithHeader(): Promise<ProjectBundle> {
+  const bundle = createEmptyBundle()
+  const logo = await createAsset(PNG, 'image/png')
+  bundle.assets[logo.id] = logo
+  bundle.project.meta.title = '测试 & 专题'
+  bundle.project.header = { logo: { assetId: logo.id, widthEmu: 900000, heightEmu: 300000 }, left: '左侧<文字>', phone: '', right: '高二物理' }
+  bundle.project.blocks = [
+    { id: 't1', type: 'title', text: '专题' },
+    { id: newId(), type: 'question', question: createQuestion({ stem: [para('第一题'), para('续行')], answer: [para('A')], knowledgePoints: ['知识点'], options: ['A', 'B', 'C', 'D'].map((l) => ({ label: l, content: para('1') })) }) },
+    { id: newId(), type: 'question', question: createQuestion({ kind: 'solve', stem: [para('第二题 ', { type: 'math', latex: '\\frac{1}{2}mv^2' })], subQuestions: [{ id: 's1', content: [para('求速度')] }], layout: { studentSpaceLines: 6 } }) },
+    { id: 't2', type: 'title', text: '作业单', restartNumbering: true },
+    { id: newId(), type: 'question', question: createQuestion({ stem: [para('作业第一题')] }) }
+  ]
+  return bundle
+}
+
+describe('导出 Word', () => {
+  it('题目用模板样式与自动编号，正文不写题号文字', async () => {
+    const { doc } = await exportParts(await bundleWithHeader(), 'teacher')
+    expect(doc).not.toContain('{{body}}')
+    expect(doc).toContain('<w:t xml:space="preserve">第一题</w:t>')
+    expect(doc).not.toMatch(/<w:t[^>]*>1\.<\/w:t>/)
+    expect(doc).not.toContain('【答案】') // 由 Word 自动编号生成
+    // 题干续行不用“次级题目”样式（否则会被编上小问号），而是正文加缩进
+    expect(doc).toContain('<w:ind w:left="333" w:firstLine="0"/>')
+  })
+
+  it('作业单从 1 重新编号', async () => {
+    const { doc, numbering } = await exportParts(await bundleWithHeader(), 'student')
+    expect(numbering).toMatch(/<w:num w:numId="9000"><w:abstractNumId w:val="\d+"\/><w:lvlOverride w:ilvl="\d"><w:startOverride w:val="1"\/>/)
+    // 作业单之后的题目指向新的编号实例
+    const after = doc.slice(doc.indexOf('作业单'))
+    expect(after).toContain('<w:numId w:val="9000"/>')
+    expect(doc.slice(0, doc.indexOf('作业单'))).not.toContain('<w:numId w:val="9000"/>')
+  })
+
+  it('学案不含答案与知识点，作答留白为固定行高的空段', async () => {
+    const { doc } = await exportParts(await bundleWithHeader(), 'student')
+    expect(doc).not.toContain('知识点')
+    expect(doc).toContain(`w:line="${6 * 312}" w:lineRule="exact"`)
+    const t = await exportParts(await bundleWithHeader(), 'teacher')
+    expect(t.doc).toContain('w:fill="F2F2F2"')
+  })
+
+  it('LaTeX 公式转为 Word 公式', async () => {
+    const { doc } = await exportParts(await bundleWithHeader(), 'student')
+    expect(doc).toMatch(/<m:oMath><m:f><m:num>/)
+    expect(doc).not.toContain('<m:oMath xmlns')
+  })
+
+  it('页眉：替换文字（含转义），设置的图片写入，未设置的删除', async () => {
+    const { header, headerRels, zip } = await exportParts(await bundleWithHeader(), 'teacher')
+    expect(header).toContain('左侧&lt;文字&gt;')
+    expect(header).toContain('高二物理(教案)')
+    expect(header).not.toContain('{{')
+    expect(header).toContain('name="tp:logo"')
+    expect(header).toContain('cx="900000" cy="300000"')
+    expect(header).not.toContain('tp:watermark') // 未设置水印
+    expect(header).not.toContain('tp:phone-icon') // 电话为空，图标一并删除
+    const targets = [...headerRels.matchAll(/Target="([^"]+)"/g)].map((m) => m[1]!)
+    for (const t of targets) if (t.startsWith('media/')) expect(zip.file(`word/${t}`)).not.toBeNull()
+  })
+
+  it('文档标题写入属性', async () => {
+    const { core } = await exportParts(await bundleWithHeader(), 'teacher')
+    expect(core).toContain('<dc:title>测试 &amp; 专题</dc:title>')
+  })
+
+  it('题图：右侧环绕与嵌入图片写入关系与内容类型', async () => {
+    const bundle = await bundleWithHeader()
+    const fig = await createAsset(new Uint8Array([...PNG, 1]), 'image/png')
+    bundle.assets[fig.id] = fig
+    const q = bundle.project.blocks[1]!
+    if (q.type !== 'question') throw new Error()
+    q.question.figures = [
+      { assetId: fig.id, widthEmu: 1800000, heightEmu: 900000, placement: 'right' },
+      { assetId: fig.id, widthEmu: 1800000, heightEmu: 900000, placement: 'below' }
+    ]
+    const { doc, rels, zip } = await exportParts(bundle, 'student')
+    expect(doc).toContain('<wp:wrapSquare wrapText="left"/>')
+    expect(doc).toContain('<wp:inline')
+    expect(rels.match(/rIdTp\d+/g)).toHaveLength(1) // 同一张图只存一份
+    const types = await zip.file('[Content_Types].xml')!.async('string')
+    expect(types).toMatch(/Extension="png"/i)
+  })
+
+  it('Word 不支持的图片格式给出明确提示', async () => {
+    const bundle = await bundleWithHeader()
+    const svg = await createAsset(new TextEncoder().encode('<svg/>'), 'image/svg+xml')
+    bundle.assets[svg.id] = svg
+    bundle.project.blocks.push({ id: 'p', type: 'paragraph', content: [{ inlines: [{ type: 'image', assetId: svg.id, widthEmu: 1, heightEmu: 1 }] }] })
+    await expect(exportParts(bundle, 'student')).rejects.toThrow(DocxExportError)
+  })
+
+  it('样例教案：导入后导出，20 道题与全部公式保留', async () => {
+    const imported = await importDocx(new Uint8Array(readFileSync('reference/samples/2026秋季高二物理敏思_动态圆专题/教案_T_动态圆专题.docx')))
+    const bundle = createEmptyBundle()
+    bundle.project.blocks = imported.blocks
+    Object.assign(bundle.assets, imported.assets)
+    const { doc } = await exportParts(bundle, 'teacher')
+    const questionStyle = doc.match(/<w:pStyle w:val="10"\/>/g) ?? []
+    expect(questionStyle).toHaveLength(20)
+    expect((doc.match(/<m:oMath>/g) ?? []).length).toBe(271)
+  })
+})
+
+describe('LaTeX → OMML', () => {
+  it.each([
+    ['\\frac{5}{4}t_0', '<m:f>'],
+    ['\\sqrt{3}', '<m:rad>'],
+    ['\\vec{F}', '<m:acc>'],
+    ['\\sum_{i=1}^{n} i', '<m:nary>'],
+    ['\\left(\\frac{a}{b}\\right)', '<m:d>'],
+    ['\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}', '<m:m>']
+  ])('%s', (latex, element) => {
+    const omml = latexToOmml(latex)
+    expect(omml).toContain(element)
+    // 往返：转回 MathML 不应有不认识的结构
+    expect(ommlToMathml(omml).unknown).toEqual([])
+  })
+
+  it('LaTeX 有误时抛出异常（导出时会改为红色文字）', () => {
+    expect(() => latexToOmml('\\frac{1}{')).toThrow()
+  })
+})

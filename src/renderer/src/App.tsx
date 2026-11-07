@@ -14,9 +14,11 @@ export function App() {
   const [newDialogOpen, setNewDialogOpen] = useState(false)
   const [demoError, setDemoError] = useState<string | null>(null)
   const [importReport, setImportReport] = useState<ImportReport | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const files = useProjectFile(state, dispatch, {
     onRequestNew: () => setNewDialogOpen(true),
+    onRequestExport: () => setExportOpen(true),
     templateId: DEFAULT_TEMPLATE_ID
   })
 
@@ -66,6 +68,8 @@ export function App() {
           importReport={importReport}
           onImportReport={setImportReport}
           onError={setDemoError}
+          exportOpen={exportOpen}
+          onExportOpenChange={setExportOpen}
         />
       )}
       {newDialogOpen && (

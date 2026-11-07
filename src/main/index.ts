@@ -5,14 +5,18 @@
  * 内容编辑与排版全部在渲染进程完成，主进程不持有工程数据。
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { ProjectFileError } from '@core/project-file/codec'
 import { DocxReadError } from '@core/import/docx-reader'
+import { DocxExportError } from '@core/export/docx-writer'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import { IPC, type MenuCommand, type OpenedProject, type Result, type SaveRequest } from '@shared/ipc'
 import { buildAppMenu } from './menu'
 import { readTemplateDefaults } from './template-io'
 import { importDocxFiles } from './import-io'
+import { existingExportFiles, exportWord } from './export-io'
+import type { ExportRequest } from '@shared/ipc'
+import type { Variant } from '@core/model/types'
 import {
   ensureProjectExtension,
   isProjectFilePath,
@@ -215,6 +219,27 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(IPC.defaultExportDir, async (_event, projectPath: string | null) =>
+    projectPath === null ? getLibraryDir() : dirname(projectPath)
+  )
+
+  ipcMain.handle(IPC.exportCheck, (_event, dir: string, baseName: string, variants: Variant[]) =>
+    existingExportFiles(dir, baseName, variants)
+  )
+
+  ipcMain.handle(IPC.exportWord, async (_event, req: ExportRequest) => {
+    try {
+      return { ok: true, value: await exportWord(req) }
+    } catch (err) {
+      return { ok: false, error: `导出失败：${describeError(err)}` }
+    }
+  })
+
+  ipcMain.handle(IPC.openPath, async (_event, path: string) => {
+    const error = await shell.openPath(path)
+    return error === '' ? null : error
+  })
+
   ipcMain.handle(IPC.createFromDocx, async (event, templateId: string) => {
     const paths = await pickDocx(event.sender, false)
     if (paths.length === 0) return { ok: true, value: null }
@@ -280,7 +305,7 @@ async function openAt(filePath: string): Promise<Result<OpenedProject>> {
 }
 
 function describeError(err: unknown): string {
-  if (err instanceof ProjectFileError || err instanceof DocxReadError) return err.message
+  if (err instanceof ProjectFileError || err instanceof DocxReadError || err instanceof DocxExportError) return err.message
   const code = (err as NodeJS.ErrnoException | undefined)?.code
   switch (code) {
     case 'ENOENT':

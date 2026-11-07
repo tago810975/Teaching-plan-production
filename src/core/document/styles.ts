@@ -18,6 +18,8 @@ export type StyleKey =
   | 'topic'
   | 'body'
   | 'question'
+  /** 题干第二段起：正文样式加上与题干对齐的缩进（不能用“次级题目”，否则会被 Word 编上小问号） */
+  | 'questionContinued'
   | 'subQuestion'
   | 'option'
   | 'answer'
@@ -48,6 +50,16 @@ export interface ParagraphStyleSpec {
   hangingTwip: number
   /** 由 Word 自动编号生成的固定前缀，如【答案】；预览需自行显示 */
   fixedLabel?: string
+  /**
+   * 模板中该样式带有自动编号（题号、小问号、【答案】等）。
+   * 导出时不写入 DocParagraph.label，由 Word 生成；预览则显示 label。
+   */
+  autoNumbered?: boolean
+  /**
+   * 模板样式本身没有、需要在段落上直接设置的左缩进（twip）。
+   * 用于“题干续行”这类借用正文样式但需要缩进的段落。
+   */
+  directIndentTwip?: number
 }
 
 const base = {
@@ -97,9 +109,11 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     spaceBeforeTwip: 160,
     spaceAfterTwip: 120,
     indentLeftTwip: 333,
-    hangingTwip: 394
+    hangingTwip: 394,
+    autoNumbered: true
   },
-  subQuestion: { ...base, wordStyleName: '物理排版 题目 次级题目', indentLeftTwip: 333 },
+  questionContinued: { ...base, wordStyleName: '物理排版 正文', indentLeftTwip: 333, directIndentTwip: 333 },
+  subQuestion: { ...base, wordStyleName: '物理排版 题目 次级题目', indentLeftTwip: 333, autoNumbered: true },
   option: {
     ...base,
     wordStyleName: '物理排版 题目 选项',
@@ -112,16 +126,18 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     ...base,
     wordStyleName: '物理排版 题目 解答',
     bold: true,
-    fixedLabel: '【答案】'
+    fixedLabel: '【答案】',
+    autoNumbered: true
   },
-  knowledge: { ...base, wordStyleName: '物理排版 题目 知识点', fixedLabel: '【知识点】' },
+  knowledge: { ...base, wordStyleName: '物理排版 题目 知识点', fixedLabel: '【知识点】', autoNumbered: true },
   keyPoint: {
     ...base,
     wordStyleName: '物理排版 题目 重点',
     color: 'C00000',
-    fixedLabel: '【重点】'
+    fixedLabel: '【重点】',
+    autoNumbered: true
   },
-  difficultPoint: { ...base, wordStyleName: '物理排版 题目 难点', fixedLabel: '【难点】' },
+  difficultPoint: { ...base, wordStyleName: '物理排版 题目 难点', fixedLabel: '【难点】', autoNumbered: true },
   analysis: { ...base, wordStyleName: '物理排版 正文' }
 }
 
@@ -130,6 +146,9 @@ export const OPTION_TAB_STOPS: Readonly<Record<2 | 4, readonly number[]>> = {
   2: [4200],
   4: [2310, 4200, 6090]
 }
+
+/** 教师版答案区的底纹颜色，与参考样例一致 */
+export const TEACHER_SHADING = 'F2F2F2'
 
 /** 正文单倍行高的近似值（twip），用于把“留白行数”换算为间距 */
 export const BODY_LINE_HEIGHT_TWIP = 312

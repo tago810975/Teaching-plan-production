@@ -65,6 +65,17 @@ for (const target of removedTargets) {
   if (!headerRels.includes(`"${target}"`)) zip.remove(`word/${target}`)
 }
 
+// 修正 WPS 的样式表元素顺序：规范要求 uiPriority 位于 semiHidden、unhideWhenUsed、qFormat 之前
+let styles = await zip.file('word/styles.xml').async('string')
+styles = styles.replace(/<w:style\b[^>]*>[\s\S]*?<\/w:style>/g, (style) => {
+  const ui = style.match(/<w:uiPriority\b[^>]*\/>/)
+  if (ui === null) return style
+  const without = style.replace(ui[0], '')
+  const anchor = without.match(/<w:(semiHidden|unhideWhenUsed|qFormat|locked|personal|personalCompose|personalReply|rsid|pPr|rPr|tblPr|trPr|tcPr|tblStylePr)\b/)
+  return anchor === null ? style : without.replace(anchor[0], ui[0] + anchor[0])
+})
+zip.file('word/styles.xml', styles)
+
 // 去掉 WPS 自定义属性与 customXml，模板不需要
 zip.remove('docProps/custom.xml')
 zip.remove('customXml')
