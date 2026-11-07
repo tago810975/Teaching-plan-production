@@ -852,9 +852,10 @@ button.link.danger {
   --keyboard-padding-bottom: 6px;
 }
 .formula-keyboard.is-open {
-  height: 250px;
+  /* 键盘实测高 202px（工具栏 42 + 4 行 × 40），底部还会多伸出约 4px */
+  height: 210px;
   margin-top: 10px;
-  border-radius: 6px;
+  overflow: visible;
 }
 .formula-dialog--keyboard {
   width: 760px;
