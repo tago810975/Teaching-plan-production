@@ -1,0 +1,157 @@
+/*
+ * 预览页面。字体与 Word 导出保持一致：西文 Times New Roman，中文宋体，公式 Cambria Math。
+ * 浏览器会按字符自动回退，效果与 Word 中“西文字体 + 中文字体”的组合一致。
+ */
+
+.preview {
+  position: relative;
+  overflow: auto;
+  padding: 24px 32px 48px;
+}
+
+.preview-measure {
+  position: absolute;
+  top: 0;
+  left: -10000px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.preview-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.page {
+  position: relative;
+  flex: none;
+  background: #fff;
+  color: #000;
+  box-shadow:
+    0 1px 2px rgba(31, 42, 46, 0.18),
+    0 6px 18px rgba(31, 42, 46, 0.1);
+}
+
+.page-header {
+  position: absolute;
+  top: 34pt;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+  font-family: 'Times New Roman', SimSun, '宋体', 'Songti SC', STSong, serif;
+  font-size: 9pt;
+}
+
+.page-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22pt;
+  text-align: center;
+  font-family: SimSun, '宋体', 'Songti SC', STSong, serif;
+  font-size: 9pt;
+}
+
+/* ---------- 段落 ---------- */
+
+.font-song {
+  font-family: 'Times New Roman', SimSun, '宋体', 'Songti SC', STSong, serif;
+}
+.font-hei {
+  font-family: 'Times New Roman', 'Microsoft YaHei', '微软雅黑', SimHei, 'PingFang SC', 'Heiti SC', sans-serif;
+}
+
+.para {
+  position: relative;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 把浮动图片“关”在本页之内：浮动不越过页面正文区 */
+.page .para:last-child::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+.page .para {
+  cursor: pointer;
+}
+.page .para:hover {
+  background-color: rgba(47, 111, 181, 0.05);
+}
+
+/* 选中的题目：左侧页边上的一道“批改红”竖线 */
+.page .para.is-selected {
+  background-color: rgba(179, 38, 30, 0.045);
+}
+.page .para.is-selected::before {
+  content: '';
+  position: absolute;
+  left: -11pt;
+  top: 0;
+  bottom: 0;
+  width: 2.5pt;
+  background: #b3261e;
+}
+
+.para--shaded {
+  background-color: #e8e8e8;
+}
+.page .para--shaded:hover {
+  background-color: #e1e4e8;
+}
+
+.para-label--hanging {
+  display: inline-block;
+  text-indent: 0;
+}
+
+.para-float {
+  float: right;
+  margin: 0 0 4pt 9pt;
+  text-indent: 0;
+}
+
+.tab-row {
+  display: inline-flex;
+  width: 100%;
+  text-indent: 0;
+}
+.tab-cell {
+  flex: none;
+}
+
+.run-image {
+  vertical-align: middle;
+}
+
+.run-blank {
+  display: inline-block;
+  border-bottom: 0.75pt solid currentColor;
+  height: 1em;
+}
+
+/* ---------- 公式 ---------- */
+
+.math math {
+  font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', math;
+  font-size: 1em;
+}
+
+.math-error {
+  color: #b3261e;
+  text-decoration: underline wavy;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.math-pending {
+  padding: 0 2pt;
+  border: 0.5pt dashed #999;
+  color: #777;
+  font-size: 0.85em;
+}

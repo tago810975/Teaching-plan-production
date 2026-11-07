@@ -1,0 +1,163 @@
+/**
+ * 段落样式表：预览与 Word 导出共用的唯一样式来源。
+ *
+ * 数值取自参考样例 reference/samples/.../教案_T_动态圆专题.docx 的 styles.xml，
+ * 单位与 Word 保持一致（twip、半磅），避免换算误差在两端累积。
+ *
+ * - Word 导出：按 `wordStyleName` 引用模板中的同名样式，样式本身由模板提供。
+ * - 预览：用 `previewCss()` 把这里的数值换算为 CSS。
+ *
+ * TODO（导出阶段）：改为启动时从模板 styles.xml 解析生成，彻底消除两份数据。
+ */
+import type { CSSLength } from './units'
+import { halfPtToPt, twipToPt } from './units'
+
+export type StyleKey =
+  | 'title'
+  | 'section'
+  | 'topic'
+  | 'body'
+  | 'question'
+  | 'subQuestion'
+  | 'option'
+  | 'answer'
+  | 'knowledge'
+  | 'keyPoint'
+  | 'difficultPoint'
+  | 'analysis'
+
+/** 中文字体类别：宋体（正文）或黑体类（标题） */
+export type FontRole = 'song' | 'hei'
+
+export interface ParagraphStyleSpec {
+  /** 模板中的样式名称 */
+  wordStyleName: string
+  fontRole: FontRole
+  /** 字号，单位半磅（21 = 五号 10.5pt） */
+  sizeHalfPt: number
+  bold?: boolean
+  /** 文字颜色，十六进制，不含 # */
+  color?: string
+  align: 'left' | 'center' | 'both'
+  spaceBeforeTwip: number
+  spaceAfterTwip: number
+  /** 行距，240 = 单倍行距；与 Word 的 lineRule="auto" 一致 */
+  lineAuto: number
+  indentLeftTwip: number
+  /** 悬挂缩进（编号悬挂在左侧） */
+  hangingTwip: number
+  /** 由 Word 自动编号生成的固定前缀，如【答案】；预览需自行显示 */
+  fixedLabel?: string
+}
+
+const base = {
+  fontRole: 'song',
+  sizeHalfPt: 21,
+  align: 'both',
+  spaceBeforeTwip: 0,
+  spaceAfterTwip: 0,
+  lineAuto: 240,
+  indentLeftTwip: 0,
+  hangingTwip: 0
+} as const satisfies Partial<ParagraphStyleSpec>
+
+export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
+  title: {
+    ...base,
+    wordStyleName: '物理排版 大标题',
+    fontRole: 'hei',
+    sizeHalfPt: 36,
+    bold: true,
+    align: 'center',
+    spaceBeforeTwip: 160,
+    spaceAfterTwip: 160
+  },
+  section: {
+    ...base,
+    wordStyleName: '物理排版 标题2 知识梳理、例题精讲、课堂总结、课后练习',
+    fontRole: 'hei',
+    sizeHalfPt: 28,
+    bold: true,
+    align: 'left',
+    spaceBeforeTwip: 160,
+    spaceAfterTwip: 160
+  },
+  topic: {
+    ...base,
+    wordStyleName: '物理排版 题目类型',
+    bold: true,
+    align: 'left',
+    spaceBeforeTwip: 120,
+    spaceAfterTwip: 120
+  },
+  body: { ...base, wordStyleName: '物理排版 正文' },
+  question: {
+    ...base,
+    wordStyleName: '物理排版 题目',
+    spaceBeforeTwip: 160,
+    spaceAfterTwip: 120,
+    indentLeftTwip: 333,
+    hangingTwip: 394
+  },
+  subQuestion: { ...base, wordStyleName: '物理排版 题目 次级题目', indentLeftTwip: 333 },
+  option: {
+    ...base,
+    wordStyleName: '物理排版 题目 选项',
+    align: 'left',
+    spaceBeforeTwip: 120,
+    spaceAfterTwip: 120,
+    indentLeftTwip: 480
+  },
+  answer: {
+    ...base,
+    wordStyleName: '物理排版 题目 解答',
+    bold: true,
+    fixedLabel: '【答案】'
+  },
+  knowledge: { ...base, wordStyleName: '物理排版 题目 知识点', fixedLabel: '【知识点】' },
+  keyPoint: {
+    ...base,
+    wordStyleName: '物理排版 题目 重点',
+    color: 'C00000',
+    fixedLabel: '【重点】'
+  },
+  difficultPoint: { ...base, wordStyleName: '物理排版 题目 难点', fixedLabel: '【难点】' },
+  analysis: { ...base, wordStyleName: '物理排版 正文' }
+}
+
+/** 选项的制表位（twip，相对页面左边距），与模板“题目 选项”样式一致 */
+export const OPTION_TAB_STOPS: Readonly<Record<2 | 4, readonly number[]>> = {
+  2: [4200],
+  4: [2310, 4200, 6090]
+}
+
+/** 正文单倍行高的近似值（twip），用于把“留白行数”换算为间距 */
+export const BODY_LINE_HEIGHT_TWIP = 312
+
+/** 预览用的 CSS 数值（不含字体族，字体族由预览样式表统一定义） */
+export interface PreviewCss {
+  fontSize: CSSLength
+  fontWeight: number
+  color?: string
+  textAlign: 'left' | 'center' | 'justify'
+  marginTop: CSSLength
+  marginBottom: CSSLength
+  lineHeight: number
+  paddingLeft: CSSLength
+  textIndent: CSSLength
+}
+
+export function previewCss(spec: ParagraphStyleSpec): PreviewCss {
+  return {
+    fontSize: `${halfPtToPt(spec.sizeHalfPt)}pt`,
+    fontWeight: spec.bold === true ? 700 : 400,
+    ...(spec.color !== undefined ? { color: `#${spec.color}` } : {}),
+    textAlign: spec.align === 'both' ? 'justify' : spec.align,
+    marginTop: `${twipToPt(spec.spaceBeforeTwip)}pt`,
+    marginBottom: `${twipToPt(spec.spaceAfterTwip)}pt`,
+    // Word 单倍行距约为字号的 1.3 倍（宋体）
+    lineHeight: 1.3 * (spec.lineAuto / 240),
+    paddingLeft: `${twipToPt(spec.indentLeftTwip)}pt`,
+    textIndent: `${-twipToPt(spec.hangingTwip)}pt`
+  }
+}

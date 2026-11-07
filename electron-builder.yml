@@ -1,0 +1,31 @@
+appId: io.github.tago810975.teachingplan
+productName: TeachingPlan
+directories:
+  output: release/${version}
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+fileAssociations:
+  - ext: tplan
+    name: 教学案工程
+    description: 教学案工程文件
+    role: Editor
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: 教学案制作-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: 教学案制作
+  # 中文安装界面
+  language: '2052'
+mac:
+  # macOS 移植阶段再补充签名与公证
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.education
+  artifactName: 教学案制作-${version}-${arch}.${ext}
