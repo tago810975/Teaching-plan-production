@@ -14,7 +14,7 @@ import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
-import { HEADER_SELECTION, type EditorAction, type EditorState } from './state/store'
+import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
 import type { ProjectFileActions } from './state/useProjectFile'
 
 interface Props {
@@ -175,6 +175,7 @@ export function Editor({
         <Inspector
           block={selectedBlock}
           header={headerSelected ? project.header : null}
+          layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}
           dispatch={dispatch}
         />

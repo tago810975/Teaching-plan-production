@@ -49,7 +49,7 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         break
       case 'question':
         questionNo += 1
-        out.push(...buildQuestion(block.id, block.question, questionNo, variant))
+        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant]))
         break
     }
   }
@@ -66,7 +66,13 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
 
 // ---------------- 题目 ----------------
 
-function buildQuestion(blockId: string, q: Question, no: number, variant: Variant): DocParagraph[] {
+function buildQuestion(
+  blockId: string,
+  q: Question,
+  no: number,
+  variant: Variant,
+  keepTogetherByDefault: boolean
+): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
   const push = (p: Omit<DocParagraph, 'sourceBlockId'>): void => {
@@ -137,6 +143,9 @@ function buildQuestion(blockId: string, q: Question, no: number, variant: Varian
     })
   })
 
+  /** 题目主体（题干、题图、选项、小问）的段落数，主体始终保持在同一页 */
+  const bodyCount = paras.length
+
   // 教师版内容
   if (variant === 'teacher') {
     const teacherStart = paras.length
@@ -170,17 +179,18 @@ function buildQuestion(blockId: string, q: Question, no: number, variant: Varian
     })
   }
 
-  // 防跨页：除最后一段外都“与下段同页”，所有段“段中不分页”。
-  // 作答留白无论是否勾选防跨页，都与前一段同页。
+  // 防跨页。整题同页：除最后一段外都“与下段同页”，所有段“段中不分页”。
+  // 允许跨页：只把题目主体连在一起（不会出现题干在页底、选项在下一页），答案与详解可以跨页。
+  // 作答留白无论哪种设置都与前一段同页。
+  const keepAll = q.layout.keepTogether === 'always' || (q.layout.keepTogether === 'auto' && keepTogetherByDefault)
+  const keptCount = keepAll ? paras.length : bodyCount
   paras.forEach((p, i) => {
-    const isLast = i === paras.length - 1
     const nextIsSpacer = paras[i + 1]?.spacerTwip !== undefined
-    if (q.layout.keepTogether) {
+    if (i < keptCount) {
       p.keepLines = true
-      if (!isLast) p.keepNext = true
-    } else if (nextIsSpacer) {
-      p.keepNext = true
+      if (i < keptCount - 1) p.keepNext = true
     }
+    if (nextIsSpacer) p.keepNext = true
   })
   if (q.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
 

@@ -4,7 +4,7 @@
 import type { Dispatch } from 'react'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
-import { HEADER_SELECTION, type EditorAction } from '../state/store'
+import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction } from '../state/store'
 
 interface Props {
   blocks: Block[]
@@ -27,6 +27,13 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
           onClick={() => dispatch({ type: 'select', blockId: HEADER_SELECTION })}
         >
           <span className="outline-text">页眉与水印</span>
+        </button>
+        <button
+          type="button"
+          className={`outline-item outline-item--header${selectedBlockId === LAYOUT_SELECTION ? ' is-selected' : ''}`}
+          onClick={() => dispatch({ type: 'select', blockId: LAYOUT_SELECTION })}
+        >
+          <span className="outline-text">版式设置</span>
         </button>
       </div>
       {blocks.length === 0 ? (

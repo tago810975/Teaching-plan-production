@@ -3,10 +3,12 @@
  * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
  */
 import { createEmptyBundle } from '@core/model/factory'
-import type { Asset, Block, PageHeader, ProjectBundle, Variant } from '@core/model/types'
+import type { Asset, Block, PageHeader, ProjectBundle, ProjectLayout, Variant } from '@core/model/types'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
+/** 选中版式设置时 selectedBlockId 的取值 */
+export const LAYOUT_SELECTION = '#layout'
 
 export type HeaderImageSlot = 'logo' | 'phoneIcon' | 'watermark'
 
@@ -34,6 +36,7 @@ export type EditorAction =
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   | { type: 'delete-block'; blockId: string }
   | { type: 'set-title'; title: string }
+  | { type: 'update-layout'; layout: ProjectLayout }
   /** 添加图片资源（题图等），不改变内容 */
   | { type: 'add-asset'; asset: Asset }
   /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
@@ -113,6 +116,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         bundle: { ...next.bundle, assets: { ...next.bundle.assets, ...action.assets } }
       }
     }
+    case 'update-layout':
+      return touch(state, { ...state.bundle.project, layout: action.layout })
     case 'set-title': {
       const { project } = state.bundle
       return touch(state, { ...project, meta: { ...project.meta, title: action.title } })

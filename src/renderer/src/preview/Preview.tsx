@@ -7,7 +7,8 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { DocIR } from '@core/document/ir'
-import { paginate } from '@core/document/paginate'
+import { paginate, type PageSlice } from '@core/document/paginate'
+import { STYLE_SPECS } from '@core/document/styles'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
 import { DocParagraphView } from './DocParagraphView'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
@@ -35,7 +36,7 @@ export function Preview({
 }: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [layout, setLayout] = useState<{ ir: DocIR; pages: number[][] } | null>(null)
+  const [layout, setLayout] = useState<{ ir: DocIR; pages: PageSlice[][]; heights: number[] } | null>(null)
   const [fontsReady, setFontsReady] = useState(false)
   const [zoom, setZoom] = useState(1)
 
@@ -55,13 +56,23 @@ export function Preview({
     const els = Array.from(root.children) as HTMLElement[]
     const bottom = root.scrollHeight
     const items = ir.paragraphs.map((p, i) => {
-      const top = els[i]?.offsetTop ?? 0
+      const el = els[i]
+      const top = el?.offsetTop ?? 0
       const next = els[i + 1]?.offsetTop ?? bottom
-      const spaceAfter = els[i] === undefined ? 0 : parseFloat(getComputedStyle(els[i]!).paddingBottom) || 0
-      return { height: next - top, spaceAfter, keepNext: p.keepNext, pageBreakBefore: p.pageBreakBefore }
+      const spaceAfter = el === undefined ? 0 : parseFloat(getComputedStyle(el).paddingBottom) || 0
+      // 作答留白与带浮动图片的段落不拆分；其余未设“段中不分页”的段落可按行拆分
+      const splittable = el !== undefined && p.keepLines !== true && p.spacerTwip === undefined && p.floatingImage === undefined
+      return {
+        height: next - top,
+        spaceAfter,
+        keepNext: p.keepNext,
+        keepLines: p.keepLines,
+        pageBreakBefore: p.pageBreakBefore,
+        ...(splittable ? { lineBreaks: measureLineBreaks(el), minLines: STYLE_SPECS[p.style].widowControl === true ? 2 : 1 } : {})
+      }
     })
     const bodyHeightPx = twipToPt(bodyHeightTwip) * PT_TO_PX
-    setLayout({ ir, pages: paginate(items, bodyHeightPx) })
+    setLayout({ ir, pages: paginate(items, bodyHeightPx), heights: items.map((it) => it.height) })
   }, [ir, fontsReady, bodyHeightTwip])
 
   const pageCount = layout?.pages.length ?? 1
@@ -105,6 +116,7 @@ export function Preview({
 
   // 首次测量完成前用旧的分页结果，避免下标越界
   const current = layout?.ir === ir ? layout.pages : (layout?.pages ?? [[]])
+  const heights = layout?.heights ?? []
 
   return (
     <div className="preview" ref={scrollRef}>
@@ -133,10 +145,10 @@ export function Preview({
               onSelect={onSelectHeader}
             />
             <div style={bodyStyle}>
-              {indices.map((i) => {
-                const p = ir.paragraphs[i]
+              {indices.map((slice) => {
+                const p = ir.paragraphs[slice.index]
                 if (p === undefined) return null
-                return (
+                const view = (
                   <DocParagraphView
                     key={p.key}
                     paragraph={p}
@@ -144,6 +156,14 @@ export function Preview({
                     selected={p.sourceBlockId === selectedBlockId}
                     onSelect={onSelect}
                   />
+                )
+                if (slice.from === 0 && slice.to === undefined) return view
+                // 跨页的段落：本页只显示 from 到 to 这一段
+                const end = slice.to ?? heights[slice.index] ?? 0
+                return (
+                  <div key={`${p.key}@${slice.from}`} className="para-slice" style={{ height: `${end - slice.from}px` }}>
+                    <div style={{ marginTop: `${-slice.from}px` }}>{view}</div>
+                  </div>
                 )
               })}
             </div>
@@ -155,4 +175,28 @@ export function Preview({
       </div>
     </div>
   )
+}
+
+/**
+ * 段落中相邻两行之间的分界线（相对段落顶端，像素）。
+ * 用 Range.getClientRects 取得各行文字、公式、图片的位置，按纵向重叠归并为行。
+ */
+function measureLineBreaks(el: HTMLElement): number[] {
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  const top = el.getBoundingClientRect().top
+  const rects = Array.from(range.getClientRects())
+    .filter((r) => r.height > 1 && r.width > 0)
+    .sort((a, b) => a.top - b.top)
+  const lines: Array<{ top: number; bottom: number }> = []
+  for (const r of rects) {
+    const last = lines[lines.length - 1]
+    if (last === undefined || r.top >= last.bottom - 1) lines.push({ top: r.top, bottom: r.bottom })
+    else last.bottom = Math.max(last.bottom, r.bottom)
+  }
+  const breaks: number[] = []
+  for (let i = 0; i + 1 < lines.length; i++) {
+    breaks.push((lines[i]!.bottom + lines[i + 1]!.top) / 2 - top)
+  }
+  return breaks
 }

@@ -5,6 +5,7 @@ import type {
   Inline,
   Project,
   ProjectBundle,
+  ProjectLayout,
   Question,
   QuestionLayout,
   RichParagraph,
@@ -17,11 +18,16 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
+/** 教案默认允许跨页以节省纸张；学案默认整题同页，保证题目与作答空间在一起 */
+export const DEFAULT_PROJECT_LAYOUT: Readonly<ProjectLayout> = Object.freeze({
+  keepQuestionTogether: Object.freeze({ teacher: false, student: true })
+})
+
 export const DEFAULT_QUESTION_LAYOUT: Readonly<QuestionLayout> = Object.freeze({
   studentSpaceLines: 0,
   teacherSpaceLines: 0,
   optionColumns: 'auto',
-  keepTogether: true,
+  keepTogether: 'auto',
   pageBreakBefore: false
 })
 
@@ -30,6 +36,7 @@ export function createEmptyProject(now: Date = new Date()): Project {
   return {
     meta: { title: '未命名教学案', createdAt: stamp, updatedAt: stamp },
     header: { left: '', phone: '', right: '' },
+    layout: { ...DEFAULT_PROJECT_LAYOUT, keepQuestionTogether: { ...DEFAULT_PROJECT_LAYOUT.keepQuestionTogether } },
     templateId: DEFAULT_TEMPLATE_ID,
     blocks: []
   }

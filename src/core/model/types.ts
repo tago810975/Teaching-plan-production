@@ -90,6 +90,8 @@ export interface SubQuestion {
   content: RichText
 }
 
+export type KeepTogether = 'auto' | 'always' | 'never'
+
 /** 选项排布：自动根据选项长度决定，或手动指定每行几项 */
 export type OptionColumns = 'auto' | 1 | 2 | 4
 
@@ -99,8 +101,13 @@ export interface QuestionLayout {
   /** 教师版题后留白，单位：行 */
   teacherSpaceLines: number
   optionColumns: OptionColumns
-  /** 尽量不跨页：对应 Word 的“与下段同页”和“段中不分页” */
-  keepTogether: boolean
+  /**
+   * 整题是否排在同一页：
+   * - auto：跟随工程的版式设置（教案、学案分别设置）
+   * - always：整道题（含答案、详解）排在同一页
+   * - never：允许跨页，但题干、题图、选项等题目主体仍保持在同一页
+   */
+  keepTogether: KeepTogether
   /** 从新页开始：对应 Word 的“段前分页” */
   pageBreakBefore: boolean
 }
@@ -209,9 +216,16 @@ export interface PageHeader {
   watermark?: HeaderImage
 }
 
+/** 工程级的版式设置 */
+export interface ProjectLayout {
+  /** 每道题默认是否整题排在同一页，教案与学案分别设置 */
+  keepQuestionTogether: Record<Variant, boolean>
+}
+
 export interface Project {
   meta: ProjectMeta
   header: PageHeader
+  layout: ProjectLayout
   /** 使用的 Word 模板标识，对应 resources/templates 下的目录名 */
   templateId: string
   blocks: Block[]

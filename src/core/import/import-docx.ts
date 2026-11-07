@@ -2,6 +2,7 @@
  * 导入 Word 文档：读取 → 识别 → 整理资源与提示信息。
  */
 import { ommlToMathml } from '../math/omml-to-mathml'
+import { createEmptyProject } from '../model/factory'
 import type { Asset, Block } from '../model/types'
 import { collectAssetRefs } from '../project-file/codec'
 import { readDocx } from './docx-reader'
@@ -22,7 +23,7 @@ export async function importDocx(bytes: Uint8Array): Promise<DocxImportResult> {
   const { blocks, questionCount, firstTitle } = recognize(read.paragraphs)
 
   // 只保留被引用的图片（水印、页眉图片等不会进入正文）
-  const refs = collectAssetRefs({ meta: { title: '', createdAt: '', updatedAt: '' }, header: { left: '', phone: '', right: '' }, templateId: '', blocks })
+  const refs = collectAssetRefs({ ...createEmptyProject(), blocks })
   const assets: Record<string, Asset> = {}
   for (const id of refs) if (read.assets[id] !== undefined) assets[id] = read.assets[id]
 

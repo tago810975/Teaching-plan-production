@@ -173,9 +173,28 @@ async function readJson<T>(zip: JSZip, path: string): Promise<T> {
   }
 }
 
-/** 将旧版本的 project.json 迁移到当前版本。目前只有版本 1，无需迁移。 */
+/** 将旧版本的 project.json 迁移到当前版本 */
 function migrate(raw: unknown, fromVersion: number): unknown {
-  // 将来示例：if (fromVersion < 2) raw = migrateV1toV2(raw)
-  void fromVersion
-  return raw
+  let data = raw
+  if (fromVersion < 2) data = migrateV1toV2(data)
+  return data
+}
+
+/**
+ * 版本 1 → 2：
+ * - 补上工程版式设置。旧工程原本都是“整题同页”，迁移后保持原样，不改变已有的排版效果；
+ * - 题目的 keepTogether：true（旧默认）→ auto，false → never。
+ */
+function migrateV1toV2(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const project = raw as Record<string, unknown>
+  project.layout ??= { keepQuestionTogether: { teacher: true, student: true } }
+  const blocks = Array.isArray(project.blocks) ? project.blocks : []
+  for (const block of blocks as Array<Record<string, unknown>>) {
+    const layout = (block?.question as Record<string, unknown> | undefined)?.layout as Record<string, unknown> | undefined
+    if (layout !== undefined && typeof layout.keepTogether === 'boolean') {
+      layout.keepTogether = layout.keepTogether ? 'auto' : 'never'
+    }
+  }
+  return project
 }

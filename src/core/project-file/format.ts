@@ -18,7 +18,13 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 1
+export const CURRENT_FORMAT_VERSION = 2
+
+/*
+ * 版本记录：
+ * 1 —— 初始版本
+ * 2 —— 新增 project.layout（整题同页的默认设置）；题目 layout.keepTogether 由布尔值改为 auto/always/never
+ */
 
 export interface Manifest {
   format: 'teaching-plan'

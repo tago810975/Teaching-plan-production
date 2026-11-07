@@ -7,20 +7,32 @@ import { useId, useState, type Dispatch, type ReactNode } from 'react'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { newId } from '@core/model/factory'
 import { FigureList } from './FigureList'
-import type { Block, OptionColumns, Question, QuestionBlock, RichParagraph, RichText } from '@core/model/types'
+import type { Block, KeepTogether, OptionColumns, Question, QuestionBlock, RichParagraph, RichText } from '@core/model/types'
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
-import type { PageHeader } from '@core/model/types'
+import type { PageHeader, ProjectLayout, Variant } from '@core/model/types'
 
 interface Props {
   block: Block | null
   /** 不为 null 时表示正在编辑页眉 */
   header: PageHeader | null
+  /** 不为 null 时表示正在编辑版式设置 */
+  layout: ProjectLayout | null
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
 }
 
-export function Inspector({ block, header, assetUrls, dispatch }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch }: Props) {
+  if (layout !== null) {
+    return (
+      <aside className="panel inspector" aria-label="属性">
+        <h2 className="panel-title">版式设置</h2>
+        <div className="inspector-body">
+          <LayoutForm layout={layout} dispatch={dispatch} />
+        </div>
+      </aside>
+    )
+  }
   if (header !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -78,6 +90,39 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
   topic: '题型分组',
   paragraph: '正文段落',
   question: '题目'
+}
+
+// ---------------- 版式设置 ----------------
+
+function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction> }) {
+  const set = (variant: Variant, value: boolean): void =>
+    dispatch({
+      type: 'update-layout',
+      layout: { ...layout, keepQuestionTogether: { ...layout.keepQuestionTogether, [variant]: value } }
+    })
+  const row = (variant: Variant, name: string) => (
+    <Field label={name}>
+      <Segmented<'keep' | 'split'>
+        value={layout.keepQuestionTogether[variant] ? 'keep' : 'split'}
+        options={[
+          ['split', '允许跨页（节省纸张）'],
+          ['keep', '整题同页']
+        ]}
+        onChange={(v) => set(variant, v === 'keep')}
+      />
+    </Field>
+  )
+  return (
+    <>
+      <p className="field-hint">
+        设置每道题默认是否整题排在同一页。整题同页时，排不下的题目会整道移到下一页，前一页可能留下空白；
+        允许跨页时，题干、题图与选项仍保持在同一页，只有答案和详解可以接到下一页。
+      </p>
+      {row('teacher', '教案')}
+      {row('student', '学案')}
+      <p className="field-hint">单道题可以在题目的“版式”中另行设置。</p>
+    </>
+  )
 }
 
 // ---------------- 题目表单 ----------------
@@ -245,11 +290,17 @@ function QuestionForm({
         <Field label="教师版题后留白" hint="单位：行">
           <NumberInput value={q.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
         </Field>
-        <Checkbox
-          label="整道题尽量排在同一页"
-          checked={q.layout.keepTogether}
-          onChange={(keepTogether) => setLayout({ keepTogether })}
-        />
+        <Field label="跨页" hint="允许跨页时，题干、题图与选项仍保持在同一页，只有答案和详解可以接到下一页">
+          <Segmented<KeepTogether>
+            value={q.layout.keepTogether}
+            options={[
+              ['auto', '跟随版式设置'],
+              ['always', '整题同页'],
+              ['never', '允许跨页']
+            ]}
+            onChange={(keepTogether) => setLayout({ keepTogether })}
+          />
+        </Field>
         <Checkbox
           label="从新的一页开始"
           checked={q.layout.pageBreakBefore}

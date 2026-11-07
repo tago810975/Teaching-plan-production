@@ -70,7 +70,7 @@ const question = z.object({
     studentSpaceLines: z.number().min(0),
     teacherSpaceLines: z.number().min(0),
     optionColumns: z.union([z.literal('auto'), z.literal(1), z.literal(2), z.literal(4)]),
-    keepTogether: z.boolean(),
+    keepTogether: z.enum(['auto', 'always', 'never']),
     pageBreakBefore: z.boolean()
   })
 })
@@ -112,6 +112,9 @@ export const projectSchema = z.object({
     phone: z.string(),
     right: z.string(),
     watermark: headerImage.optional()
+  }),
+  layout: z.object({
+    keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() })
   }),
   templateId: z.string(),
   blocks: z.array(block)

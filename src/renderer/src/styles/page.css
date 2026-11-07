@@ -209,3 +209,12 @@
   text-align: center;
   margin: 2pt 0;
 }
+
+/*
+ * 跨页段落的一部分：纵向裁切，左右不裁（保留选中时页边上的红线）。
+ * flow-root 阻止内部负的上边距与容器合并，否则整个容器会被一起拉上去。
+ */
+.para-slice {
+  display: flow-root;
+  clip-path: inset(0 -24pt 0 -24pt);
+}

@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { createEmptyBundle } from '@core/model/factory'
+import { createEmptyBundle, createQuestion } from '@core/model/factory'
 import { createAsset, decodeBundle, decodeSummary, encodeBundle, ProjectFileError } from '@core/project-file/codec'
 import { CURRENT_FORMAT_VERSION, PROJECT_FILE_MIMETYPE } from '@core/project-file/format'
 import { createDemoBundle } from '@core/sample/demo-project'
@@ -80,6 +80,21 @@ describe('工程文件编解码', () => {
     )
     zip.file('project.json', '{}')
     await expect(decodeBundle(await zip.generateAsync({ type: 'uint8array' }))).rejects.toThrow('请升级软件')
+  })
+
+  it('旧版（第 1 版）工程自动迁移，排版效果保持不变', async () => {
+    const v2 = createEmptyBundle().project
+    const { layout: _layout, ...v1 } = v2
+    const q = { id: 'q', type: 'question', question: { ...createQuestion(), layout: { ...createQuestion().layout, keepTogether: true } } }
+    const q2 = { id: 'q2', type: 'question', question: { ...createQuestion(), layout: { ...createQuestion().layout, keepTogether: false } } }
+    const zip = new JSZip()
+    zip.file('mimetype', PROJECT_FILE_MIMETYPE)
+    zip.file('manifest.json', JSON.stringify({ format: 'teaching-plan', formatVersion: 1, appVersion: '0.1.0', savedAt: '' }))
+    zip.file('project.json', JSON.stringify({ ...v1, blocks: [q, q2] }))
+    const decoded = await decodeBundle(await zip.generateAsync({ type: 'uint8array' }))
+    expect(decoded.project.layout.keepQuestionTogether).toEqual({ teacher: true, student: true })
+    const layouts = decoded.project.blocks.map((b) => (b.type === 'question' ? b.question.layout.keepTogether : null))
+    expect(layouts).toEqual(['auto', 'never'])
   })
 
   it('project.json 结构不对时给出具体位置', async () => {

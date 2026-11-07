@@ -56,6 +56,10 @@ export interface ParagraphStyleSpec {
    */
   autoNumbered?: boolean
   /**
+   * 孤行控制：开启时段落跨页后两边各至少保留 2 行。取自模板（WPS 生成的样式大多关闭）。
+   */
+  widowControl?: boolean
+  /**
    * 模板样式本身没有、需要在段落上直接设置的左缩进（twip）。
    * 用于“题干续行”这类借用正文样式但需要缩进的段落。
    */
@@ -113,7 +117,13 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     autoNumbered: true
   },
   questionContinued: { ...base, wordStyleName: '物理排版 正文', indentLeftTwip: 333, directIndentTwip: 333 },
-  subQuestion: { ...base, wordStyleName: '物理排版 题目 次级题目', indentLeftTwip: 333, autoNumbered: true },
+  subQuestion: {
+    ...base,
+    wordStyleName: '物理排版 题目 次级题目',
+    indentLeftTwip: 333,
+    autoNumbered: true,
+    widowControl: true
+  },
   option: {
     ...base,
     wordStyleName: '物理排版 题目 选项',

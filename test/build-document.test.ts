@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument, resolveOptionColumns } from '@core/document/build'
-import { paginate } from '@core/document/paginate'
+import { paginate, type MeasuredParagraph, type PageSlice } from '@core/document/paginate'
 import { createEmptyProject, createQuestion, newId, para } from '@core/model/factory'
 import type { Project, Question } from '@core/model/types'
 import { createDemoBundle } from '@core/sample/demo-project'
@@ -120,10 +120,7 @@ describe('版式参数', () => {
   })
 
   it('学生版作答留白为题末的固定高度空段，并与题目同页', () => {
-    const q = createQuestion({
-      stem: [para('题')],
-      layout: { studentSpaceLines: 5, keepTogether: false } as Question['layout']
-    })
+    const q = createQuestion({ stem: [para('题')], layout: { studentSpaceLines: 5, keepTogether: 'never' } })
     const ir = buildDocument(projectWith(q), 'student')
     expect(ir.paragraphs.map((p) => [p.style, p.spacerTwip, p.keepNext ?? false])).toEqual([
       ['question', undefined, true],
@@ -132,10 +129,35 @@ describe('版式参数', () => {
     expect(buildDocument(projectWith(q), 'teacher').paragraphs).toHaveLength(1)
   })
 
-  it('防跨页：除最后一段外都与下段同页', () => {
-    const ir = buildDocument(projectWith(fullQuestion()), 'teacher')
+  it('整题同页：除最后一段外都与下段同页', () => {
+    const q = fullQuestion()
+    q.layout.keepTogether = 'always'
+    const ir = buildDocument(projectWith(q), 'teacher')
     expect(ir.paragraphs.map((p) => p.keepNext ?? false)).toEqual([true, true, true, true, true, true, false])
     expect(ir.paragraphs.every((p) => p.keepLines === true)).toBe(true)
+  })
+
+  it('允许跨页：只有题目主体连在一起，答案与详解可以跨页', () => {
+    const q = fullQuestion()
+    q.layout.keepTogether = 'never'
+    const ir = buildDocument(projectWith(q), 'teacher')
+    expect(ir.paragraphs.map((p) => [p.style, p.keepNext ?? false, p.keepLines ?? false])).toEqual([
+      ['question', true, true],
+      ['option', false, true],
+      ['answer', false, false],
+      ['knowledge', false, false],
+      ['keyPoint', false, false],
+      ['difficultPoint', false, false],
+      ['analysis', false, false]
+    ])
+  })
+
+  it('跟随工程设置：教案默认允许跨页，学案默认整题同页', () => {
+    const p = projectWith(fullQuestion())
+    expect(p.layout.keepQuestionTogether).toEqual({ teacher: false, student: true })
+    expect(buildDocument(p, 'teacher').paragraphs[2]?.keepLines).toBeUndefined()
+    p.layout.keepQuestionTogether.teacher = true
+    expect(buildDocument(p, 'teacher').paragraphs[2]?.keepLines).toBe(true)
   })
 
   it('右侧题图挂在题干段落上', async () => {
@@ -149,37 +171,75 @@ describe('版式参数', () => {
 
 
 describe('预览分页', () => {
-  const h = (height: number, extra: Partial<{ keepNext: boolean; pageBreakBefore: boolean }> = {}) => ({
-    height,
-    ...extra
-  })
+  const h = (height: number, extra: Partial<MeasuredParagraph> = {}): MeasuredParagraph => ({ height, ...extra })
+  /** 只看每页有哪些段落 */
+  const idx = (pages: PageSlice[][]): number[][] => pages.map((p) => p.map((s) => s.index))
 
   it('按高度依次填满每页', () => {
-    expect(paginate([h(40), h(40), h(40)], 100)).toEqual([[0, 1], [2]])
+    expect(idx(paginate([h(40), h(40), h(40)], 100))).toEqual([[0, 1], [2]])
   })
 
   it('与下段同页的一组放不下时整组移到下一页', () => {
-    expect(paginate([h(50), h(30, { keepNext: true }), h(30)], 100)).toEqual([[0], [1, 2]])
+    expect(idx(paginate([h(50), h(30, { keepNext: true }), h(30, { keepLines: true })], 100))).toEqual([[0], [1, 2]])
   })
 
   it('整组超过一页时逐段排', () => {
-    expect(paginate([h(60, { keepNext: true }), h(60, { keepNext: true }), h(60)], 100)).toEqual([[0], [1], [2]])
+    expect(idx(paginate([h(60, { keepNext: true }), h(60, { keepNext: true }), h(60)], 100))).toEqual([[0], [1], [2]])
   })
 
   it('页底段落的段后间距可以超出页面', () => {
-    expect(paginate([h(50), { height: 60, spaceAfter: 15 }], 100)).toEqual([[0, 1]])
-    expect(paginate([h(50), { height: 60, spaceAfter: 5 }], 100)).toEqual([[0], [1]])
+    expect(idx(paginate([h(50), { height: 60, spaceAfter: 15 }], 100))).toEqual([[0, 1]])
+    expect(idx(paginate([h(50), { height: 60, spaceAfter: 5 }], 100))).toEqual([[0], [1]])
   })
 
-  it('段前分页', () => {
-    expect(paginate([h(10), h(10, { pageBreakBefore: true })], 100)).toEqual([[0], [1]])
-  })
-
-  it('首页的段前分页不产生空白页', () => {
-    expect(paginate([h(10, { pageBreakBefore: true })], 100)).toEqual([[0]])
+  it('段前分页；首页的段前分页不产生空白页', () => {
+    expect(idx(paginate([h(10), h(10, { pageBreakBefore: true })], 100))).toEqual([[0], [1]])
+    expect(idx(paginate([h(10, { pageBreakBefore: true })], 100))).toEqual([[0]])
   })
 
   it('空文档为一页空白页', () => {
     expect(paginate([], 100)).toEqual([[]])
+  })
+
+  // 一个 6 行的段落，每行 20：分界线在 20、40、60、80、100
+  const sixLines = (extra: Partial<MeasuredParagraph> = {}): MeasuredParagraph =>
+    h(120, { lineBreaks: [20, 40, 60, 80, 100], ...extra })
+
+  it('允许拆分的段落按行拆到下一页', () => {
+    expect(paginate([h(50), sixLines()], 100)).toEqual([
+      [{ index: 0, from: 0 }, { index: 1, from: 0, to: 40 }],
+      [{ index: 1, from: 40 }]
+    ])
+  })
+
+  it('孤行控制：两边各至少 2 行', () => {
+    // 当前页只放得下 1 行时不拆，整段移到下一页
+    expect(paginate([h(95), sixLines({ minLines: 2 })], 130)).toEqual([[{ index: 0, from: 0 }], [{ index: 1, from: 0 }]])
+    // 关闭孤行控制则可以只留 1 行在当前页
+    expect(paginate([h(95), sixLines()], 130)).toEqual([
+      [{ index: 0, from: 0 }, { index: 1, from: 0, to: 20 }],
+      [{ index: 1, from: 20 }]
+    ])
+  })
+
+  it('段中不分页的段落不拆', () => {
+    expect(idx(paginate([h(50), sixLines({ keepLines: true })], 100))).toEqual([[0], [1]])
+  })
+
+  it('超过一页的长段落连续拆到多页', () => {
+    const long = h(250, { lineBreaks: Array.from({ length: 24 }, (_, i) => (i + 1) * 10) })
+    const pages = paginate([long], 100)
+    expect(pages.map((p) => p[0])).toEqual([
+      { index: 0, from: 0, to: 100 },
+      { index: 0, from: 100, to: 200 },
+      { index: 0, from: 200 }
+    ])
+  })
+
+  it('与下段同页：前一段放得下且下一段开头几行放得下时，在下一段中间拆开', () => {
+    expect(paginate([h(30), h(20, { keepNext: true }), sixLines()], 100)).toEqual([
+      [{ index: 0, from: 0 }, { index: 1, from: 0 }, { index: 2, from: 0, to: 40 }],
+      [{ index: 2, from: 40 }]
+    ])
   })
 })

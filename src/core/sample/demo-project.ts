@@ -80,8 +80,7 @@ export async function createDemoBundle(defaults?: TemplateDefaults, now?: Date):
             '．'
           ),
           para('【点睛】抓住粒子的周期一定，根据速度的偏向角等于轨迹的圆心角，由圆心角确定粒子在磁场中的运动时间．')
-        ],
-        layout: { studentSpaceLines: 0, teacherSpaceLines: 0, optionColumns: 'auto', keepTogether: true, pageBreakBefore: false }
+        ]
       })
     },
     { id: newId(), type: 'topic', text: '圆形边界磁场动态圆' },
@@ -134,7 +133,7 @@ export async function createDemoBundle(defaults?: TemplateDefaults, now?: Date):
         answer: [para('(1) ', m('v_0=\\frac{qBL}{m}'), '；(2) ', m('v_0\\le\\frac{qBL}{3m}'))],
         knowledgePoints: ['放缩圆'],
         keyPoint: '电性未知导致多解',
-        layout: { studentSpaceLines: 8, teacherSpaceLines: 0, optionColumns: 'auto', keepTogether: true, pageBreakBefore: false }
+        layout: { studentSpaceLines: 8 }
       })
     }
   ]
