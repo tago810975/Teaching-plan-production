@@ -6,7 +6,7 @@
 import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
-import { newId } from '@core/model/factory'
+import { createKnowledge, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
 import type {
   Block,
@@ -176,8 +176,11 @@ function KnowledgeForm({
       <Field label="内容" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
         <RichTextField value={block.content} rows={10} onChange={(content) => set({ content })} />
       </Field>
+      <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
         title="插图"
+        kind="knowledge"
+        paragraphs={block.content}
         figures={block.figures}
         assetUrls={assetUrls}
         onChange={(figures) => set({ figures })}
@@ -185,6 +188,88 @@ function KnowledgeForm({
       />
       <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整块同页" />
     </>
+  )
+}
+
+/**
+ * 知识点的段落设置：每段的段后空行、从此段换页；也可以从某一段拆分出新的知识点，
+ * 拆出的部分拥有独立的版式设置。
+ */
+function ParagraphSettings({
+  block,
+  update,
+  dispatch
+}: {
+  block: KnowledgeBlock
+  update: (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void
+  dispatch: Dispatch<EditorAction>
+}) {
+  if (block.content.length === 0) return null
+  const setFormat = (i: number, patch: NonNullable<RichParagraph['format']>): void =>
+    update((b) => ({
+      ...b,
+      content: b.content.map((p, j) => {
+        if (j !== i) return p
+        const format = { ...p.format, ...patch }
+        if (format.spaceAfterLines === 0) delete format.spaceAfterLines
+        if (format.pageBreakBefore === false) delete format.pageBreakBefore
+        return Object.keys(format).length > 0 ? { ...p, format } : { inlines: p.inlines }
+      })
+    }))
+
+  const split = (i: number): void => {
+    const last = block.content.length - 1
+    const stay = block.figures.filter((f) => (f.anchorParagraph ?? last) < i)
+    const move = block.figures
+      .filter((f) => (f.anchorParagraph ?? last) >= i)
+      .map((f) => ({ ...f, anchorParagraph: (f.anchorParagraph ?? last) - i }))
+    const rest = createKnowledge({ title: '', content: block.content.slice(i), figures: move })
+    update((b) => ({ ...b, content: b.content.slice(0, i), figures: stay }))
+    dispatch({ type: 'insert-blocks', blocks: [rest], afterBlockId: block.id })
+  }
+
+  return (
+    <fieldset className="group">
+      <legend>段落设置</legend>
+      <p className="field-hint">在长知识点中插入空行或换页；也可以从某段拆分出新的知识点，单独设置版式。</p>
+      <ol className="para-settings">
+        {block.content.map((p, i) => (
+          <li key={i} className="para-settings-row">
+            <span className="para-settings-text" title={plainText(p)}>
+              {i + 1}. {plainText(p).replace(/\$[^$]*\$/g, '…').slice(0, 18) || '（空）'}
+            </span>
+            <span className="para-settings-controls">
+              <label title="这一段之后空出的行数">
+                空行
+                <input
+                  type="number"
+                  min={0}
+                  max={40}
+                  value={p.format?.spaceAfterLines ?? 0}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    if (Number.isFinite(n) && n >= 0) setFormat(i, { spaceAfterLines: n })
+                  }}
+                />
+              </label>
+              <label title="从这一段开始换到新的一页">
+                <input
+                  type="checkbox"
+                  checked={p.format?.pageBreakBefore === true}
+                  onChange={(e) => setFormat(i, { pageBreakBefore: e.target.checked })}
+                />
+                换页
+              </label>
+              {i > 0 && (
+                <button type="button" className="link" title="从这一段起拆分为新的知识点" onClick={() => split(i)}>
+                  拆分
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </fieldset>
   )
 }
 
@@ -254,6 +339,9 @@ function QuestionForm({
       </Field>
 
       <FigureList
+        kind="question"
+        paragraphs={q.stem}
+        subQuestionCount={q.subQuestions.length}
         figures={q.figures}
         assetUrls={assetUrls}
         onChange={(figures) => set({ figures })}
@@ -414,9 +502,16 @@ function RichTextField({ value, rows, onChange }: { value: RichText; rows: numbe
   const [initial] = useState(() => toEditable(value))
   const [draft, setDraft] = useState(initial.text)
   const ref = useRef<HTMLTextAreaElement>(null)
+  const latest = useRef(value)
+  latest.current = value
   const update = (text: string): void => {
     setDraft(text)
-    onChange(fromEditable(text, initial.objects))
+    // 文本框只编辑文字：按段落顺序保留原有的段落格式（缩进、空行、换页）
+    const next = fromEditable(text, initial.objects).map((p, i) => {
+      const format = latest.current[i]?.format
+      return format !== undefined ? { ...p, format } : p
+    })
+    onChange(next)
   }
   return (
     <div className="text-field">

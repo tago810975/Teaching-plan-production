@@ -3,8 +3,8 @@
  * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
  */
 import { createEmptyBundle } from '@core/model/factory'
-import type { InlineRef } from '@core/document/ir'
-import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, Variant } from '@core/model/types'
+import type { FigureRef, InlineRef } from '@core/document/ir'
+import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, Variant } from '@core/model/types'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -45,6 +45,8 @@ export type EditorAction =
   | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
+  /** 修改某张题图 / 插图（在预览中缩放、拖动后） */
+  | { type: 'update-figure'; ref: FigureRef; patch: Partial<QuestionFigure> }
   /** 替换（inline 为 null 时删除）某个行内内容，如在预览中编辑的公式 */
   | { type: 'replace-inline'; ref: InlineRef; inline: Inline | null }
   /** 添加图片资源（题图等），不改变内容 */
@@ -139,6 +141,21 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         selectedBlockId: action.blocks[0]!.id,
         bundle: { ...next.bundle, assets: { ...next.bundle.assets, ...action.assets } }
       }
+    }
+    case 'update-figure': {
+      const { ref, patch } = action
+      const next = withBlocks(state, (blocks) =>
+        blocks.map((b) => {
+          if (b.id !== ref.blockId) return b
+          const apply = (figs: QuestionFigure[]): QuestionFigure[] =>
+            figs.map((f, i) => (i === ref.figureIndex ? { ...f, ...patch } : f))
+          if (b.type === 'question') return { ...b, question: { ...b.question, figures: apply(b.question.figures) } }
+          if (b.type === 'knowledge') return { ...b, figures: apply(b.figures) }
+          return b
+        })
+      )
+      // 属性面板中的宽度等数值随之更新
+      return { ...next, revision: state.revision + 1 }
     }
     case 'replace-inline': {
       const { ref, inline } = action

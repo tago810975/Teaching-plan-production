@@ -229,6 +229,7 @@ function EditorBody({
           headerSelected={headerSelected}
           onPageCount={setPageCount}
           onEditMath={editMath}
+          onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
         />
         <Inspector
           block={selectedBlock}

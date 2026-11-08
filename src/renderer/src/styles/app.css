@@ -1060,3 +1060,57 @@ body.is-dragging-outline * {
 .outline-actions button {
   white-space: nowrap;
 }
+
+/* ---------- 图片位置与段落设置 ---------- */
+
+.figure-placement,
+.figure-anchor {
+  width: 100%;
+  max-width: 240px;
+  padding: 3px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--panel-raised);
+}
+.figure-free-hint {
+  margin: 0;
+}
+.para-settings {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.para-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #e3e8e6;
+}
+.para-settings-text {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-soft);
+}
+.para-settings-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.para-settings-controls label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.para-settings-controls input[type='number'] {
+  width: 3.5em;
+  padding: 2px 4px;
+}

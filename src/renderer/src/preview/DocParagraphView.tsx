@@ -6,6 +6,7 @@ import type { DocParagraph, DocRun } from '@core/document/ir'
 import { previewCss, STYLE_SPECS } from '@core/document/styles'
 import { emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
+import { FigureImage, type FigureChangeHandler } from './FigureImage'
 
 interface Props {
   paragraph: DocParagraph
@@ -14,6 +15,8 @@ interface Props {
   onSelect?: (blockId: string) => void
   /** 点击公式时调用；不提供则公式不可点击（如测量区） */
   onEditMath?: (run: MathRun) => void
+  /** 在预览中缩放、拖动图片后调用 */
+  onFigureChange?: FigureChangeHandler
 }
 
 export type MathRun = Extract<DocRun, { kind: 'math' }>
@@ -23,7 +26,8 @@ export const DocParagraphView = memo(function DocParagraphView({
   assetUrls,
   selected,
   onSelect,
-  onEditMath
+  onEditMath,
+  onFigureChange
 }: Props) {
   const spec = STYLE_SPECS[p.style]
   const css = previewCss(spec)
@@ -63,18 +67,34 @@ export const DocParagraphView = memo(function DocParagraphView({
       </span>
     )
 
+  const fi = p.floatingImage
   const floating =
-    p.floatingImage === undefined ? null : (
-      <img
+    fi === undefined ? null : (
+      <FigureImage
         className="para-float"
-        src={assetUrls.get(p.floatingImage.assetId)}
-        alt=""
-        style={{
-          width: `${emuToPt(p.floatingImage.widthEmu)}pt`,
-          height: `${emuToPt(p.floatingImage.heightEmu)}pt`
-        }}
+        src={assetUrls.get(fi.assetId)}
+        widthEmu={fi.widthEmu}
+        heightEmu={fi.heightEmu}
+        figureRef={fi.ref}
+        active={selected}
+        onChange={onFigureChange}
       />
     )
+
+  // 自由位置的图片：相对本段定位，浮于文字上方
+  const freeImages = (p.freeImages ?? []).map((img) => (
+    <FigureImage
+      key={`free-${img.ref.figureIndex}`}
+      className="para-free"
+      src={assetUrls.get(img.assetId)}
+      widthEmu={img.widthEmu}
+      heightEmu={img.heightEmu}
+      figureRef={img.ref}
+      active={selected}
+      onChange={onFigureChange}
+      free={{ offsetXEmu: img.offsetXEmu, offsetYEmu: img.offsetYEmu }}
+    />
+  ))
 
   const className = [
     'para',
@@ -94,9 +114,10 @@ export const DocParagraphView = memo(function DocParagraphView({
       onClick={onSelect === undefined ? undefined : () => onSelect(p.sourceBlockId)}
     >
       {floating}
+      {freeImages}
       {label}
       {p.tabStopsTwip === undefined ? (
-        renderRuns(p.runs, assetUrls, onEditMath)
+        renderRuns(p.runs, assetUrls, onEditMath, { active: selected, onChange: onFigureChange })
       ) : (
         <TabbedRuns
           runs={p.runs}
@@ -145,7 +166,8 @@ function TabbedRuns(props: {
 function renderRuns(
   runs: DocRun[],
   assetUrls: ReadonlyMap<string, string>,
-  onEditMath?: (run: MathRun) => void
+  onEditMath?: (run: MathRun) => void,
+  figures?: { active: boolean; onChange: FigureChangeHandler | undefined }
 ): ReactNode[] {
   return runs.map((run, i) => {
     switch (run.kind) {
@@ -176,6 +198,21 @@ function renderRuns(
           />
         )
       case 'image':
+        // 属于题图、插图的图片可在预览中缩放；正文中的行内图片保持普通显示
+        if (run.ref !== undefined && figures !== undefined) {
+          return (
+            <FigureImage
+              key={i}
+              className="run-image"
+              src={assetUrls.get(run.assetId)}
+              widthEmu={run.widthEmu}
+              heightEmu={run.heightEmu}
+              figureRef={run.ref}
+              active={figures.active}
+              onChange={figures.onChange}
+            />
+          )
+        }
         return (
           <img
             key={i}

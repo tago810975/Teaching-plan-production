@@ -3,11 +3,19 @@
  */
 import { useRef, useState } from 'react'
 import { createAsset } from '@core/project-file/codec'
-import type { Asset, QuestionFigure } from '@core/model/types'
+import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/model/types'
+import { plainText } from '@core/model/factory'
+import { A4_PAGE, contentWidthTwip } from '@core/document/units'
 
 interface Props {
   /** 分组标题，默认“题图” */
   title?: string
+  /** 题目与知识点可选的位置不同 */
+  kind: 'question' | 'knowledge'
+  /** 可锚定的段落（题干或知识点正文），用于“第 N 段”选择 */
+  paragraphs: RichText
+  /** 小问数量，用于“第 N 小问下方” */
+  subQuestionCount?: number
   figures: QuestionFigure[]
   assetUrls: ReadonlyMap<string, string>
   onChange: (figures: QuestionFigure[]) => void
@@ -19,7 +27,34 @@ const EMU_PER_CM = 360000
 /** 新加图片的默认宽度：5 厘米 */
 const DEFAULT_WIDTH_CM = 5
 
-export function FigureList({ title = '题图', figures, assetUrls, onChange, onAddAsset }: Props) {
+const QUESTION_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
+  ['below', '题干下方'],
+  ['right', '题干右侧（文字环绕）'],
+  ['right-items', '题干下方，位于选项或小问右侧'],
+  ['below-item', '某个小问下方'],
+  ['below-all', '全部题目文字下方'],
+  ['free', '自由位置（在预览中拖动）']
+]
+
+const KNOWLEDGE_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
+  ['below', '某段之后'],
+  ['right', '某段右侧（文字环绕）'],
+  ['free', '自由位置（在预览中拖动）']
+]
+
+/** EMU / twip */
+const EMU_PER_TWIP = 635
+
+export function FigureList({
+  title = '题图',
+  kind,
+  paragraphs,
+  subQuestionCount = 0,
+  figures,
+  assetUrls,
+  onChange,
+  onAddAsset
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,25 +97,49 @@ export function FigureList({ title = '题图', figures, assetUrls, onChange, onA
             <img src={assetUrls.get(f.assetId)} alt={`${title} ${i + 1}`} />
           </div>
           <div className="figure-controls">
-            <div className="segmented" role="radiogroup" aria-label={`${title} ${i + 1} 的位置`}>
-              {(
-                [
-                  ['below', title === '题图' ? '题干下方' : '正文下方'],
-                  ['right', '右侧环绕']
-                ] as const
-              ).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="radio"
-                  aria-checked={f.placement === v}
-                  className={f.placement === v ? 'is-active' : ''}
-                  onClick={() => update(i, { placement: v })}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <select
+              className="figure-placement"
+              aria-label={`${title} ${i + 1} 的位置`}
+              value={f.placement}
+              onChange={(e) => update(i, placementPatch(f, e.target.value as FigurePlacement))}
+            >
+              {(kind === 'question' ? QUESTION_PLACEMENTS : KNOWLEDGE_PLACEMENTS)
+                .filter(([v]) => v !== 'below-item' || subQuestionCount > 0 || f.placement === 'below-item')
+                .map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+            {needsParagraph(kind, f.placement) && paragraphs.length > 1 && (
+              <select
+                className="figure-anchor"
+                aria-label={`${title} ${i + 1} 所在段落`}
+                value={Math.min(f.anchorParagraph ?? (kind === 'knowledge' && f.placement === 'below' ? paragraphs.length - 1 : 0), paragraphs.length - 1)}
+                onChange={(e) => update(i, { anchorParagraph: Number(e.target.value) })}
+              >
+                {paragraphs.map((p, j) => (
+                  <option key={j} value={j}>
+                    第 {j + 1} 段：{excerpt(p)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {f.placement === 'below-item' && subQuestionCount > 0 && (
+              <select
+                className="figure-anchor"
+                aria-label={`${title} ${i + 1} 所在小问`}
+                value={Math.min(f.anchorItem ?? 0, subQuestionCount - 1)}
+                onChange={(e) => update(i, { anchorItem: Number(e.target.value) })}
+              >
+                {Array.from({ length: subQuestionCount }, (_, j) => (
+                  <option key={j} value={j}>
+                    第 ({j + 1}) 小问下方
+                  </option>
+                ))}
+              </select>
+            )}
+            {f.placement === 'free' && <p className="field-hint figure-free-hint">选中内容后，在预览中按住图片拖动摆放。</p>}
             <label className="figure-width">
               宽度
               <input
@@ -137,6 +196,23 @@ export function FigureList({ title = '题图', figures, assetUrls, onChange, onA
       />
     </fieldset>
   )
+}
+
+function needsParagraph(kind: 'question' | 'knowledge', placement: FigurePlacement): boolean {
+  if (kind === 'knowledge') return true
+  return placement === 'right' || placement === 'free'
+}
+
+function excerpt(p: RichText[number]): string {
+  const t = plainText(p).replace(/\$[^$]*\$/g, '…').replace(/\s+/g, ' ')
+  return t.length > 14 ? `${t.slice(0, 14)}…` : t || '（空）'
+}
+
+/** 切换位置时补上需要的字段：自由位置默认放在栏的右上角 */
+function placementPatch(f: QuestionFigure, placement: FigurePlacement): Partial<QuestionFigure> {
+  if (placement !== 'free' || f.offsetXEmu !== undefined) return { placement }
+  const columnEmu = contentWidthTwip(A4_PAGE) * EMU_PER_TWIP
+  return { placement, offsetXEmu: Math.max(0, columnEmu - f.widthEmu), offsetYEmu: 0 }
 }
 
 function swap<T>(arr: T[], a: number, b: number): T[] {

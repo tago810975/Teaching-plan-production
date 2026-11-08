@@ -11,6 +11,7 @@ import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
 import { DocParagraphView, type MathRun } from './DocParagraphView'
+import type { FigureChangeHandler } from './FigureImage'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
 const PT_TO_PX = 96 / 72
@@ -24,6 +25,7 @@ interface Props {
   headerSelected: boolean
   onPageCount?: (count: number) => void
   onEditMath?: (run: MathRun) => void
+  onFigureChange?: FigureChangeHandler
 }
 
 export function Preview({
@@ -34,7 +36,8 @@ export function Preview({
   onSelectHeader,
   headerSelected,
   onPageCount,
-  onEditMath
+  onEditMath,
+  onFigureChange
 }: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -158,6 +161,7 @@ export function Preview({
                     selected={p.sourceBlockId === selectedBlockId}
                     onSelect={onSelect}
                     {...(onEditMath !== undefined ? { onEditMath } : {})}
+                    {...(onFigureChange !== undefined ? { onFigureChange } : {})}
                   />
                 )
                 if (slice.from === 0 && slice.to === undefined) return view
