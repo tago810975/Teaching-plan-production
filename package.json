@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
+    "cfb": "1.2.2",
     "jszip": "3.10.2",
     "mathlive": "0.111.1",
     "react": "19.3.1",

@@ -7,6 +7,9 @@ import type { Asset, Inline, TextMarks } from '../model/types'
 import { createAsset } from '../project-file/codec'
 import { mimeForExt } from '../project-file/format'
 import { attr, child, children, descendants, NS, parseXml, serializeXml, type Element } from '../xml/dom'
+import { drawingToSvg, isPlainTextBox, isShapeDrawing, type ResolvedImage } from './drawing-svg'
+import { eqFieldToLatex, isEqField } from './eq-field'
+import { mathTypeToLatex } from './mathtype'
 
 const { w: W, m: M, r: R, wp: WP, a: A, mc: MC, v: V } = NS
 
@@ -62,7 +65,22 @@ class Reader {
   private rels = new Map<string, string>()
   private styles = new Map<string, string>()
   private assetByTarget = new Map<string, Asset>()
-  private counts = { vectorImages: 0, oleObjects: 0, textBoxes: 0, tables: 0, missingImages: 0 }
+  private counts = {
+    vectorImages: 0,
+    oleObjects: 0,
+    mathTypeConverted: 0,
+    drawingsConverted: 0,
+    eqConverted: 0,
+    eqFailed: 0,
+    textBoxes: 0,
+    tables: 0,
+    missingImages: 0
+  }
+  /**
+   * 正在读取的域（可嵌套）。phase 为 instr 时正在读域代码；
+   * skip 为 true 时跳过域结果（EQ 域的结果是 Word 缓存的显示效果，已按代码转成公式）。
+   */
+  private fields: Array<{ instr: string; phase: 'instr' | 'result'; skip: boolean }> = []
 
   constructor(private zip: JSZip) {}
 
@@ -89,7 +107,16 @@ class Reader {
     const c = this.counts
     const out: string[] = []
     if (c.vectorImages > 0) out.push(`${c.vectorImages} 张图片是 EMF/WMF 矢量格式，预览中暂时无法显示，导出 Word 后正常。`)
-    if (c.oleObjects > 0) out.push(`${c.oleObjects} 个 MathType 等嵌入对象已按图片导入，无法在软件中修改。`)
+    if (c.mathTypeConverted + c.eqConverted > 0) {
+      const parts = [
+        c.mathTypeConverted > 0 ? `${c.mathTypeConverted} 个 MathType 公式` : '',
+        c.eqConverted > 0 ? `${c.eqConverted} 个 EQ 域公式` : ''
+      ].filter(Boolean)
+      out.push(`已将${parts.join('、')}转换为可编辑的公式，导出时为 Word 公式。`)
+    }
+    if (c.drawingsConverted > 0) out.push(`${c.drawingsConverted} 幅用形状绘制的示意图已转换为图片，请核对显示效果。`)
+    if (c.oleObjects > 0) out.push(`${c.oleObjects} 个嵌入对象（无法识别的公式等）已按图片导入，无法在软件中修改。`)
+    if (c.eqFailed > 0) out.push(`${c.eqFailed} 个 EQ 域公式无法识别，已保留其中的文字，请检查。`)
     if (c.textBoxes > 0) out.push(`${c.textBoxes} 个文本框中的文字已拆成普通段落，请检查位置是否合适。`)
     if (c.tables > 0) out.push(`${c.tables} 个表格已按段落导入，表格格式没有保留。`)
     if (c.missingImages > 0) out.push(`${c.missingImages} 张图片在文档中找不到对应文件，已跳过。`)
@@ -137,6 +164,8 @@ class Reader {
         for (const om of children(node, M, 'oMath')) para.inlines.push({ type: 'math', omml: serializeMath(om), display: true })
       } else if (ns === W && name === 'r') {
         await this.readRun(node, para, textBoxes)
+      } else if (ns === W && name === 'fldSimple' && isEqField(attr(node, W, 'instr') ?? '')) {
+        this.pushEq(attr(node, W, 'instr')!, para)
       } else if (ns === W && (name === 'hyperlink' || name === 'ins' || name === 'smartTag' || name === 'fldSimple' || name === 'customXml')) {
         await this.readInlines(node, para, marks, textBoxes)
       } else if (ns === W && name === 'sdt') {
@@ -158,6 +187,17 @@ class Reader {
   private async readRunContent(container: Element, para: ReadParagraph, marks: TextMarks, textBoxes: Element[]): Promise<void> {
     for (const node of children(container)) {
       const name = node.localName
+      if (node.namespaceURI === W && name === 'fldChar') {
+        this.fieldChar(attr(node, W, 'fldCharType'), para)
+        continue
+      }
+      if (node.namespaceURI === W && name === 'instrText') {
+        const top = this.fields[this.fields.length - 1]
+        if (top?.phase === 'instr') top.instr += node.textContent ?? ''
+        continue
+      }
+      // 域代码部分、以及已转为公式的 EQ 域结果，不读取其中的内容
+      if (this.fields.some((f) => f.phase === 'instr' || f.skip)) continue
       if (node.namespaceURI === W) {
         if (name === 't') pushText(para, node.textContent ?? '', marks)
         else if (name === 'tab' || name === 'ptab') pushText(para, '\t', marks)
@@ -172,11 +212,54 @@ class Reader {
     }
   }
 
+  private fieldChar(type: string | undefined, para: ReadParagraph): void {
+    if (type === 'begin') {
+      this.fields.push({ instr: '', phase: 'instr', skip: false })
+      return
+    }
+    const top = this.fields[this.fields.length - 1]
+    if (top === undefined) return
+    if (type === 'separate') {
+      top.phase = 'result'
+      if (isEqField(top.instr)) {
+        this.pushEq(top.instr, para)
+        top.skip = true
+      }
+    } else if (type === 'end') {
+      if (top.phase === 'instr' && isEqField(top.instr)) this.pushEq(top.instr, para)
+      this.fields.pop()
+    }
+  }
+
+  private pushEq(instr: string, para: ReadParagraph): void {
+    const latex = eqFieldToLatex(instr)
+    if (latex !== null) {
+      this.counts.eqConverted += 1
+      para.inlines.push({ type: 'math', latex })
+    } else {
+      this.counts.eqFailed += 1
+      pushText(para, instr.replace(/^\s*eq\s*/i, ''), {})
+    }
+  }
+
   private async readDrawing(drawing: Element, para: ReadParagraph, textBoxes: Element[]): Promise<void> {
     const anchor = child(drawing, WP, 'anchor')
     const inline = child(drawing, WP, 'inline')
     const holder = anchor ?? inline
     if (holder === undefined) return
+
+    // 用形状绘制的示意图（WPS / Word 的形状与组合）→ SVG 图片
+    const graphicData = descendants(holder, A, 'graphicData')[0]
+    if (graphicData !== undefined && isShapeDrawing(graphicData) && !isPlainTextBox(graphicData)) {
+      const image = await this.shapeDrawing(holder, graphicData)
+      if (image !== undefined) {
+        this.counts.drawingsConverted += 1
+        const wraps = anchor !== undefined && children(anchor).some((c) => c.namespaceURI === WP && /^wrap(Square|Tight|Through|TopAndBottom)$/.test(c.localName ?? ''))
+        if (anchor !== undefined && anchor.getAttribute('behindDoc') !== '1' && wraps) para.floating.push(image)
+        else para.inlines.push({ type: 'image', assetId: image.assetId, widthEmu: image.widthEmu, heightEmu: image.heightEmu })
+        return
+      }
+    }
 
     const txbx = descendants(holder, W, 'txbxContent')
     if (txbx.length > 0 && descendants(holder, A, 'blip').length === 0) {
@@ -205,6 +288,31 @@ class Reader {
     para.inlines.push({ type: 'image', assetId: image.assetId, widthEmu: image.widthEmu, heightEmu: image.heightEmu })
   }
 
+  /** 形状绘制的示意图渲染为 SVG，作为图片资源 */
+  private async shapeDrawing(holder: Element, graphicData: Element): Promise<DocxImage | undefined> {
+    const extent = child(holder, WP, 'extent')
+    const cx = Number(extent?.getAttribute('cx') ?? 0)
+    const cy = Number(extent?.getAttribute('cy') ?? 0)
+    if (cx <= 0 || cy <= 0) return undefined
+    // 先读出组合中用到的图片，渲染时以 data URI 嵌入
+    const images = new Map<string, ResolvedImage>()
+    for (const blip of descendants(graphicData, A, 'blip')) {
+      const rid = blip.getAttributeNS(R, 'embed')
+      const target = rid ? this.rels.get(rid) : undefined
+      if (!rid || target === undefined || images.has(rid)) continue
+      const path = resolveTarget(target)
+      const data = await this.zip.file(path)?.async('uint8array')
+      if (data === undefined) continue
+      const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+      images.set(rid, { mime: mimeForExt(ext === 'jpeg' ? 'jpg' : ext), base64: toBase64(data) })
+    }
+    const rendered = drawingToSvg(graphicData, cx, cy, (rid) => images.get(rid))
+    if (rendered === null) return undefined
+    const asset = await createAsset(new TextEncoder().encode(rendered.svg), 'image/svg+xml')
+    this.assets[asset.id] = asset
+    return { assetId: asset.id, widthEmu: rendered.widthEmu, heightEmu: rendered.heightEmu }
+  }
+
   /** 旧式 VML 图片与 OLE 对象（如 MathType 公式），取其预览图 */
   private async readVml(el: Element, para: ReadParagraph, textBoxes: Element[], isObject: boolean): Promise<void> {
     const txbx = descendants(el, W, 'txbxContent')
@@ -212,6 +320,14 @@ class Reader {
       this.counts.textBoxes += txbx.length
       textBoxes.push(...txbx)
       return
+    }
+    if (isObject) {
+      const latex = await this.mathTypeLatex(el)
+      if (latex !== null) {
+        this.counts.mathTypeConverted += 1
+        para.inlines.push({ type: 'math', latex })
+        return
+      }
     }
     const imageData = descendants(el, V, 'imagedata')[0]
     const rid = imageData?.getAttributeNS(R, 'id')
@@ -223,6 +339,18 @@ class Reader {
     if (image !== undefined) {
       para.inlines.push({ type: 'image', assetId: image.assetId, widthEmu: image.widthEmu, heightEmu: image.heightEmu })
     }
+  }
+
+  /** 嵌入的 MathType 公式对象 → LaTeX；不是 MathType 或无法解析时返回 null */
+  private async mathTypeLatex(object: Element): Promise<string | null> {
+    const ole = descendants(object, NS.o, 'OLEObject')[0]
+    const progId = ole?.getAttribute('ProgID') ?? ''
+    if (ole === undefined || !/^Equation\.(DSMT|3)/i.test(progId)) return null
+    const rid = ole.getAttributeNS(R, 'id')
+    const target = rid === null ? undefined : this.rels.get(rid)
+    if (target === undefined) return null
+    const data = await this.zip.file(resolveTarget(target))?.async('uint8array')
+    return data === undefined ? null : mathTypeToLatex(data)
   }
 
   private async image(rid: string, widthEmu: number, heightEmu: number, description?: string): Promise<DocxImage | undefined> {
@@ -336,6 +464,19 @@ function vmlSize(style: string): { widthEmu: number; heightEmu: number } {
 function pickAlternate(node: Element): Element | undefined {
   const choice = child(node, MC, 'Choice')
   const fallback = child(node, MC, 'Fallback')
-  if (choice !== undefined && descendants(choice, A, 'blip').length > 0) return choice
+  if (choice !== undefined) {
+    // 新格式中有图片，或有可以渲染的形状绘图时，用新格式
+    if (descendants(choice, A, 'blip').length > 0) return choice
+    const gd = descendants(choice, A, 'graphicData')[0]
+    if (gd !== undefined && isShapeDrawing(gd) && !isPlainTextBox(gd)) return choice
+  }
   return fallback ?? choice
+}
+
+/** Uint8Array → Base64（主进程与界面通用，不依赖 Buffer） */
+function toBase64(data: Uint8Array): string {
+  let s = ''
+  const chunk = 0x8000
+  for (let i = 0; i < data.length; i += chunk) s += String.fromCharCode(...data.subarray(i, i + chunk))
+  return btoa(s)
 }

@@ -12,6 +12,7 @@ export const NS = {
   pic: 'http://schemas.openxmlformats.org/drawingml/2006/picture',
   mc: 'http://schemas.openxmlformats.org/markup-compatibility/2006',
   v: 'urn:schemas-microsoft-com:vml',
+  o: 'urn:schemas-microsoft-com:office:office',
   rel: 'http://schemas.openxmlformats.org/package/2006/relationships'
 } as const
 

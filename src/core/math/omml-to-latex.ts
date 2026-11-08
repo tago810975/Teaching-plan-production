@@ -38,6 +38,11 @@ function group(el: Element | undefined, ctx: Ctx): string {
   return `{${seq(el, ctx)}}`
 }
 
+/** 上标：其中的度数符号不再嵌套一层上标 */
+function supGroup(el: Element | undefined, ctx: Ctx): string {
+  return `{${seq(el, ctx).replace(/\^\{\\circ\}/g, '\\circ ')}}`
+}
+
 /** 上下标的底数：单个字母、数字或命令时不加括号，读起来更自然 */
 function base(el: Element | undefined, ctx: Ctx): string {
   const s = seq(el, ctx)
@@ -116,9 +121,9 @@ function node(el: Element, ctx: Ctx): string {
     case 'sSub':
       return `${base(child(el, M, 'e'), ctx)}_${group(child(el, M, 'sub'), ctx)}`
     case 'sSup':
-      return `${base(child(el, M, 'e'), ctx)}^${group(child(el, M, 'sup'), ctx)}`
+      return `${base(child(el, M, 'e'), ctx)}^${supGroup(child(el, M, 'sup'), ctx)}`
     case 'sSubSup':
-      return `${base(child(el, M, 'e'), ctx)}_${group(child(el, M, 'sub'), ctx)}^${group(child(el, M, 'sup'), ctx)}`
+      return `${base(child(el, M, 'e'), ctx)}_${group(child(el, M, 'sub'), ctx)}^${supGroup(child(el, M, 'sup'), ctx)}`
     case 'sPre':
       return `{}_${group(child(el, M, 'sub'), ctx)}^${group(child(el, M, 'sup'), ctx)}${base(child(el, M, 'e'), ctx)}`
 
