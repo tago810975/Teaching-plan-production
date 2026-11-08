@@ -12,7 +12,7 @@ interface Props {
   paragraph: DocParagraph
   assetUrls: ReadonlyMap<string, string>
   selected: boolean
-  onSelect?: (blockId: string) => void
+  onSelect?: (blockId: string, focus?: ParagraphFocus) => void
   /** 点击公式时调用；不提供则公式不可点击（如测量区） */
   onEditMath?: (run: MathRun) => void
   /** 在预览中缩放、拖动图片后调用 */
@@ -20,6 +20,41 @@ interface Props {
 }
 
 export type MathRun = Extract<DocRun, { kind: 'math' }>
+
+/** 点击段落时要定位到的输入框、段落与点击处前后的文字 */
+export interface ParagraphFocus {
+  field: string
+  paragraph: number
+  before: string
+  after: string
+}
+
+/** 点击处前后各取几个字 */
+const SNIPPET = 6
+
+function focusFromClick(p: DocParagraph, e: MouseEvent): ParagraphFocus | undefined {
+  const target = p.editTarget
+  if (target === undefined) return undefined
+  let field = target.field
+  let paragraph = target.paragraph
+  // 选项行：按点击的那一列确定是第几个选项
+  if (field === 'option') {
+    const cell = (e.target as Element).closest('[data-cell]') as HTMLElement | null
+    field = `option:${paragraph + Number(cell?.dataset.cell ?? 0)}`
+    paragraph = 0
+  }
+  let before = ''
+  let after = ''
+  const range = document.caretRangeFromPoint?.(e.clientX, e.clientY)
+  const node = range?.startContainer
+  if (node !== undefined && node !== null && node.nodeType === Node.TEXT_NODE && !(node.parentElement?.closest('math') ?? null)) {
+    const text = node.textContent ?? ''
+    const offset = range!.startOffset
+    before = text.slice(Math.max(0, offset - SNIPPET), offset)
+    after = text.slice(offset, offset + SNIPPET)
+  }
+  return { field, paragraph, before, after }
+}
 
 export const DocParagraphView = memo(function DocParagraphView({
   paragraph: p,
@@ -98,7 +133,7 @@ export const DocParagraphView = memo(function DocParagraphView({
       style={style}
       data-block-id={p.sourceBlockId}
       data-anchor-index={p.anchorIndex}
-      onClick={onSelect === undefined ? undefined : () => onSelect(p.sourceBlockId)}
+      onClick={onSelect === undefined ? undefined : (e) => onSelect(p.sourceBlockId, focusFromClick(p, e.nativeEvent))}
     >
       {floating}
       {label}
@@ -138,6 +173,7 @@ function TabbedRuns(props: {
         return (
           <span
             key={i}
+            data-cell={i}
             className="tab-cell"
             style={width === undefined ? { flex: 1 } : { width: `${twipToPt(width)}pt` }}
           >

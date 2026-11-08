@@ -1151,3 +1151,22 @@ body.is-dragging-outline * {
 .composite-items button.link {
   text-align: left;
 }
+
+/* 点击预览定位到的输入框：短暂高亮 */
+@keyframes located {
+  from {
+    box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.45);
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(179, 38, 30, 0);
+  }
+}
+.is-located {
+  animation: located 1.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-located {
+    animation: none;
+    outline: 2px solid var(--red-pen);
+  }
+}

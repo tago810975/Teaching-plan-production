@@ -12,7 +12,8 @@ import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
 import { ommlToLatex } from '@core/math/omml-to-latex'
-import type { MathRun } from './preview/DocParagraphView'
+import type { MathRun, ParagraphFocus } from './preview/DocParagraphView'
+import { FieldFocusContext } from './panels/fieldFocus'
 import type { ImportReport } from '@shared/ipc'
 import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
@@ -121,7 +122,10 @@ function EditorBody({
 
   const selectedBlock = findBlock(project.blocks, state.selectedBlockId)
   const headerSelected = state.selectedBlockId === HEADER_SELECTION
-  const select = useCallback((blockId: string) => dispatch({ type: 'select', blockId }), [dispatch])
+  const select = useCallback(
+    (blockId: string, focus?: ParagraphFocus) => dispatch({ type: 'select', blockId, ...(focus !== undefined ? { focus } : {}) }),
+    [dispatch]
+  )
   const selectHeader = useCallback(() => dispatch({ type: 'select', blockId: HEADER_SELECTION }), [dispatch])
 
   useEffect(() => {
@@ -231,6 +235,7 @@ function EditorBody({
           onEditMath={editMath}
           onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
         />
+        <FieldFocusContext.Provider value={state.focusRequest}>
         <Inspector
           block={selectedBlock}
           header={headerSelected ? project.header : null}
@@ -239,6 +244,7 @@ function EditorBody({
           dispatch={dispatch}
           revision={state.revision}
         />
+        </FieldFocusContext.Provider>
         <Splitter
           side="left"
           width={panelWidths.left}

@@ -53,6 +53,7 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
             sourceBlockId: block.id,
             style: 'body',
             ...formatProps(p),
+            editTarget: { field: 'content', paragraph: i },
             runs: toRuns(p, { blockId: block.id, path: ['content', i] })
           })
           const spacer = spacerAfter(p, `${block.id}:gap${i}`, block.id)
@@ -116,6 +117,7 @@ function buildQuestion(
     push({
       key: key(`stem${i}`),
       anchorIndex: i,
+      editTarget: { field: 'stem', paragraph: i },
       style: i === 0 ? 'question' : 'questionContinued',
       ...(i === 0 ? { label: `${no}.` } : {}),
       runs
@@ -175,6 +177,8 @@ function buildQuestion(
       push({
         key: key(`opt${i}`),
         style: 'option',
+        // 选项行：paragraph 为本行第一个选项的序号，点击时再加上所在列
+        editTarget: { field: 'option', paragraph: q.options.indexOf(row[0]!) },
         runs,
         ...(columns > 1 ? { tabStopsTwip: OPTION_TAB_STOPS[columns as 2 | 4] } : {})
       })
@@ -189,6 +193,7 @@ function buildQuestion(
         key: key(`sub${i}-${j}`),
         style: j === 0 ? 'subQuestion' : 'questionContinued',
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
+        editTarget: { field: `sub:${i}`, paragraph: j },
         runs: toRuns(p, at('subQuestions', i, 'content', j))
       })
       attachRightItems(paras[paras.length - 1]!)
@@ -210,20 +215,21 @@ function buildQuestion(
         key: key(`ans${i}`),
         style: 'answer',
         ...(i === 0 ? { label: '【答案】' } : {}),
+        editTarget: { field: 'answer', paragraph: i },
         runs: toRuns(p, at('answer', i))
       })
     })
     if (q.knowledgePoints.length > 0) {
-      push(fixedLabelPara(key('kp'), 'knowledge', q.knowledgePoints.join('；')))
+      push({ ...fixedLabelPara(key('kp'), 'knowledge', q.knowledgePoints.join('；')), editTarget: { field: 'knowledgePoints', paragraph: 0 } })
     }
     if (q.keyPoint !== undefined && q.keyPoint !== '') {
-      push(fixedLabelPara(key('key'), 'keyPoint', q.keyPoint))
+      push({ ...fixedLabelPara(key('key'), 'keyPoint', q.keyPoint), editTarget: { field: 'keyPoint', paragraph: 0 } })
     }
     if (q.difficultPoint !== undefined && q.difficultPoint !== '') {
-      push(fixedLabelPara(key('diff'), 'difficultPoint', q.difficultPoint))
+      push({ ...fixedLabelPara(key('diff'), 'difficultPoint', q.difficultPoint), editTarget: { field: 'difficultPoint', paragraph: 0 } })
     }
     q.analysis.forEach((p, i) => {
-      push({ key: key(`ana${i}`), style: 'analysis', ...formatProps(p), runs: toRuns(p, at('analysis', i)) })
+      push({ key: key(`ana${i}`), style: 'analysis', ...formatProps(p), editTarget: { field: 'analysis', paragraph: i }, runs: toRuns(p, at('analysis', i)) })
     })
     for (let i = teacherStart; i < paras.length; i++) paras[i]!.shaded = true
   }
@@ -265,7 +271,7 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${k.id}:${suffix}`
   if (k.title.trim() !== '') {
-    paras.push({ key: key('title'), sourceBlockId: k.id, style: 'topic', runs: [{ kind: 'text', text: k.title }], keepNext: true })
+    paras.push({ key: key('title'), sourceBlockId: k.id, style: 'topic', runs: [{ kind: 'text', text: k.title }], keepNext: true, editTarget: { field: 'title', paragraph: 0 } })
   }
   const content: RichText = k.content.length > 0 ? k.content : k.title.trim() === '' ? [{ inlines: [] }] : []
   paras.push(...contentWithFigures(k.id, 'content', content, k.figures, 'body'))
@@ -306,6 +312,7 @@ function contentWithFigures(
   const paras: DocParagraph[] = content.map((p, i) => ({
     key: key(`c${i}`),
     anchorIndex: i,
+    editTarget: { field, paragraph: i },
     sourceBlockId: blockId,
     style,
     ...formatProps(p),
@@ -349,7 +356,7 @@ function buildComposite(
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${c.id}:${suffix}`
   if (c.title.trim() !== '') {
-    paras.push({ key: key('title'), sourceBlockId: c.id, style: 'compositeTitle', runs: [{ kind: 'text', text: c.title }], keepNext: true })
+    paras.push({ key: key('title'), sourceBlockId: c.id, style: 'compositeTitle', runs: [{ kind: 'text', text: c.title }], keepNext: true, editTarget: { field: 'title', paragraph: 0 } })
   }
   const background = contentWithFigures(c.id, 'background', c.background, c.figures, 'compositeBackground')
   // 背景与第一道小题保持在同一页
@@ -365,11 +372,12 @@ function buildComposite(
         sourceBlockId: c.id,
         style: 'answer',
         ...(i === 0 ? { label: '【答案】' } : {}),
+        editTarget: { field: 'answer', paragraph: i },
         runs: toRuns(p, { blockId: c.id, path: ['answer', i] })
       })
     })
     c.analysis.forEach((p, i) => {
-      paras.push({ key: key(`ana${i}`), sourceBlockId: c.id, style: 'analysis', ...formatProps(p), runs: toRuns(p, { blockId: c.id, path: ['analysis', i] }) })
+      paras.push({ key: key(`ana${i}`), sourceBlockId: c.id, style: 'analysis', ...formatProps(p), editTarget: { field: 'analysis', paragraph: i }, runs: toRuns(p, { blockId: c.id, path: ['analysis', i] }) })
     })
     for (let i = start; i < paras.length; i++) paras[i]!.shaded = true
   }
@@ -558,7 +566,7 @@ function imageParagraph(key: string, items: FigItem[], blockId: string): Omit<Do
 }
 
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {
-  return { key: blockId, sourceBlockId: blockId, style, runs: [{ kind: 'text', text }], keepNext: true }
+  return { key: blockId, sourceBlockId: blockId, style, runs: [{ kind: 'text', text }], keepNext: true, editTarget: { field: 'text', paragraph: 0 } }
 }
 
 function fixedLabelPara(

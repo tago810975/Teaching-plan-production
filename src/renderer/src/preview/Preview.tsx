@@ -5,12 +5,12 @@
  * 读出每段高度后用 paginate() 分页，再按页渲染。工程数据一变，
  * DocIR 随之重建，预览即时重排，实现所改即所见。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { DocIR } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
-import { DocParagraphView, type MathRun } from './DocParagraphView'
+import { DocParagraphView, type MathRun, type ParagraphFocus } from './DocParagraphView'
 import type { FigureChangeHandler } from './FigureImage'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
@@ -20,7 +20,7 @@ interface Props {
   ir: DocIR
   assetUrls: ReadonlyMap<string, string>
   selectedBlockId: string | null
-  onSelect: (blockId: string) => void
+  onSelect: (blockId: string, focus?: ParagraphFocus) => void
   onSelectHeader: () => void
   headerSelected: boolean
   onPageCount?: (count: number) => void
@@ -99,9 +99,23 @@ export function Preview({
   // 在大纲中选中（或新添加）内容时，把它滚动到可见位置。
   // 新内容要等重新排版后才出现在页面上，所以选中变化时先记下，排版完成后再滚动。
   const pendingScrollRef = useRef<string | null>(null)
+  /** 在预览中点击选中的内容：用户正看着它，不应把预览滚走 */
+  const clickedInPreviewRef = useRef<string | null>(null)
   useEffect(() => {
+    if (clickedInPreviewRef.current === selectedBlockId) {
+      clickedInPreviewRef.current = null
+      pendingScrollRef.current = null
+      return
+    }
     pendingScrollRef.current = selectedBlockId
   }, [selectedBlockId])
+  const selectFromPreview = useCallback(
+    (blockId: string, focus?: ParagraphFocus) => {
+      if (blockId !== selectedBlockId) clickedInPreviewRef.current = blockId
+      onSelect(blockId, focus)
+    },
+    [onSelect, selectedBlockId]
+  )
   useEffect(() => {
     const id = pendingScrollRef.current
     if (id === null) return
@@ -159,7 +173,7 @@ export function Preview({
                     paragraph={p}
                     assetUrls={assetUrls}
                     selected={p.sourceBlockId === selectedBlockId}
-                    onSelect={onSelect}
+                    onSelect={selectFromPreview}
                     {...(onEditMath !== undefined ? { onEditMath } : {})}
                     {...(onFigureChange !== undefined ? { onFigureChange } : {})}
                   />

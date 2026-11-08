@@ -29,6 +29,19 @@ export interface EditorState {
    * 属性面板的输入框以它作为 key 的一部分，变化时重新读取内容。
    */
   revision: number
+  /** 点击预览后请求定位到的输入框 */
+  focusRequest: FocusRequest | null
+}
+
+export interface FocusRequest {
+  blockId: string
+  /** 输入框标识，见 EditTarget.field */
+  field: string
+  paragraph: number
+  /** 点击处前后的几个字，用于把光标放在点击位置 */
+  before: string
+  after: string
+  nonce: number
 }
 
 export type EditorAction =
@@ -37,7 +50,7 @@ export type EditorAction =
   | { type: 'close' }
   | { type: 'saved'; filePath: string }
   | { type: 'set-variant'; variant: Variant }
-  | { type: 'select'; blockId: string | null }
+  | { type: 'select'; blockId: string | null; focus?: Omit<FocusRequest, 'blockId' | 'nonce'> }
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   | { type: 'delete-block'; blockId: string }
@@ -61,7 +74,7 @@ export type EditorAction =
     }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
-  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0 }
+  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0, focusRequest: null }
 }
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
@@ -82,7 +95,14 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'set-variant':
       return { ...state, variant: action.variant }
     case 'select':
-      return { ...state, selectedBlockId: action.blockId }
+      return {
+        ...state,
+        selectedBlockId: action.blockId,
+        focusRequest:
+          action.focus !== undefined && action.blockId !== null
+            ? { ...action.focus, blockId: action.blockId, nonce: (state.focusRequest?.nonce ?? 0) + 1 }
+            : state.focusRequest
+      }
     case 'update-block':
       return withBlocks(state, (blocks) => mapBlockById(blocks, action.blockId, action.update))
     case 'move-block':

@@ -91,10 +91,21 @@ export interface DocParagraph {
   /** 锚定在本段的浮动图片（文字环绕） */
   floatingImages?: FloatingImage[]
   /**
+   * 本段在属性面板中对应的输入框与段落，供“点击预览定位到编辑框”使用。
+   * field 如 stem、answer、analysis、content、background、title、text、sub:1、option:2。
+   */
+  editTarget?: EditTarget
+  /**
    * 本段是可锚定图片的段落（题干、知识点正文、综合题背景）时，它在原字段中的序号。
    * 预览中拖动图片越过段落边界时，据此改换锚定段落。
    */
   anchorIndex?: number
+}
+
+export interface EditTarget {
+  field: string
+  /** 输入框中的第几段 */
+  paragraph: number
 }
 
 export interface DocIR {

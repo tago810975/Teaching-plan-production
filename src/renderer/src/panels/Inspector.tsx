@@ -5,6 +5,7 @@
  */
 import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
+import { useFieldFocus } from './fieldFocus'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { createKnowledge, createQuestion, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
@@ -97,6 +98,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
         ) : block.type === 'paragraph' ? (
           <Field label="内容">
             <RichTextField
+              fieldId="content"
               value={block.content}
               rows={6}
               onChange={(content) => update((b) => ({ ...b, content }) as Block)}
@@ -104,7 +106,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
           </Field>
         ) : (
           <Field label="文字">
-            <TextInput value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
+            <TextInput fieldId="text" value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
           </Field>
         )}
       </div>
@@ -186,10 +188,10 @@ function CompositeForm({
   return (
     <>
       <Field label="标题" hint="如“材料一”；居中显示">
-        <TextInput value={block.title} onChange={(title) => set({ title })} />
+        <TextInput fieldId="title" value={block.title} onChange={(title) => set({ title })} />
       </Field>
       <Field label="背景材料（可选）" hint="小题共用的情境、材料；留空则不显示">
-        <RichTextField value={block.background} rows={6} onChange={(background) => set({ background })} />
+        <RichTextField fieldId="background" value={block.background} rows={6} onChange={(background) => set({ background })} />
       </Field>
       <FigureList
         title="背景配图"
@@ -225,10 +227,10 @@ function CompositeForm({
       <fieldset className="group group--teacher">
         <legend>仅教师版：共用的答案与详解</legend>
         <Field label="答案" hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写">
-          <RichTextField value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
+          <RichTextField fieldId="answer" value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
         </Field>
         <Field label="详解">
-          <RichTextField value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
+          <RichTextField fieldId="analysis" value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
       <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整题同页" />
@@ -254,10 +256,10 @@ function KnowledgeForm({
   return (
     <>
       <Field label="标题" hint="如“一、放缩圆”；留空则只显示内容">
-        <TextInput value={block.title} onChange={(title) => set({ title })} />
+        <TextInput fieldId="title" value={block.title} onChange={(title) => set({ title })} />
       </Field>
       <Field label="内容" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
-        <RichTextField value={block.content} rows={10} onChange={(content) => set({ content })} />
+        <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
       </Field>
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
@@ -418,7 +420,7 @@ function QuestionForm({
         <TextInput value={q.difficulty ?? ''} width="4em" onChange={(v) => set({ difficulty: v || undefined })} />
       </Field>
       <Field label="题干" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
-        <RichTextField value={q.stem} rows={5} onChange={(stem) => set({ stem })} />
+        <RichTextField fieldId="stem" value={q.stem} rows={5} onChange={(stem) => set({ stem })} />
       </Field>
 
       <FigureList
@@ -438,6 +440,7 @@ function QuestionForm({
           <div key={`${block.id}-${opt.label}-${q.options.length}`} className="option-row">
             <span className="option-label">{opt.label}</span>
             <ParagraphField
+              fieldId={`option:${i}`}
               value={opt.content}
               onChange={(content) => set({ options: q.options.map((o, j) => (j === i ? { ...o, content } : o)) })}
             />
@@ -493,6 +496,7 @@ function QuestionForm({
               </button>
             </div>
             <RichTextField
+              fieldId={`sub:${i}`}
               value={sq.content}
               rows={2}
               onChange={(content) =>
@@ -514,10 +518,11 @@ function QuestionForm({
       <fieldset className="group group--teacher">
         <legend>仅教师版</legend>
         <Field label="答案">
-          <RichTextField value={q.answer} rows={2} onChange={(answer) => set({ answer })} />
+          <RichTextField fieldId="answer" value={q.answer} rows={2} onChange={(answer) => set({ answer })} />
         </Field>
         <Field label="知识点" hint="多个知识点用顿号或逗号分隔">
           <TextInput
+            fieldId="knowledgePoints"
             value={q.knowledgePoints.join('、')}
             onChange={(v) =>
               set({
@@ -530,13 +535,13 @@ function QuestionForm({
           />
         </Field>
         <Field label="重点">
-          <TextInput value={q.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
+          <TextInput fieldId="keyPoint" value={q.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
         </Field>
         <Field label="难点">
-          <TextInput value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
+          <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
         </Field>
         <Field label="详解">
-          <RichTextField value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
+          <RichTextField fieldId="analysis" value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
 
@@ -581,10 +586,22 @@ const EDIT_HINT = '公式写作 $LaTeX$，如 $\\frac{1}{2}mv^2$。⟦⟧ 中是
  * 多段富文本的文本框。输入框保留自己的草稿，只在挂载时从模型读取一次，
  * 避免“解析 → 再生成”把用户正在输入的内容改掉（例如还没配对的 $）。
  */
-function RichTextField({ value, rows, onChange }: { value: RichText; rows: number; onChange: (v: RichText) => void }) {
+function RichTextField({
+  value,
+  rows,
+  onChange,
+  fieldId
+}: {
+  value: RichText
+  rows: number
+  onChange: (v: RichText) => void
+  /** 对应预览段落的字段名，用于“点击预览定位到编辑框” */
+  fieldId?: string
+}) {
   const [initial] = useState(() => toEditable(value))
   const [draft, setDraft] = useState(initial.text)
   const ref = useRef<HTMLTextAreaElement>(null)
+  useFieldFocus(fieldId, ref)
   const latest = useRef(value)
   latest.current = value
   const update = (text: string): void => {
@@ -611,10 +628,11 @@ function RichTextField({ value, rows, onChange }: { value: RichText; rows: numbe
   )
 }
 
-function ParagraphField({ value, onChange }: { value: RichParagraph; onChange: (v: RichParagraph) => void }) {
+function ParagraphField({ value, onChange, fieldId }: { value: RichParagraph; onChange: (v: RichParagraph) => void; fieldId?: string }) {
   const [initial] = useState(() => paragraphToEditable(value))
   const [draft, setDraft] = useState(initial.text)
   const ref = useRef<HTMLInputElement>(null)
+  useFieldFocus(fieldId, ref)
   const update = (text: string): void => {
     setDraft(text)
     onChange(paragraphFromEditable(text, initial.objects))
@@ -672,9 +690,12 @@ function relabel(options: Question['options']): Question['options'] {
   return options.map((o, i) => ({ ...o, label: String.fromCharCode(65 + i) }))
 }
 
-function TextInput({ value, width, onChange }: { value: string; width?: string; onChange: (v: string) => void }) {
+function TextInput({ value, width, onChange, fieldId }: { value: string; width?: string; onChange: (v: string) => void; fieldId?: string }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useFieldFocus(fieldId, ref)
   return (
     <input
+      ref={ref}
       type="text"
       value={value}
       spellCheck={false}
