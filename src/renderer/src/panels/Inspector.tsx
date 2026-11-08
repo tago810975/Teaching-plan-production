@@ -9,6 +9,8 @@ import { useFieldFocus } from './fieldFocus'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { createKnowledge, createQuestion, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
+import { OptionImageControls } from './OptionImageControls'
+import { optionImageSignature } from '@core/model/option-images'
 import type {
   Block,
   BlockLayout,
@@ -35,9 +37,11 @@ interface Props {
   dispatch: Dispatch<EditorAction>
   /** 内容在面板之外被修改时递增，用于让输入框重新读取内容 */
   revision: number
+  /** 预览中拖动选项图片时是否全部一起缩放 */
+  linkOptionImages?: boolean
 }
 
-export function Inspector({ block, header, layout, assetUrls, dispatch, revision }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false }: Props) {
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -80,6 +84,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             update={update as (fn: (b: QuestionBlock) => QuestionBlock) => void}
             assetUrls={assetUrls}
             dispatch={dispatch}
+            linkOptionImages={linkOptionImages}
           />
         ) : block.type === 'knowledge' ? (
           <KnowledgeForm
@@ -402,14 +407,18 @@ function QuestionForm({
   block,
   update,
   assetUrls,
-  dispatch
+  dispatch,
+  linkOptionImages
 }: {
   block: QuestionBlock
   update: (fn: (b: QuestionBlock) => QuestionBlock) => void
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
+  linkOptionImages: boolean
 }) {
   const q = block.question
+  // 选项图片的尺寸变化时，选项输入框需要重新读取内容（它只在挂载时读取一次行内图片）
+  const imageSig = optionImageSignature(q)
   const set = (patch: Partial<Question>): void => update((b) => ({ ...b, question: { ...b.question, ...patch } }))
   const setLayout = (patch: Partial<Question['layout']>): void =>
     update((b) => ({ ...b, question: { ...b.question, layout: { ...b.question.layout, ...patch } } }))
@@ -437,7 +446,7 @@ function QuestionForm({
         <legend>选项</legend>
         {q.options.length === 0 && <p className="field-hint">没有选项。选择题请添加选项。</p>}
         {q.options.map((opt, i) => (
-          <div key={`${block.id}-${opt.label}-${q.options.length}`} className="option-row">
+          <div key={`${block.id}-${opt.label}-${q.options.length}-${imageSig}`} className="option-row">
             <span className="option-label">{opt.label}</span>
             <ParagraphField
               fieldId={`option:${i}`}
@@ -480,6 +489,19 @@ function QuestionForm({
           )}
         </div>
       </fieldset>
+
+      <OptionImageControls
+        question={q}
+        assetUrls={assetUrls}
+        onUpdate={(fn) =>
+          update((b) => {
+            const question = fn(b.question)
+            return question === b.question ? b : { ...b, question }
+          })
+        }
+        linked={linkOptionImages}
+        onLinkedChange={(value) => dispatch({ type: 'set-link-option-images', value })}
+      />
 
       <fieldset className="group">
         <legend>小问</legend>

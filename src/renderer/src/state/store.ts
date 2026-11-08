@@ -31,6 +31,8 @@ export interface EditorState {
   revision: number
   /** 点击预览后请求定位到的输入框 */
   focusRequest: FocusRequest | null
+  /** 在预览中拖动一张选项图片时，全部选项图片一起缩放（按住 Shift 临时反过来） */
+  linkOptionImages: boolean
 }
 
 export interface FocusRequest {
@@ -58,6 +60,8 @@ export type EditorAction =
   | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
+  /** 选项图片在预览中拖动时是否全部一起缩放（界面设置，不存入工程） */
+  | { type: 'set-link-option-images'; value: boolean }
   /** 修改某张题图 / 插图（在预览中缩放、拖动后） */
   | { type: 'update-figure'; ref: FigureRef; patch: Partial<QuestionFigure> }
   /** 替换（inline 为 null 时删除）某个行内内容，如在预览中编辑的公式 */
@@ -74,7 +78,7 @@ export type EditorAction =
     }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
-  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0, focusRequest: null }
+  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0, focusRequest: null, linkOptionImages: false }
 }
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
@@ -89,7 +93,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         selectedBlockId: null
       }
     case 'close':
-      return { ...initEditorState(createEmptyBundle()), variant: state.variant }
+      return { ...initEditorState(createEmptyBundle()), variant: state.variant, linkOptionImages: state.linkOptionImages }
     case 'saved':
       return { ...state, filePath: action.filePath, dirty: false }
     case 'set-variant':
@@ -192,6 +196,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const next = withBlocks(state, (blocks) => mapBlockById(blocks, ref.blockId, (b) => replaceAt(b, ref.path, inline) as Block))
       return { ...next, selectedBlockId: ref.blockId, revision: state.revision + 1 }
     }
+    case 'set-link-option-images':
+      return { ...state, linkOptionImages: action.value }
     case 'update-layout':
       return touch(state, { ...state.bundle.project, layout: action.layout })
     case 'set-title': {

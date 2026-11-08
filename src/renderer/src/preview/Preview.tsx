@@ -5,12 +5,12 @@
  * 读出每段高度后用 paginate() 分页，再按页渲染。工程数据一变，
  * DocIR 随之重建，预览即时重排，实现所改即所见。
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import type { DocIR } from '@core/document/ir'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import type { DocIR, OptionImageRef } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
-import { DocParagraphView, type MathRun, type ParagraphFocus } from './DocParagraphView'
+import { DocParagraphView, type MathRun, type OptionImageHandlers, type ParagraphFocus } from './DocParagraphView'
 import type { FigureChangeHandler } from './FigureImage'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
@@ -26,6 +26,10 @@ interface Props {
   onPageCount?: (count: number) => void
   onEditMath?: (run: MathRun) => void
   onFigureChange?: FigureChangeHandler
+  /** 选项图片缩放后调用：把 ref 处的图缩放到 widthEmu；group 为 true 时全部选项图片按同一比例缩放 */
+  onOptionImageResize?: (ref: OptionImageRef, widthEmu: number, group: boolean) => void
+  /** 在预览中拖动一张选项图片时，默认是否全部一起缩放 */
+  linkOptionImages?: boolean
 }
 
 export function Preview({
@@ -37,13 +41,33 @@ export function Preview({
   headerSelected,
   onPageCount,
   onEditMath,
-  onFigureChange
+  onFigureChange,
+  onOptionImageResize,
+  linkOptionImages = false
 }: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<{ ir: DocIR; pages: PageSlice[][]; heights: number[] } | null>(null)
   const [fontsReady, setFontsReady] = useState(false)
   const [zoom, setZoom] = useState(1)
+
+  // 选项图片“全部一起缩放”的拖动过程：哪道题、当前比例。松开后由工程数据接手
+  const [groupDraft, setGroupDraft] = useState<{ blockId: string; scale: number } | null>(null)
+  const optionHandlers = useMemo<OptionImageHandlers | undefined>(
+    () =>
+      onOptionImageResize === undefined
+        ? undefined
+        : {
+            onResize: onOptionImageResize,
+            onDraft: (ref, scale, group) => setGroupDraft(scale !== null && group ? { blockId: ref.blockId, scale } : null),
+            groupByDefault: linkOptionImages
+          },
+    [onOptionImageResize, linkOptionImages]
+  )
+  const groupHandlers = useMemo(
+    () => (optionHandlers !== undefined && groupDraft !== null ? { ...optionHandlers, groupScale: groupDraft.scale } : undefined),
+    [optionHandlers, groupDraft]
+  )
 
   const { page } = ir
   const bodyHeightTwip = page.heightTwip - ir.bodyTopTwip - page.marginBottomTwip
@@ -176,6 +200,9 @@ export function Preview({
                     onSelect={selectFromPreview}
                     {...(onEditMath !== undefined ? { onEditMath } : {})}
                     {...(onFigureChange !== undefined ? { onFigureChange } : {})}
+                    {...(p.style === 'option' && optionHandlers !== undefined
+                      ? { optionImages: groupHandlers !== undefined && groupDraft?.blockId === p.sourceBlockId ? groupHandlers : optionHandlers }
+                      : {})}
                   />
                 )
                 if (slice.from === 0 && slice.to === undefined) return view

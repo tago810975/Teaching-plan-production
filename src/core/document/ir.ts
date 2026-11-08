@@ -24,7 +24,7 @@ export interface InlineRef {
 export type DocRun =
   | { kind: 'text'; text: string; marks?: TextMarks }
   | ({ kind: 'math'; ref?: InlineRef } & Omit<MathInline, 'type'>)
-  | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef }
+  | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef; optionRef?: OptionImageRef }
   | { kind: 'blank'; widthChars: number }
   /** 制表符，用于选项分列 */
   | { kind: 'tab' }
@@ -46,6 +46,16 @@ export interface FloatingImage {
   /** 在预览中如何拖动：free 可上下左右移动；vertical 只能上下移动（右侧图） */
   movable: 'free' | 'vertical'
   ref?: FigureRef
+}
+
+/**
+ * 选择题选项中的图片在工程数据中的位置：所在题目（块或综合题中的小题）的 ID、
+ * 第几个选项、该选项内容中第几个行内元素。预览中据此缩放单张或全部选项图片。
+ */
+export interface OptionImageRef {
+  blockId: string
+  option: number
+  inline: number
 }
 
 /** 图片在工程数据中的位置：所在内容（块或综合题中的小题）的 ID 与 figures 中的序号 */

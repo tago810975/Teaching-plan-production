@@ -4,6 +4,9 @@
  * - 右下角缩放手柄：按住拖动，等比例调整大小；
  * - 自由位置的图片：按住图片拖动，摆放到任意位置。
  * 拖动过程中只在本地显示效果，松开后才写回工程数据，避免每一像素都触发重新排版。
+ *
+ * 选择题的选项图片也用这个组件（只有缩放，没有拖动摆放）：此时不提供 figureRef，
+ * 改用 onResizeEnd / onResizeDraft；“全部一起缩放”时，拖动过程中其他选项图片按 groupScale 同步显示。
  */
 import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import type { FigureRef, FloatingImage } from '@core/document/ir'
@@ -31,6 +34,14 @@ interface Props {
   float?: FloatingImage
   className: string
   style?: CSSProperties
+  /** 不写回题图，而是把缩放结果交给调用方（选项图片）。group：是否全部一起缩放 */
+  onResizeEnd?: (size: { widthEmu: number; heightEmu: number }, group: boolean) => void
+  /** 拖动缩放过程中的比例（松开或取消时为 null），供其他图片同步显示 */
+  onResizeDraft?: (scale: number | null, group: boolean) => void
+  /** 默认是否全部一起缩放；按住 Shift 拖动时临时反过来 */
+  groupByDefault?: boolean
+  /** 别的图片正在“全部一起缩放”时，本图按此比例显示 */
+  groupScale?: number
 }
 
 /** 屏幕像素 → EMU：先除以预览缩放，再按 96 DPI 换算 */
@@ -45,21 +56,21 @@ function previewZoom(el: Element): number {
 }
 
 export function FigureImage(props: Props) {
-  const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style } = props
+  const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style, onResizeEnd, onResizeDraft, groupByDefault = false, groupScale } = props
   const [draft, setDraft] = useState<{ widthEmu?: number; heightEmu?: number; dx?: number; dy?: number } | null>(null)
-  const start = useRef<{ x: number; y: number; zoom: number; mode: 'move' | 'resize' } | null>(null)
+  const start = useRef<{ x: number; y: number; zoom: number; mode: 'move' | 'resize'; group: boolean } | null>(null)
   const boxRef = useRef<HTMLSpanElement>(null)
-  const interactive = active && figureRef !== undefined && onChange !== undefined
+  const interactive = active && ((figureRef !== undefined && onChange !== undefined) || onResizeEnd !== undefined)
 
-  const w = draft?.widthEmu ?? widthEmu
-  const h = draft?.heightEmu ?? heightEmu
+  const w = draft?.widthEmu ?? (groupScale !== undefined ? Math.round(widthEmu * groupScale) : widthEmu)
+  const h = draft?.heightEmu ?? (groupScale !== undefined ? Math.round(heightEmu * groupScale) : heightEmu)
 
   const begin = (e: PointerEvent<HTMLElement>, mode: 'move' | 'resize'): void => {
     if (!interactive || e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    start.current = { x: e.clientX, y: e.clientY, zoom: previewZoom(e.currentTarget), mode }
+    start.current = { x: e.clientX, y: e.clientY, zoom: previewZoom(e.currentTarget), mode, group: groupByDefault !== e.shiftKey }
   }
 
   const move = (e: PointerEvent<HTMLElement>): void => {
@@ -74,6 +85,7 @@ export function FigureImage(props: Props) {
       const scale = Math.max((widthEmu + dx) / widthEmu, (heightEmu + dy) / heightEmu)
       const nw = Math.max(MIN_EMU, Math.round(widthEmu * scale))
       setDraft({ widthEmu: nw, heightEmu: Math.round((heightEmu * nw) / widthEmu) })
+      onResizeDraft?.(nw / widthEmu, s.group)
     } else {
       // 拖动中只做视觉位移，松开后再重新排版
       setDraft({ dx: float?.movable === 'free' ? dxPx : 0, dy: dyPx })
@@ -85,7 +97,10 @@ export function FigureImage(props: Props) {
     if (s === null) return
     start.current = null
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-    if (draft !== null && figureRef !== undefined) {
+    if (s.mode === 'resize') onResizeDraft?.(null, s.group)
+    if (draft !== null && s.mode === 'resize' && onResizeEnd !== undefined) {
+      onResizeEnd({ widthEmu: draft.widthEmu!, heightEmu: draft.heightEmu! }, s.group)
+    } else if (draft !== null && figureRef !== undefined) {
       if (s.mode === 'resize') onChange?.(figureRef, { widthEmu: draft.widthEmu!, heightEmu: draft.heightEmu! })
       else if (boxRef.current !== null && float !== undefined) onChange?.(figureRef, placeAfterDrag(boxRef.current, figureRef, float, s.zoom))
     }
@@ -116,7 +131,7 @@ export function FigureImage(props: Props) {
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={end}
-      title={interactive ? (float !== undefined ? (float.movable === 'free' ? '拖动摆放；拖动右下角调整大小' : '上下拖动调整位置；拖动右下角调整大小') : '拖动右下角调整大小') : undefined}
+      title={interactive ? (onResizeEnd !== undefined ? (groupByDefault ? '拖动右下角，全部选项图片一起缩放；按住 Shift 只缩放这一张' : '拖动右下角调整这一张的大小；按住 Shift 全部选项图片一起缩放') : float !== undefined ? (float.movable === 'free' ? '拖动摆放；拖动右下角调整大小' : '上下拖动调整位置；拖动右下角调整大小') : '拖动右下角调整大小') : undefined}
     >
       <img src={src} alt="" draggable={false} />
       {interactive && (

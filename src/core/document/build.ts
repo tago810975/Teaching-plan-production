@@ -172,7 +172,12 @@ function buildQuestion(
       const runs: DocRun[] = []
       row.forEach((opt, j) => {
         if (j > 0) runs.push({ kind: 'tab' })
-        runs.push({ kind: 'text', text: `${opt.label}．` }, ...toRuns(opt.content, at('options', q.options.indexOf(opt), 'content')))
+        const option = q.options.indexOf(opt)
+        // 选项中的图片记下位置，预览中可单独或整体缩放
+        const optRuns = toRuns(opt.content, at('options', option, 'content')).map((r, inline): DocRun =>
+          r.kind === 'image' ? { ...r, optionRef: { blockId, option, inline } } : r
+        )
+        runs.push({ kind: 'text', text: `${opt.label}．` }, ...optRuns)
       })
       push({
         key: key(`opt${i}`),

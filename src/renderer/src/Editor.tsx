@@ -3,6 +3,8 @@
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
+import type { OptionImageRef } from '@core/document/ir'
+import { resizeOptionImage, scaleOptionImages } from '@core/model/option-images'
 import type { Variant } from '@core/model/types'
 import { AddMenu } from './AddMenu'
 import { Splitter } from './layout/Splitter'
@@ -121,6 +123,26 @@ function EditorBody({
   }, [ir])
 
   const selectedBlock = findBlock(project.blocks, state.selectedBlockId)
+
+  // 预览中缩放选项图片：单张等比例缩放，或全部按同一比例缩放
+  const resizeOptionImageFromPreview = useCallback(
+    (ref: OptionImageRef, widthEmu: number, group: boolean) => {
+      dispatch({
+        type: 'update-block',
+        blockId: ref.blockId,
+        update: (b) => {
+          if (b.type !== 'question') return b
+          const image = b.question.options[ref.option]?.content.inlines[ref.inline]
+          if (image?.type !== 'image') return b
+          const question = group
+            ? scaleOptionImages(b.question, widthEmu / image.widthEmu)
+            : resizeOptionImage(b.question, { option: ref.option, inline: ref.inline }, widthEmu)
+          return question === b.question ? b : { ...b, question }
+        }
+      })
+    },
+    [dispatch]
+  )
   const headerSelected = state.selectedBlockId === HEADER_SELECTION
   const select = useCallback(
     (blockId: string, focus?: ParagraphFocus) => dispatch({ type: 'select', blockId, ...(focus !== undefined ? { focus } : {}) }),
@@ -234,10 +256,13 @@ function EditorBody({
           onPageCount={setPageCount}
           onEditMath={editMath}
           onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
+          onOptionImageResize={resizeOptionImageFromPreview}
+          linkOptionImages={state.linkOptionImages}
         />
         <FieldFocusContext.Provider value={state.focusRequest}>
         <Inspector
           block={selectedBlock}
+          linkOptionImages={state.linkOptionImages}
           header={headerSelected ? project.header : null}
           layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}

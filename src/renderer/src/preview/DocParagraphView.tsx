@@ -2,7 +2,7 @@
  * 单个段落的预览渲染。只依据 DocIR 与 STYLE_SPECS，不包含任何排版规则。
  */
 import { memo, type CSSProperties, type ReactNode } from 'react'
-import type { DocParagraph, DocRun } from '@core/document/ir'
+import type { DocParagraph, DocRun, OptionImageRef } from '@core/document/ir'
 import { previewCss, STYLE_SPECS } from '@core/document/styles'
 import { emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
@@ -17,6 +17,26 @@ interface Props {
   onEditMath?: (run: MathRun) => void
   /** 在预览中缩放、拖动图片后调用 */
   onFigureChange?: FigureChangeHandler
+  /** 选项图片的缩放（单张或全部一起），见 OptionImageHandlers */
+  optionImages?: OptionImageHandlers
+}
+
+/** 选择题选项图片在预览中的缩放 */
+export interface OptionImageHandlers {
+  /** 松开后：把这张图缩放到 widthEmu；group 为 true 时全部选项图片按同一比例缩放 */
+  onResize: (ref: OptionImageRef, widthEmu: number, group: boolean) => void
+  /** 拖动中：全部一起缩放时的比例（结束时为 null），用于其他选项图片同步显示 */
+  onDraft: (ref: OptionImageRef, scale: number | null, group: boolean) => void
+  /** 默认是否全部一起缩放 */
+  groupByDefault: boolean
+  /** 本段所属题目的选项图片正在被“全部一起缩放”时的比例 */
+  groupScale?: number
+}
+
+interface FigureOptions {
+  active: boolean
+  onChange: FigureChangeHandler | undefined
+  optionImages: OptionImageHandlers | undefined
 }
 
 export type MathRun = Extract<DocRun, { kind: 'math' }>
@@ -62,7 +82,8 @@ export const DocParagraphView = memo(function DocParagraphView({
   selected,
   onSelect,
   onEditMath,
-  onFigureChange
+  onFigureChange,
+  optionImages
 }: Props) {
   const spec = STYLE_SPECS[p.style]
   const css = previewCss(spec)
@@ -103,6 +124,7 @@ export const DocParagraphView = memo(function DocParagraphView({
     )
 
   // 浮动图（右侧图、自由位置）：文字绕开图片
+  const figures: FigureOptions = { active: selected, onChange: onFigureChange, optionImages }
   const floating = (p.floatingImages ?? []).map((f, i) => (
     <FigureImage
       key={`float-${f.ref?.figureIndex ?? i}`}
@@ -138,7 +160,7 @@ export const DocParagraphView = memo(function DocParagraphView({
       {floating}
       {label}
       {p.tabStopsTwip === undefined ? (
-        renderRuns(p.runs, assetUrls, onEditMath, { active: selected, onChange: onFigureChange })
+        renderRuns(p.runs, assetUrls, onEditMath, figures)
       ) : (
         <TabbedRuns
           runs={p.runs}
@@ -146,6 +168,7 @@ export const DocParagraphView = memo(function DocParagraphView({
           indentTwip={spec.indentLeftTwip}
           assetUrls={assetUrls}
           onEditMath={onEditMath}
+          figures={figures}
         />
       )}
     </div>
@@ -159,6 +182,7 @@ function TabbedRuns(props: {
   indentTwip: number
   assetUrls: ReadonlyMap<string, string>
   onEditMath: ((run: MathRun) => void) | undefined
+  figures: FigureOptions
 }): ReactNode {
   const segments: DocRun[][] = [[]]
   for (const run of props.runs) {
@@ -177,7 +201,7 @@ function TabbedRuns(props: {
             className="tab-cell"
             style={width === undefined ? { flex: 1 } : { width: `${twipToPt(width)}pt` }}
           >
-            {renderRuns(seg, props.assetUrls, props.onEditMath)}
+            {renderRuns(seg, props.assetUrls, props.onEditMath, props.figures)}
           </span>
         )
       })}
@@ -189,7 +213,7 @@ function renderRuns(
   runs: DocRun[],
   assetUrls: ReadonlyMap<string, string>,
   onEditMath?: (run: MathRun) => void,
-  figures?: { active: boolean; onChange: FigureChangeHandler | undefined }
+  figures?: FigureOptions
 ): ReactNode[] {
   return runs.map((run, i) => {
     switch (run.kind) {
@@ -219,7 +243,28 @@ function renderRuns(
             {...(onEditMath !== undefined && run.ref !== undefined ? { onEdit: () => onEditMath(run) } : {})}
           />
         )
-      case 'image':
+      case 'image': {
+        // 选项中的图片：可单张缩放，或全部一起缩放
+        const opt = figures?.optionImages
+        if (run.optionRef !== undefined && opt !== undefined) {
+          const ref = run.optionRef
+          return (
+            <FigureImage
+              key={i}
+              className="run-image"
+              src={assetUrls.get(run.assetId)}
+              widthEmu={run.widthEmu}
+              heightEmu={run.heightEmu}
+              figureRef={undefined}
+              active={figures!.active}
+              onChange={undefined}
+              onResizeEnd={(size, group) => opt.onResize(ref, size.widthEmu, group)}
+              onResizeDraft={(scale, group) => opt.onDraft(ref, scale, group)}
+              groupByDefault={opt.groupByDefault}
+              {...(opt.groupScale !== undefined ? { groupScale: opt.groupScale } : {})}
+            />
+          )
+        }
         // 属于题图、插图的图片可在预览中缩放；正文中的行内图片保持普通显示
         if (run.ref !== undefined && figures !== undefined) {
           return (
@@ -244,6 +289,7 @@ function renderRuns(
             style={{ width: `${emuToPt(run.widthEmu)}pt`, height: `${emuToPt(run.heightEmu)}pt` }}
           />
         )
+      }
       case 'blank':
         return <span key={i} className="run-blank" style={{ width: `${run.widthChars}em` }} />
       case 'tab':
