@@ -3,7 +3,7 @@
  * 以及锚定在该段的浮动图片。题目识别在 recognize.ts 中进行。
  */
 import JSZip from 'jszip'
-import type { Asset, Inline, TextMarks } from '../model/types'
+import type { Asset, Inline, ParagraphFormat, TextMarks } from '../model/types'
 import { createAsset } from '../project-file/codec'
 import { mimeForExt } from '../project-file/format'
 import { attr, child, children, descendants, NS, parseXml, serializeXml, type Element } from '../xml/dom'
@@ -29,6 +29,8 @@ export interface ReadParagraph {
   inlines: Inline[]
   /** 四周环绕或浮于文字上方的图片 */
   floating: DocxImage[]
+  /** 段落格式（首行缩进、对齐），已合并段落样式中的设置 */
+  format?: ParagraphFormat
 }
 
 export interface ReadResult {
@@ -64,6 +66,8 @@ class Reader {
   assets: Record<string, Asset> = {}
   private rels = new Map<string, string>()
   private styles = new Map<string, string>()
+  /** 样式的段落格式与所继承的样式，用于计算段落实际的首行缩进与对齐 */
+  private styleFormats = new Map<string, { format: ParagraphFormat; basedOn?: string }>()
   private assetByTarget = new Map<string, Asset>()
   private counts = {
     vectorImages: 0,
@@ -99,8 +103,20 @@ class Reader {
         const id = attr(style, W, 'styleId')
         const name = attr(child(style, W, 'name'), W, 'val')
         if (id !== undefined && name !== undefined) this.styles.set(id, name)
+        if (id !== undefined && style.getAttributeNS(W, 'type') !== 'character') {
+          const basedOn = attr(child(style, W, 'basedOn'), W, 'val')
+          this.styleFormats.set(id, { format: paragraphFormat(child(style, W, 'pPr')), ...(basedOn !== undefined ? { basedOn } : {}) })
+        }
       }
     }
+  }
+
+  /** 样式（含继承）中的段落格式；越靠近的样式优先 */
+  private styleFormat(styleId: string | undefined, depth = 0): ParagraphFormat {
+    if (styleId === undefined || depth > 10) return {}
+    const entry = this.styleFormats.get(styleId)
+    if (entry === undefined) return {}
+    return { ...this.styleFormat(entry.basedOn, depth + 1), ...entry.format }
   }
 
   warningList(): string[] {
@@ -141,11 +157,14 @@ class Reader {
   private async readParagraph(p: Element): Promise<void> {
     const pPr = child(p, W, 'pPr')
     const styleId = attr(pPr && child(pPr, W, 'pStyle'), W, 'val')
+    const format = { ...this.styleFormat(styleId), ...paragraphFormat(pPr) }
+    if (format.firstLineChars === 0) delete format.firstLineChars
     const para: ReadParagraph = {
       ...(styleId !== undefined ? { styleName: this.styles.get(styleId) ?? styleId } : {}),
       numbered: pPr !== undefined && child(pPr, W, 'numPr') !== undefined,
       inlines: [],
-      floating: []
+      floating: [],
+      ...(Object.keys(format).length > 0 ? { format } : {})
     }
     const textBoxes: Element[] = []
     await this.readInlines(p, para, {}, textBoxes)
@@ -390,6 +409,30 @@ function serializeMath(oMath: Element): string {
   if (!xml.includes(`xmlns:m="${M}"`)) xml = xml.replace(/^<m:oMath\b/, `<m:oMath xmlns:m="${M}"`)
   if (xml.includes('<w:') && !xml.includes(`xmlns:w="${W}"`)) xml = xml.replace(/^<m:oMath\b/, `<m:oMath xmlns:w="${W}"`)
   return xml
+}
+
+/**
+ * 段落属性中的首行缩进与对齐。首行缩进优先取“字符”单位（firstLineChars，单位 1/100 字符），
+ * 否则由 twip 换算（五号字一个字约 210 twip）；悬挂缩进视为没有首行缩进。
+ */
+function paragraphFormat(pPr: Element | undefined): ParagraphFormat {
+  const out: ParagraphFormat = {}
+  if (pPr === undefined) return out
+  const ind = child(pPr, W, 'ind')
+  if (ind !== undefined) {
+    const chars = attr(ind, W, 'firstLineChars')
+    const twip = attr(ind, W, 'firstLine')
+    const hanging = attr(ind, W, 'hanging') ?? attr(ind, W, 'hangingChars')
+    // 字符单位为 0 时 Word 改用 twip 数值（WPS 常写成 firstLine="420" firstLineChars="0"）
+    if (hanging !== undefined && Number(hanging) > 0) out.firstLineChars = 0
+    else if (chars !== undefined && Number(chars) > 0) out.firstLineChars = Math.round(Number(chars) / 50) / 2
+    else if (twip !== undefined) out.firstLineChars = Math.round((Number(twip) / 210) * 2) / 2
+    else if (chars !== undefined) out.firstLineChars = 0
+  }
+  const jc = attr(child(pPr, W, 'jc'), W, 'val')
+  if (jc === 'center') out.align = 'center'
+  else if (jc === 'right' || jc === 'end') out.align = 'right'
+  return out
 }
 
 function runMarks(rPr: Element | undefined): TextMarks {

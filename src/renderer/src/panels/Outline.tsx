@@ -104,5 +104,7 @@ function describe(block: Block): string {
       return summary(plainText(block.content)) || '（空段落）'
     case 'question':
       return summary(plainText(block.question.stem)) || '（空题目）'
+    case 'knowledge':
+      return block.title.trim() || summary(plainText(block.content)) || '（知识点）'
   }
 }

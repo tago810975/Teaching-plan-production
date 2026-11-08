@@ -6,8 +6,17 @@
  * 2. 文字：其他文档按“1.”题号、“A．”选项、“【答案】”“【详解】”等标记识别。
  * 样式规则优先；某段没有可用样式时才看文字。
  */
-import { createQuestion, newId } from '../model/factory'
-import type { Block, ChoiceOption, Inline, Question, QuestionFigure, RichParagraph } from '../model/types'
+import { createKnowledge, createQuestion, newId } from '../model/factory'
+import type {
+  Block,
+  ChoiceOption,
+  Inline,
+  KnowledgeBlock,
+  ParagraphBlock,
+  Question,
+  QuestionFigure,
+  RichParagraph
+} from '../model/types'
 import type { DocxImage, ReadParagraph } from './docx-reader'
 
 type Role =
@@ -40,6 +49,13 @@ const STYLE_ROLES: Array<[RegExp, Role]> = [
 /** 常见的栏目标题，在没有样式的文档中按文字识别 */
 const SECTION_TITLES = /^(知识梳理|知识点梳理|知识清单|例题精讲|典例精析|典例分析|课堂练习|随堂练习|课堂检测|课后练习|课后作业|巩固练习|课堂总结|作业单|拓展提升|能力提升)$/
 
+/** 知识类栏目：其中按文字规则不识别题号（“1.适用条件”之类是知识要点而非题目） */
+const KNOWLEDGE_SECTION = /知识|梳理|清单|总结|要点|归纳|概念|方法/
+
+/** 未使用样式的知识标题：“一、”“二、”开头的短段落 */
+const KNOWLEDGE_HEADING = /^\s*[一二三四五六七八九十]{1,3}\s*[、．.]/
+const KNOWLEDGE_HEADING_MAX_CHARS = 40
+
 const ANSWER_LABEL = /^\s*【\s*答案\s*】\s*/
 const ANALYSIS_LABEL = /^\s*【\s*(详解|解析|分析|点睛|点评|名师点睛|拓展|方法技巧)\s*】/
 const KNOWLEDGE_LABEL = /^\s*【\s*(知识点|考点)\s*】\s*/
@@ -62,6 +78,30 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
   const blocks: Block[] = []
   let current: { q: Question; stage: 'stem' | 'options' | 'teacher' } | null = null
   let firstTitle: string | undefined
+  /** 正在收集内容的知识点 */
+  let knowledge: KnowledgeBlock | null = null
+  /** 可以继续合并普通段落的正文块（中间出现其他内容时清空） */
+  let openParagraph: ParagraphBlock | null = null
+  let inKnowledgeSection = false
+  const closeOpen = (): void => {
+    knowledge = null
+    openParagraph = null
+  }
+
+  /** 第 index 段之后的第一个非空段落 */
+  const nextContent = (index: number): ReadParagraph | undefined => {
+    for (let j = index + 1; j < paragraphs.length; j++) if (!isBlank(paragraphs[j]!)) return paragraphs[j]
+    return undefined
+  }
+  const startsQuestion = (p: ReadParagraph): boolean => {
+    if (styleRole(p.styleName) === 'question') return true
+    const t = textOf(p)
+    return !usesStyles && !inKnowledgeSection && QUESTION_NUMBER.test(t) && !OPTION_START.test(t)
+  }
+  const isHeading = (p: ReadParagraph): boolean => {
+    const r = styleRole(p.styleName)
+    return r === 'title' || r === 'section' || r === 'topic' || (!usesStyles && SECTION_TITLES.test(textOf(p).trim()))
+  }
 
   const finishQuestion = (): void => {
     if (current === null) return
@@ -70,7 +110,8 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     current = null
   }
 
-  for (const para of paragraphs) {
+  for (let index = 0; index < paragraphs.length; index++) {
+    const para = paragraphs[index]!
     const text = textOf(para)
     if (isBlank(para)) continue
     const role = styleRole(para.styleName)
@@ -78,6 +119,7 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     // ---------- 标题类 ----------
     if (role === 'title' || role === 'section' || role === 'topic' || (!usesStyles && SECTION_TITLES.test(text.trim()))) {
       finishQuestion()
+      closeOpen()
       const kind = role === 'title' ? 'title' : role === 'topic' ? 'topic' : 'section'
       if (kind === 'title') {
         if (firstTitle === undefined) firstTitle = text.trim()
@@ -87,17 +129,28 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
           text: text.trim(),
           ...(blocks.some((b) => b.type === 'title') ? { restartNumbering: true } : {})
         })
+      } else if (kind === 'topic') {
+        // 标题后面跟的是题目：题型分组；跟的是正文：知识点
+        const next = nextContent(index)
+        if (next !== undefined && !startsQuestion(next) && !isHeading(next)) {
+          knowledge = createKnowledge({ title: text.trim() })
+          blocks.push(knowledge)
+        } else {
+          blocks.push({ id: newId(), type: 'topic', text: text.trim() })
+        }
       } else {
-        blocks.push({ id: newId(), type: kind, text: text.trim() })
+        inKnowledgeSection = KNOWLEDGE_SECTION.test(text)
+        blocks.push({ id: newId(), type: 'section', text: text.trim() })
       }
       continue
     }
 
     // ---------- 新题目 ----------
     const startsByStyle = role === 'question'
-    const startsByNumber = !usesStyles && QUESTION_NUMBER.test(text) && !OPTION_START.test(text)
+    const startsByNumber = !usesStyles && !inKnowledgeSection && QUESTION_NUMBER.test(text) && !OPTION_START.test(text)
     if (startsByStyle || startsByNumber) {
       finishQuestion()
+      closeOpen()
       const q = createQuestion({ kind: 'solve' })
       let inlines = para.inlines
       if (startsByNumber) inlines = stripPrefix(inlines, QUESTION_NUMBER)
@@ -112,11 +165,44 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       continue
     }
 
-    // ---------- 不在题目中：正文段落 ----------
+    // ---------- 不在题目中：未使用样式的知识标题（“一、……”） ----------
+    if (current === null && role === undefined && KNOWLEDGE_HEADING.test(text) && [...text.trim()].length <= KNOWLEDGE_HEADING_MAX_CHARS) {
+      const next = nextContent(index)
+      if (next !== undefined && !startsQuestion(next) && !isHeading(next)) {
+        closeOpen()
+        knowledge = createKnowledge({ title: text.trim() })
+        blocks.push(knowledge)
+        continue
+      }
+    }
+
+    // ---------- 不在题目中：知识点内容或正文 ----------
     if (current === null) {
-      const content: RichParagraph[] = [clean(para.inlines)]
-      for (const img of para.floating) content.push({ inlines: [imageInline(img)] })
-      blocks.push({ id: newId(), type: 'paragraph', content: content.filter((p) => p.inlines.length > 0) })
+      const rp = withFormat(clean(para.inlines), para)
+      const k: KnowledgeBlock | null = knowledge
+      if (k !== null) {
+        if (rp.inlines.length > 0) k.content.push(rp)
+        // 浮在文字旁的图：作为知识点的右侧环绕图，锚定在当前段落
+        for (const img of para.floating) {
+          k.figures.push({
+            assetId: img.assetId,
+            widthEmu: img.widthEmu,
+            heightEmu: img.heightEmu,
+            placement: 'right',
+            anchorParagraph: Math.max(0, k.content.length - 1)
+          })
+        }
+        continue
+      }
+      // 连续的普通段落合并为一个正文块
+      let target: ParagraphBlock | null = openParagraph
+      if (target === null) {
+        target = { id: newId(), type: 'paragraph', content: [] }
+        blocks.push(target)
+        openParagraph = target
+      }
+      if (rp.inlines.length > 0) target.content.push(rp)
+      for (const img of para.floating) target.content.push({ inlines: [imageInline(img)] })
       continue
     }
 
@@ -196,10 +282,11 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     // 其余：题干续行（选项之后出现的文字也算题干，如综合题的补充说明）
     if (q.subQuestions.length > 0) {
       q.subQuestions[q.subQuestions.length - 1]!.content.push(clean(para.inlines))
+      addFloating(q, para.floating)
     } else {
       q.stem.push(clean(para.inlines))
+      addFloating(q, para.floating, q.stem.length - 1)
     }
-    addFloating(q, para.floating)
   }
   finishQuestion()
 
@@ -230,13 +317,14 @@ function finalizeQuestion(q: Question): void {
 
 type FigureWithDescription = QuestionFigure & { description?: string }
 
-function addFloating(q: Question, floating: DocxImage[]): void {
+function addFloating(q: Question, floating: DocxImage[], anchorParagraph = 0): void {
   for (const img of floating) {
     const fig: FigureWithDescription = {
       assetId: img.assetId,
       widthEmu: img.widthEmu,
       heightEmu: img.heightEmu,
       placement: 'right',
+      ...(anchorParagraph > 0 ? { anchorParagraph } : {}),
       ...(img.description !== undefined ? { description: img.description } : {})
     }
     q.figures.push(fig)
@@ -244,7 +332,7 @@ function addFloating(q: Question, floating: DocxImage[]): void {
 }
 
 function pushAnalysis(q: Question, para: ReadParagraph): void {
-  const p = clean(para.inlines)
+  const p = withFormat(clean(para.inlines), para)
   if (p.inlines.length > 0) q.analysis.push(p)
   for (const img of para.floating) q.analysis.push({ inlines: [imageInline(img)] })
 }
@@ -302,6 +390,11 @@ export function splitOptions(inlines: Inline[], startIndex = 0): ChoiceOption[] 
 }
 
 // ---------------- 工具函数 ----------------
+
+/** 带上原段落的格式（首行缩进、对齐） */
+function withFormat(rp: RichParagraph, para: ReadParagraph): RichParagraph {
+  return para.format !== undefined && Object.keys(para.format).length > 0 ? { ...rp, format: { ...para.format } } : rp
+}
 
 function styleRole(styleName: string | undefined): Role | undefined {
   if (styleName === undefined) return undefined

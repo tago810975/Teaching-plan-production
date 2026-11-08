@@ -177,6 +177,7 @@ async function readJson<T>(zip: JSZip, path: string): Promise<T> {
 function migrate(raw: unknown, fromVersion: number): unknown {
   let data = raw
   if (fromVersion < 2) data = migrateV1toV2(data)
+  if (fromVersion < 3) data = migrateV2toV3(data)
   return data
 }
 
@@ -196,5 +197,15 @@ function migrateV1toV2(raw: unknown): unknown {
       layout.keepTogether = layout.keepTogether ? 'auto' : 'never'
     }
   }
+  return project
+}
+
+/** 版本 2 → 3：补上知识点的默认版式设置（新增的块类型与字段都是可选的，无需改动旧数据） */
+function migrateV2toV3(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const project = raw as Record<string, unknown>
+  const layout = (project.layout ?? {}) as Record<string, unknown>
+  layout.keepKnowledgeTogether ??= { teacher: false, student: false }
+  project.layout = layout
   return project
 }

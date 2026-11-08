@@ -280,6 +280,19 @@ body.is-resizing * {
 .outline-item--question {
   padding-left: 24px;
 }
+.outline-item--knowledge {
+  padding-left: 16px;
+}
+.outline-item--knowledge .outline-text::before {
+  content: '知';
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 3px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
 .outline-no {
   flex: none;
   min-width: 1.8em;

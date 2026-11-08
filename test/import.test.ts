@@ -27,10 +27,35 @@ describe('导入样例教案（教师版）', async () => {
     ])
   })
 
-  it('栏目与题型分组', () => {
+  it('栏目、知识点与题型分组', () => {
     const sections = result.blocks.flatMap((b) => (b.type === 'section' ? [b.text] : []))
     expect(sections).toEqual(['知识梳理', '例题精讲', '课堂练习'])
-    expect(result.blocks.filter((b) => b.type === 'topic').length).toBeGreaterThanOrEqual(13)
+    // 知识梳理中的标题后面跟正文：知识点；例题中的标题后面跟题目：题型分组
+    const knowledge = result.blocks.flatMap((b) => (b.type === 'knowledge' ? [b.title] : []))
+    expect(knowledge).toEqual(['一、放缩圆', '二、旋转圆', '三、平移圆', '四、圆形边界磁场动态圆', '五、轨迹半径等于磁场半径'])
+    expect(result.blocks.filter((b) => b.type === 'topic').length).toBe(8)
+  })
+
+  it('知识梳理不再拆成零散段落：第一题之前只有 10 项', () => {
+    expect(result.blocks.findIndex((b) => b.type === 'question')).toBe(10)
+  })
+
+  it('导语段落保留首行缩进（firstLine="420" firstLineChars="0" 的写法）', () => {
+    const intro = result.blocks[1]
+    expect(intro?.type).toBe('paragraph')
+    if (intro?.type === 'paragraph') {
+      expect(intro.content).toHaveLength(3)
+      for (const p of intro.content) expect(p.format?.firstLineChars).toBe(2)
+    }
+  })
+
+  it('知识点中浮动在文字旁的图：右侧环绕，锚定在原段落', () => {
+    const k4 = result.blocks.find((b) => b.type === 'knowledge' && b.title.startsWith('四、'))
+    if (k4?.type !== 'knowledge') throw new Error('缺少知识点四')
+    expect(k4.figures.map((f) => [f.placement, f.anchorParagraph])).toEqual([
+      ['right', 0],
+      ['right', 3]
+    ])
   })
 
   it('第 1 题：多选、四个选项、答案、知识点、详解', () => {

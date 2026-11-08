@@ -6,6 +6,8 @@ import { createAsset } from '@core/project-file/codec'
 import type { Asset, QuestionFigure } from '@core/model/types'
 
 interface Props {
+  /** 分组标题，默认“题图” */
+  title?: string
   figures: QuestionFigure[]
   assetUrls: ReadonlyMap<string, string>
   onChange: (figures: QuestionFigure[]) => void
@@ -17,7 +19,7 @@ const EMU_PER_CM = 360000
 /** 新加图片的默认宽度：5 厘米 */
 const DEFAULT_WIDTH_CM = 5
 
-export function FigureList({ figures, assetUrls, onChange, onAddAsset }: Props) {
+export function FigureList({ title = '题图', figures, assetUrls, onChange, onAddAsset }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,18 +54,18 @@ export function FigureList({ figures, assetUrls, onChange, onAddAsset }: Props) 
 
   return (
     <fieldset className="group">
-      <legend>题图</legend>
-      {figures.length === 0 && <p className="field-hint">没有题图。</p>}
+      <legend>{title}</legend>
+      {figures.length === 0 && <p className="field-hint">没有{title}。</p>}
       {figures.map((f, i) => (
         <div key={`${f.assetId}-${i}`} className="figure-row">
           <div className="figure-thumb">
-            <img src={assetUrls.get(f.assetId)} alt={`题图 ${i + 1}`} />
+            <img src={assetUrls.get(f.assetId)} alt={`${title} ${i + 1}`} />
           </div>
           <div className="figure-controls">
-            <div className="segmented" role="radiogroup" aria-label={`题图 ${i + 1} 的位置`}>
+            <div className="segmented" role="radiogroup" aria-label={`${title} ${i + 1} 的位置`}>
               {(
                 [
-                  ['below', '题干下方'],
+                  ['below', title === '题图' ? '题干下方' : '正文下方'],
                   ['right', '右侧环绕']
                 ] as const
               ).map(([v, label]) => (
@@ -114,11 +116,11 @@ export function FigureList({ figures, assetUrls, onChange, onAddAsset }: Props) 
         </div>
       ))}
       {figures.filter((f) => f.placement === 'right').length > 1 && (
-        <p className="field-hint">右侧环绕只能放一张图，其余的会排在题干下方。</p>
+        <p className="field-hint">每个段落右侧只能环绕一张图，多出的会排在下方。</p>
       )}
       <div className="group-actions">
         <button type="button" onClick={() => inputRef.current?.click()}>
-          添加题图…
+          添加{title}…
         </button>
       </div>
       {error !== null && <p className="field-error">{error}</p>}

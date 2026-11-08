@@ -80,6 +80,19 @@ describe('导入题库文档：MathType、EQ 域、形状示意图', async () =>
   })
 })
 
+describe('未使用样式的知识标题（“一、……”）', async () => {
+  const result = await importDocx(new Uint8Array(readFileSync(SAMPLE)))
+  it('识别为知识点，示意图在右侧', () => {
+    const ks = result.blocks.filter((b) => b.type === 'knowledge')
+    expect(ks.map((k) => (k.type === 'knowledge' ? k.title : ''))).toEqual([
+      '一、带电粒子在匀强磁场中的圆周运动',
+      '二、圆周运动的三个确定: 圆心、半径、运动时间'
+    ])
+    const k1 = ks[0]
+    if (k1?.type === 'knowledge') expect(k1.figures[0]?.placement).toBe('right')
+  })
+})
+
 describe('知识点框（带边框的成段文字）仍按文字导入', async () => {
   const result = await importDocx(
     new Uint8Array(readFileSync('reference/samples/2026秋季高二物理敏思_动态圆专题/教案_T_动态圆专题.docx'))

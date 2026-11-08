@@ -59,9 +59,17 @@ export interface BlankInline {
 
 export type Inline = TextInline | MathInline | ImageInline | BlankInline
 
+/** 段落格式（从 Word 导入时保留，正文类段落使用） */
+export interface ParagraphFormat {
+  /** 首行缩进，单位：字符 */
+  firstLineChars?: number
+  align?: 'center' | 'right'
+}
+
 /** 一个段落的行内内容 */
 export interface RichParagraph {
   inlines: Inline[]
+  format?: ParagraphFormat
 }
 
 /** 多段落富文本 */
@@ -83,6 +91,8 @@ export interface QuestionFigure {
   heightEmu: number
   /** 题图位置：题干下方，或浮动在题目右侧（选项在左、题图在右） */
   placement: 'below' | 'right'
+  /** 右侧环绕时锚定在第几段（题干或知识点正文的段落序号，默认第 0 段） */
+  anchorParagraph?: number
 }
 
 export interface SubQuestion {
@@ -94,6 +104,9 @@ export type KeepTogether = 'auto' | 'always' | 'never'
 
 /** 选项排布：自动根据选项长度决定，或手动指定每行几项 */
 export type OptionColumns = 'auto' | 1 | 2 | 4
+
+/** 知识点等内容块的版式（与题目相同，但没有选项排列） */
+export type BlockLayout = Omit<QuestionLayout, 'optionColumns'>
 
 export interface QuestionLayout {
   /** 学生版题后留白（作答空间），单位：行（按正文行高折算） */
@@ -178,7 +191,21 @@ export interface QuestionBlock {
   question: Question
 }
 
-export type Block = TitleBlock | SectionBlock | TopicBlock | ParagraphBlock | QuestionBlock
+/**
+ * 知识点：一个知识标题（如“一、带电粒子在匀强磁场中的圆周运动”）连同其下的文字与图片。
+ * 与题目一样可以设置留白、跨页与换页。
+ */
+export interface KnowledgeBlock {
+  id: string
+  type: 'knowledge'
+  /** 知识标题；为空时只有正文 */
+  title: string
+  content: RichText
+  figures: QuestionFigure[]
+  layout: BlockLayout
+}
+
+export type Block = TitleBlock | SectionBlock | TopicBlock | ParagraphBlock | QuestionBlock | KnowledgeBlock
 
 // ---------- 工程 ----------
 
@@ -220,6 +247,8 @@ export interface PageHeader {
 export interface ProjectLayout {
   /** 每道题默认是否整题排在同一页，教案与学案分别设置 */
   keepQuestionTogether: Record<Variant, boolean>
+  /** 每个知识点默认是否整块排在同一页 */
+  keepKnowledgeTogether: Record<Variant, boolean>
 }
 
 export interface Project {

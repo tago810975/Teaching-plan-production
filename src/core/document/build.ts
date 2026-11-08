@@ -6,6 +6,7 @@
  */
 import type {
   ChoiceOption,
+  KnowledgeBlock,
   Inline,
   OptionColumns,
   Project,
@@ -48,9 +49,13 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
             key: `${block.id}:${i}`,
             sourceBlockId: block.id,
             style: 'body',
+            ...formatProps(p),
             runs: toRuns(p, { blockId: block.id, path: ['content', i] })
           })
         })
+        break
+      case 'knowledge':
+        out.push(...buildKnowledge(block, variant, project.layout.keepKnowledgeTogether[variant]))
         break
       case 'question':
         questionNo += 1
@@ -101,11 +106,12 @@ function buildQuestion(
     })
   })
 
-  // 题图：靠右浮动的图挂在题干第一段上；下方的图各占一段
+  // 题图：靠右浮动的图挂在锚定的题干段落上（默认第一段）；下方的图各占一段
   const first = paras[0]
   for (const [i, fig] of q.figures.entries()) {
-    if (fig.placement === 'right' && first !== undefined && first.floatingImage === undefined) {
-      first.floatingImage = {
+    const host = paras[Math.min(fig.anchorParagraph ?? 0, stem.length - 1)] ?? first
+    if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
+      host.floatingImage = {
         assetId: fig.assetId,
         widthEmu: fig.widthEmu,
         heightEmu: fig.heightEmu,
@@ -174,7 +180,7 @@ function buildQuestion(
       push(fixedLabelPara(key('diff'), 'difficultPoint', q.difficultPoint))
     }
     q.analysis.forEach((p, i) => {
-      push({ key: key(`ana${i}`), style: 'analysis', runs: toRuns(p, at('analysis', i)) })
+      push({ key: key(`ana${i}`), style: 'analysis', ...formatProps(p), runs: toRuns(p, at('analysis', i)) })
     })
     for (let i = teacherStart; i < paras.length; i++) paras[i]!.shaded = true
   }
@@ -206,6 +212,60 @@ function buildQuestion(
   })
   if (q.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
 
+  return paras
+}
+
+// ---------------- 知识点 ----------------
+
+function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefault: boolean): DocParagraph[] {
+  const paras: DocParagraph[] = []
+  const key = (suffix: string): string => `${k.id}:${suffix}`
+  if (k.title.trim() !== '') {
+    paras.push({ key: key('title'), sourceBlockId: k.id, style: 'topic', runs: [{ kind: 'text', text: k.title }], keepNext: true })
+  }
+  const contentStart = paras.length
+  const content: RichText = k.content.length > 0 ? k.content : k.title.trim() === '' ? [{ inlines: [] }] : []
+  content.forEach((p, i) => {
+    paras.push({
+      key: key(`c${i}`),
+      sourceBlockId: k.id,
+      style: 'body',
+      ...formatProps(p),
+      runs: toRuns(p, { blockId: k.id, path: ['content', i] })
+    })
+  })
+
+  // 图：右侧环绕的挂在锚定段落上，其余排在正文之后
+  for (const [i, fig] of k.figures.entries()) {
+    const host = paras[contentStart + Math.min(fig.anchorParagraph ?? 0, Math.max(0, content.length - 1))]
+    if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
+      host.floatingImage = { assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, side: 'right' }
+    } else {
+      paras.push({
+        key: key(`fig${i}`),
+        sourceBlockId: k.id,
+        style: 'body',
+        runs: [{ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu }]
+      })
+    }
+  }
+
+  const spaceLines = variant === 'student' ? k.layout.studentSpaceLines : k.layout.teacherSpaceLines
+  if (spaceLines > 0) {
+    paras.push({ key: key('space'), sourceBlockId: k.id, style: 'body', runs: [], spacerTwip: Math.round(spaceLines * BODY_LINE_HEIGHT_TWIP) })
+  }
+
+  const keepAll = k.layout.keepTogether === 'always' || (k.layout.keepTogether === 'auto' && keepTogetherByDefault)
+  paras.forEach((p, i) => {
+    const isLast = i === paras.length - 1
+    if (keepAll) {
+      p.keepLines = true
+      if (!isLast) p.keepNext = true
+    }
+    if (paras[i + 1]?.spacerTwip !== undefined) p.keepNext = true
+  })
+  const first = paras[0]
+  if (k.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
   return paras
 }
 
@@ -293,6 +353,19 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
 }
 
 /** 标题类段落（大标题、栏目标题、题型分组）一律与下段同页，避免标题孤零零留在页底 */
+/** 五号字一个汉字的宽度（twip），用于把“首行缩进 N 字符”换算为长度 */
+const INDENT_CHAR_TWIP = 210
+
+/** 段落格式 → DocIR 字段 */
+function formatProps(p: RichParagraph): Pick<DocParagraph, 'firstLineIndentTwip' | 'align'> {
+  const f = p.format
+  if (f === undefined) return {}
+  return {
+    ...(f.firstLineChars !== undefined && f.firstLineChars > 0 ? { firstLineIndentTwip: Math.round(f.firstLineChars * INDENT_CHAR_TWIP) } : {}),
+    ...(f.align !== undefined ? { align: f.align } : {})
+  }
+}
+
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {
   return { key: blockId, sourceBlockId: blockId, style, runs: [{ kind: 'text', text }], keepNext: true }
 }

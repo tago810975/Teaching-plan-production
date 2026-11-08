@@ -8,7 +8,17 @@ import { useOpenFormulaEditor } from '../formula/context'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { newId } from '@core/model/factory'
 import { FigureList } from './FigureList'
-import type { Block, KeepTogether, OptionColumns, Question, QuestionBlock, RichParagraph, RichText } from '@core/model/types'
+import type {
+  Block,
+  BlockLayout,
+  KeepTogether,
+  KnowledgeBlock,
+  OptionColumns,
+  Question,
+  QuestionBlock,
+  RichParagraph,
+  RichText
+} from '@core/model/types'
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
 import type { PageHeader, ProjectLayout, Variant } from '@core/model/types'
@@ -69,6 +79,13 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             assetUrls={assetUrls}
             dispatch={dispatch}
           />
+        ) : block.type === 'knowledge' ? (
+          <KnowledgeForm
+            block={block}
+            update={update as (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void}
+            assetUrls={assetUrls}
+            dispatch={dispatch}
+          />
         ) : block.type === 'paragraph' ? (
           <Field label="内容">
             <RichTextField
@@ -92,39 +109,120 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
   section: '栏目标题',
   topic: '题型分组',
   paragraph: '正文段落',
-  question: '题目'
+  question: '题目',
+  knowledge: '知识点'
 }
 
 // ---------------- 版式设置 ----------------
 
 function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction> }) {
-  const set = (variant: Variant, value: boolean): void =>
-    dispatch({
-      type: 'update-layout',
-      layout: { ...layout, keepQuestionTogether: { ...layout.keepQuestionTogether, [variant]: value } }
-    })
-  const row = (variant: Variant, name: string) => (
+  type Key = 'keepQuestionTogether' | 'keepKnowledgeTogether'
+  const set = (key: Key, variant: Variant, value: boolean): void =>
+    dispatch({ type: 'update-layout', layout: { ...layout, [key]: { ...layout[key], [variant]: value } } })
+  const row = (key: Key, variant: Variant, name: string, keepLabel: string) => (
     <Field label={name}>
       <Segmented<'keep' | 'split'>
-        value={layout.keepQuestionTogether[variant] ? 'keep' : 'split'}
+        value={layout[key][variant] ? 'keep' : 'split'}
         options={[
           ['split', '允许跨页（节省纸张）'],
-          ['keep', '整题同页']
+          ['keep', keepLabel]
         ]}
-        onChange={(v) => set(variant, v === 'keep')}
+        onChange={(v) => set(key, variant, v === 'keep')}
       />
     </Field>
   )
   return (
     <>
-      <p className="field-hint">
-        设置每道题默认是否整题排在同一页。整题同页时，排不下的题目会整道移到下一页，前一页可能留下空白；
-        允许跨页时，题干、题图与选项仍保持在同一页，只有答案和详解可以接到下一页。
-      </p>
-      {row('teacher', '教案')}
-      {row('student', '学案')}
-      <p className="field-hint">单道题可以在题目的“版式”中另行设置。</p>
+      <fieldset className="group">
+        <legend>题目</legend>
+        <p className="field-hint">
+          整题同页时，排不下的题目会整道移到下一页，前一页可能留下空白；允许跨页时，题干、题图与选项仍保持在同一页，
+          只有答案和详解可以接到下一页。
+        </p>
+        {row('keepQuestionTogether', 'teacher', '教案', '整题同页')}
+        {row('keepQuestionTogether', 'student', '学案', '整题同页')}
+      </fieldset>
+      <fieldset className="group">
+        <legend>知识点</legend>
+        <p className="field-hint">整块同页时，排不下的知识点会整块移到下一页；允许跨页时，知识点的文字可以接到下一页。</p>
+        {row('keepKnowledgeTogether', 'teacher', '教案', '整块同页')}
+        {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
+      </fieldset>
+      <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
     </>
+  )
+}
+
+// ---------------- 知识点表单 ----------------
+
+function KnowledgeForm({
+  block,
+  update,
+  assetUrls,
+  dispatch
+}: {
+  block: KnowledgeBlock
+  update: (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void
+  assetUrls: ReadonlyMap<string, string>
+  dispatch: Dispatch<EditorAction>
+}) {
+  const set = (patch: Partial<KnowledgeBlock>): void => update((b) => ({ ...b, ...patch }))
+  const setLayout = (patch: Partial<BlockLayout>): void => update((b) => ({ ...b, layout: { ...b.layout, ...patch } }))
+  return (
+    <>
+      <Field label="标题" hint="如“一、放缩圆”；留空则只显示内容">
+        <TextInput value={block.title} onChange={(title) => set({ title })} />
+      </Field>
+      <Field label="内容" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
+        <RichTextField value={block.content} rows={10} onChange={(content) => set({ content })} />
+      </Field>
+      <FigureList
+        title="插图"
+        figures={block.figures}
+        assetUrls={assetUrls}
+        onChange={(figures) => set({ figures })}
+        onAddAsset={(asset) => dispatch({ type: 'add-asset', asset })}
+      />
+      <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整块同页" />
+    </>
+  )
+}
+
+/** 题目与知识点共用的版式字段：留白、跨页、从新页开始 */
+function LayoutFields({
+  layout,
+  onChange,
+  keepLabel,
+  children
+}: {
+  layout: BlockLayout
+  onChange: (patch: Partial<BlockLayout>) => void
+  keepLabel: string
+  children?: ReactNode
+}) {
+  return (
+    <fieldset className="group">
+      <legend>版式</legend>
+      {children}
+      <Field label="学生版后留白" hint="单位：行">
+        <NumberInput value={layout.studentSpaceLines} onChange={(studentSpaceLines) => onChange({ studentSpaceLines })} />
+      </Field>
+      <Field label="教师版后留白" hint="单位：行">
+        <NumberInput value={layout.teacherSpaceLines} onChange={(teacherSpaceLines) => onChange({ teacherSpaceLines })} />
+      </Field>
+      <Field label="跨页">
+        <Segmented<KeepTogether>
+          value={layout.keepTogether}
+          options={[
+            ['auto', '跟随版式设置'],
+            ['always', keepLabel],
+            ['never', '允许跨页']
+          ]}
+          onChange={(keepTogether) => onChange({ keepTogether })}
+        />
+      </Field>
+      <Checkbox label="从新的一页开始" checked={layout.pageBreakBefore} onChange={(pageBreakBefore) => onChange({ pageBreakBefore })} />
+    </fieldset>
   )
 }
 
@@ -271,8 +369,7 @@ function QuestionForm({
         </Field>
       </fieldset>
 
-      <fieldset className="group">
-        <legend>版式</legend>
+      <LayoutFields layout={q.layout} onChange={setLayout} keepLabel="整题同页">
         {q.options.length > 0 && (
           <Field label="选项排列">
             <Segmented<OptionColumns>
@@ -287,29 +384,7 @@ function QuestionForm({
             />
           </Field>
         )}
-        <Field label="学生版题后留白" hint="作答空间，单位：行">
-          <NumberInput value={q.layout.studentSpaceLines} onChange={(studentSpaceLines) => setLayout({ studentSpaceLines })} />
-        </Field>
-        <Field label="教师版题后留白" hint="单位：行">
-          <NumberInput value={q.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
-        </Field>
-        <Field label="跨页" hint="允许跨页时，题干、题图与选项仍保持在同一页，只有答案和详解可以接到下一页">
-          <Segmented<KeepTogether>
-            value={q.layout.keepTogether}
-            options={[
-              ['auto', '跟随版式设置'],
-              ['always', '整题同页'],
-              ['never', '允许跨页']
-            ]}
-            onChange={(keepTogether) => setLayout({ keepTogether })}
-          />
-        </Field>
-        <Checkbox
-          label="从新的一页开始"
-          checked={q.layout.pageBreakBefore}
-          onChange={(pageBreakBefore) => setLayout({ pageBreakBefore })}
-        />
-      </fieldset>
+      </LayoutFields>
     </>
   )
 }

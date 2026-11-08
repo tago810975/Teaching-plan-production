@@ -32,12 +32,12 @@ export const DocParagraphView = memo(function DocParagraphView({
     fontSize: css.fontSize,
     fontWeight: css.fontWeight,
     color: css.color,
-    textAlign: css.textAlign,
+    textAlign: p.align ?? css.textAlign,
     lineHeight: css.lineHeight,
     paddingTop: css.marginTop,
     paddingBottom: css.marginBottom,
     paddingLeft: css.paddingLeft,
-    textIndent: css.textIndent
+    textIndent: p.firstLineIndentTwip !== undefined ? `${twipToPt(p.firstLineIndentTwip)}pt` : css.textIndent
   }
 
   if (p.spacerTwip !== undefined) {

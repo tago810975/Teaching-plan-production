@@ -38,24 +38,40 @@ const inline = z.discriminatedUnion('type', [
   z.object({ type: z.literal('blank'), widthChars: z.number().positive() })
 ])
 
-const richParagraph = z.object({ inlines: z.array(inline) })
+const richParagraph = z.object({
+  inlines: z.array(inline),
+  format: z
+    .object({
+      firstLineChars: z.number().optional(),
+      align: z.enum(['center', 'right']).optional()
+    })
+    .optional()
+})
 const richText = z.array(richParagraph)
 
 const variant = z.enum(['teacher', 'student'])
+
+const figure = z.object({
+  assetId: z.string(),
+  widthEmu: z.number().positive(),
+  heightEmu: z.number().positive(),
+  placement: z.enum(['below', 'right']),
+  anchorParagraph: z.number().int().min(0).optional()
+})
+
+const blockLayout = z.object({
+  studentSpaceLines: z.number().min(0),
+  teacherSpaceLines: z.number().min(0),
+  keepTogether: z.enum(['auto', 'always', 'never']),
+  pageBreakBefore: z.boolean()
+})
 
 const question = z.object({
   id: z.string(),
   kind: z.enum(['single-choice', 'multi-choice', 'fill-blank', 'solve']),
   difficulty: z.string().optional(),
   stem: richText,
-  figures: z.array(
-    z.object({
-      assetId: z.string(),
-      widthEmu: z.number().positive(),
-      heightEmu: z.number().positive(),
-      placement: z.enum(['below', 'right'])
-    })
-  ),
+  figures: z.array(figure),
   options: z.array(z.object({ label: z.string(), content: richParagraph })),
   subQuestions: z.array(z.object({ id: z.string(), content: richText })),
   answer: richText,
@@ -90,7 +106,15 @@ const block = z.discriminatedUnion('type', [
     content: richText,
     onlyIn: variant.optional()
   }),
-  z.object({ id: z.string(), type: z.literal('question'), question })
+  z.object({ id: z.string(), type: z.literal('question'), question }),
+  z.object({
+    id: z.string(),
+    type: z.literal('knowledge'),
+    title: z.string(),
+    content: richText,
+    figures: z.array(figure),
+    layout: blockLayout
+  })
 ])
 
 const headerImage = z.object({
@@ -114,7 +138,8 @@ export const projectSchema = z.object({
     watermark: headerImage.optional()
   }),
   layout: z.object({
-    keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() })
+    keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
+    keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() })
   }),
   templateId: z.string(),
   blocks: z.array(block)

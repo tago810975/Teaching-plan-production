@@ -130,7 +130,11 @@ class ExportContext {
     if (p.spacerTwip !== undefined) {
       pPr += `<w:spacing w:before="0" w:after="0" w:line="${p.spacerTwip}" w:lineRule="exact"/>`
     }
-    if (spec.directIndentTwip !== undefined) pPr += `<w:ind w:left="${spec.directIndentTwip}" w:firstLine="0"/>`
+    if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined) {
+      const left = spec.directIndentTwip !== undefined ? ` w:left="${spec.directIndentTwip}"` : ''
+      pPr += `<w:ind${left} w:firstLine="${p.firstLineIndentTwip ?? 0}"/>`
+    }
+    if (p.align !== undefined) pPr += `<w:jc w:val="${p.align}"/>`
 
     let runs = ''
     if (p.floatingImage !== undefined) runs += this.drawing(p.floatingImage, 'anchor')

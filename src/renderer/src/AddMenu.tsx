@@ -2,10 +2,10 @@
  * “添加”菜单：在当前选中内容之后插入新的题目、标题或段落。
  */
 import { useEffect, useRef, useState } from 'react'
-import { createQuestion, newId } from '@core/model/factory'
+import { createKnowledge, createQuestion, newId } from '@core/model/factory'
 import type { Block } from '@core/model/types'
 
-type Kind = 'choice' | 'multi' | 'fill' | 'solve' | 'topic' | 'section' | 'paragraph' | 'title'
+type Kind = 'choice' | 'multi' | 'fill' | 'solve' | 'knowledge' | 'topic' | 'section' | 'paragraph' | 'title'
 
 const ITEMS: ReadonlyArray<readonly [Kind, string] | 'divider'> = [
   ['choice', '单选题'],
@@ -13,6 +13,7 @@ const ITEMS: ReadonlyArray<readonly [Kind, string] | 'divider'> = [
   ['fill', '填空题'],
   ['solve', '解答题'],
   'divider',
+  ['knowledge', '知识点（标题、内容与插图）'],
   ['topic', '题型分组（如“放缩圆”）'],
   ['section', '栏目标题（如“课堂练习”）'],
   ['paragraph', '正文段落'],
@@ -43,6 +44,8 @@ export function createBlock(kind: Kind): Block {
         type: 'question',
         question: createQuestion({ kind: 'solve', layout: { studentSpaceLines: 8 } })
       }
+    case 'knowledge':
+      return { ...createKnowledge({ title: '新的知识点' }), id }
     case 'topic':
       return { id, type: 'topic', text: '新的题型分组' }
     case 'section':
