@@ -227,7 +227,24 @@ export interface KnowledgeBlock {
   layout: BlockLayout
 }
 
-export type Block = TitleBlock | SectionBlock | TopicBlock | ParagraphBlock | QuestionBlock | KnowledgeBlock
+/**
+ * 综合题：标题（如“材料一”）+ 可选的背景材料与配图 + 若干小题（题号与全卷连续）
+ * + 共用的答案与详解（仅教师版）。
+ */
+export interface CompositeBlock {
+  id: string
+  type: 'composite'
+  title: string
+  background: RichText
+  /** 背景配图，位置选项与知识点插图相同（锚定背景段落） */
+  figures: QuestionFigure[]
+  items: QuestionBlock[]
+  answer: RichText
+  analysis: RichText
+  layout: BlockLayout
+}
+
+export type Block = TitleBlock | SectionBlock | TopicBlock | ParagraphBlock | QuestionBlock | KnowledgeBlock | CompositeBlock
 
 // ---------- 工程 ----------
 

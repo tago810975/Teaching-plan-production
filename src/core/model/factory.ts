@@ -3,6 +3,7 @@
  */
 import type {
   BlockLayout,
+  CompositeBlock,
   Inline,
   KnowledgeBlock,
   Project,
@@ -86,6 +87,23 @@ export function createKnowledge(partial: Omit<Partial<KnowledgeBlock>, 'layout' 
     figures: [],
     ...partial,
     type: 'knowledge',
+    layout: { ...DEFAULT_BLOCK_LAYOUT, ...partial.layout }
+  }
+}
+
+export function createComposite(
+  partial: Omit<Partial<CompositeBlock>, 'layout' | 'type'> & { layout?: Partial<BlockLayout> } = {}
+): CompositeBlock {
+  return {
+    id: newId(),
+    title: '',
+    background: [],
+    figures: [],
+    items: [],
+    answer: [],
+    analysis: [],
+    ...partial,
+    type: 'composite',
     layout: { ...DEFAULT_BLOCK_LAYOUT, ...partial.layout }
   }
 }

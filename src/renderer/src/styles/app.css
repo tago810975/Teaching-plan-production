@@ -1130,3 +1130,24 @@ body.is-dragging-outline * {
   width: 4.5em;
   padding: 2px 4px;
 }
+
+/* ---------- 综合题 ---------- */
+
+.outline-item--composite {
+  font-weight: 600;
+  padding-left: 16px;
+}
+.outline-item--nested {
+  padding-left: 36px;
+}
+.composite-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.composite-items li {
+  padding: 2px 0;
+}
+.composite-items button.link {
+  text-align: left;
+}

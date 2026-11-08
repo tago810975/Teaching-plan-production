@@ -16,7 +16,10 @@ interface Props {
 }
 
 export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: Props) {
-  const selectedIndex = blocks.findIndex((b) => b.id === selectedBlockId)
+  // 上移、下移：顶层块在大纲中移动；综合题中的小题在综合题内移动
+  const parent = blocks.find((b) => b.type === 'composite' && b.items.some((it) => it.id === selectedBlockId))
+  const siblings: Array<{ id: string }> = parent?.type === 'composite' ? parent.items : blocks
+  const selectedIndex = siblings.findIndex((b) => b.id === selectedBlockId)
   const listRef = useRef<HTMLOListElement>(null)
   const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(listRef, (blockId, toIndex) =>
     dispatch({ type: 'move-block-to', blockId, toIndex })
@@ -45,8 +48,8 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
         <p className="panel-empty">还没有内容。导入题目文档的功能完成后，可以从这里开始。</p>
       ) : (
         <ol className="outline-list" ref={listRef}>
-          {blocks.map((block) => (
-            <li key={block.id} className={drag?.blockId === block.id ? 'is-dragging' : undefined}>
+          {blocks.flatMap((block, topIndex) => [
+            <li key={block.id} data-top-index={topIndex} className={drag?.blockId === block.id ? 'is-dragging' : undefined}>
               <button
                 type="button"
                 className={`outline-item outline-item--${block.type}${block.id === selectedBlockId ? ' is-selected' : ''}`}
@@ -57,13 +60,29 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
                   dispatch({ type: 'select', blockId: block.id })
                 }}
               >
-                {block.type === 'question' && (
-                  <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>
-                )}
+                {block.type === 'question' && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
                 <span className="outline-text">{describe(block)}</span>
               </button>
-            </li>
-          ))}
+            </li>,
+            // 综合题的小题：缩进列在综合题之下，随综合题一起拖动
+            ...(block.type === 'composite'
+              ? block.items.map((item) => (
+                  <li key={item.id} className={drag?.blockId === block.id ? 'outline-nested is-dragging' : 'outline-nested'}>
+                    <button
+                      type="button"
+                      className={`outline-item outline-item--question outline-item--nested${item.id === selectedBlockId ? ' is-selected' : ''}`}
+                      onClick={() => {
+                        if (consumeClick()) return
+                        dispatch({ type: 'select', blockId: item.id })
+                      }}
+                    >
+                      <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>
+                      <span className="outline-text">{describe(item)}</span>
+                    </button>
+                  </li>
+                ))
+              : [])
+          ])}
           {drag !== null && <div className="outline-drop-line" style={{ top: `${drag.lineTop}px` }} aria-hidden="true" />}
         </ol>
       )}
@@ -90,7 +109,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
         </button>
         <button
           type="button"
-          disabled={selectedIndex === -1 || selectedIndex >= blocks.length - 1}
+          disabled={selectedIndex === -1 || selectedIndex >= siblings.length - 1}
           onClick={() => selectedBlockId && dispatch({ type: 'move-block', blockId: selectedBlockId, delta: 1 })}
         >
           下移
@@ -129,5 +148,7 @@ function describe(block: Block): string {
       return summary(plainText(block.question.stem)) || '（空题目）'
     case 'knowledge':
       return block.title.trim() || summary(plainText(block.content)) || '（知识点）'
+    case 'composite':
+      return `综合题　${block.title.trim() || summary(plainText(block.background)) || ''}`.trim()
   }
 }

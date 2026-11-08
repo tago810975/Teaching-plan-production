@@ -84,17 +84,24 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'select':
       return { ...state, selectedBlockId: action.blockId }
     case 'update-block':
-      return withBlocks(state, (blocks) =>
-        blocks.map((b) => (b.id === action.blockId ? action.update(b) : b))
-      )
+      return withBlocks(state, (blocks) => mapBlockById(blocks, action.blockId, action.update))
     case 'move-block':
       return withBlocks(state, (blocks) => {
+        const swapIn = <T>(list: T[], i: number): T[] => {
+          const j = i + action.delta
+          if (i === -1 || j < 0 || j >= list.length) return list
+          const next = list.slice()
+          ;[next[i], next[j]] = [next[j]!, next[i]!]
+          return next
+        }
         const i = blocks.findIndex((b) => b.id === action.blockId)
-        const j = i + action.delta
-        if (i === -1 || j < 0 || j >= blocks.length) return blocks
-        const next = blocks.slice()
-        ;[next[i], next[j]] = [next[j]!, next[i]!]
-        return next
+        if (i !== -1) return swapIn(blocks, i)
+        // 综合题中的小题：在综合题内移动
+        return blocks.map((b) =>
+          b.type === 'composite' && b.items.some((it) => it.id === action.blockId)
+            ? { ...b, items: swapIn(b.items, b.items.findIndex((it) => it.id === action.blockId)) }
+            : b
+        )
       })
     case 'move-block-to': {
       const next = withBlocks(state, (blocks) => {
@@ -111,7 +118,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return { ...next, selectedBlockId: action.blockId }
     }
     case 'delete-block': {
-      const next = withBlocks(state, (blocks) => blocks.filter((b) => b.id !== action.blockId))
+      const next = withBlocks(state, (blocks) =>
+        blocks
+          .filter((b) => b.id !== action.blockId)
+          .map((b) => (b.type === 'composite' && b.items.some((it) => it.id === action.blockId) ? { ...b, items: b.items.filter((it) => it.id !== action.blockId) } : b))
+      )
       return next.selectedBlockId === action.blockId ? { ...next, selectedBlockId: null } : next
     }
     case 'update-header': {
@@ -145,12 +156,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'update-figure': {
       const { ref, patch } = action
       const next = withBlocks(state, (blocks) =>
-        blocks.map((b) => {
-          if (b.id !== ref.blockId) return b
+        mapBlockById(blocks, ref.blockId, (b) => {
           const apply = (figs: QuestionFigure[]): QuestionFigure[] =>
             figs.map((f, i) => (i === ref.figureIndex ? { ...f, ...patch } : f))
           if (b.type === 'question') return { ...b, question: { ...b.question, figures: apply(b.question.figures) } }
-          if (b.type === 'knowledge') return { ...b, figures: apply(b.figures) }
+          if (b.type === 'knowledge' || b.type === 'composite') return { ...b, figures: apply(b.figures) }
           return b
         })
       )
@@ -159,9 +169,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
     case 'replace-inline': {
       const { ref, inline } = action
-      const next = withBlocks(state, (blocks) =>
-        blocks.map((b) => (b.id === ref.blockId ? (replaceAt(b, ref.path, inline) as Block) : b))
-      )
+      const next = withBlocks(state, (blocks) => mapBlockById(blocks, ref.blockId, (b) => replaceAt(b, ref.path, inline) as Block))
       return { ...next, selectedBlockId: ref.blockId, revision: state.revision + 1 }
     }
     case 'update-layout':
@@ -204,4 +212,28 @@ function replaceAt(obj: unknown, path: ReadonlyArray<string | number>, value: un
   }
   const record = obj as Record<string, unknown>
   return { ...record, [head]: replaceAt(record[head as string], rest, value) }
+}
+
+/** 按 ID 修改内容块：顶层的块，或综合题中的小题 */
+export function mapBlockById(blocks: Block[], id: string, fn: (b: Block) => Block): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) return fn(b)
+    if (b.type === 'composite' && b.items.some((it) => it.id === id)) {
+      return { ...b, items: b.items.map((it) => (it.id === id ? (fn(it) as typeof it) : it)) }
+    }
+    return b
+  })
+}
+
+/** 按 ID 查找内容块（含综合题中的小题） */
+export function findBlock(blocks: Block[], id: string | null): Block | null {
+  if (id === null) return null
+  for (const b of blocks) {
+    if (b.id === id) return b
+    if (b.type === 'composite') {
+      const item = b.items.find((it) => it.id === id)
+      if (item !== undefined) return item
+    }
+  }
+  return null
 }

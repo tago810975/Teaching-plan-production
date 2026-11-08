@@ -96,6 +96,8 @@ const question = z.object({
   })
 })
 
+const questionBlock = z.object({ id: z.string(), type: z.literal('question'), question })
+
 const block = z.discriminatedUnion('type', [
   z.object({
     id: z.string(),
@@ -111,13 +113,24 @@ const block = z.discriminatedUnion('type', [
     content: richText,
     onlyIn: variant.optional()
   }),
-  z.object({ id: z.string(), type: z.literal('question'), question }),
+  questionBlock,
   z.object({
     id: z.string(),
     type: z.literal('knowledge'),
     title: z.string(),
     content: richText,
     figures: z.array(figure),
+    layout: blockLayout
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('composite'),
+    title: z.string(),
+    background: richText,
+    figures: z.array(figure),
+    items: z.array(questionBlock),
+    answer: richText,
+    analysis: richText,
     layout: blockLayout
   })
 ])

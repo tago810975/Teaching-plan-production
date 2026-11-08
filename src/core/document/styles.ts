@@ -16,6 +16,8 @@ export type StyleKey =
   | 'title'
   | 'section'
   | 'topic'
+  | 'compositeTitle'
+  | 'compositeBackground'
   | 'body'
   | 'question'
   /** 题干第二段起：正文样式加上与题干对齐的缩进（不能用“次级题目”，否则会被 Word 编上小问号） */
@@ -106,6 +108,15 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     spaceBeforeTwip: 120,
     spaceAfterTwip: 120
   },
+  compositeTitle: {
+    ...base,
+    wordStyleName: '物理排版 综合题题目',
+    bold: true,
+    align: 'center',
+    spaceBeforeTwip: 120,
+    spaceAfterTwip: 120
+  },
+  compositeBackground: { ...base, wordStyleName: '物理排版 综合题背景', align: 'left', lineAuto: 312 },
   body: { ...base, wordStyleName: '物理排版 正文' },
   question: {
     ...base,

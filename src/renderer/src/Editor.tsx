@@ -19,7 +19,7 @@ import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
-import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
+import { findBlock, HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
 import type { ProjectFileActions } from './state/useProjectFile'
 
 interface Props {
@@ -119,7 +119,7 @@ function EditorBody({
     return map
   }, [ir])
 
-  const selectedBlock = project.blocks.find((b) => b.id === state.selectedBlockId) ?? null
+  const selectedBlock = findBlock(project.blocks, state.selectedBlockId)
   const headerSelected = state.selectedBlockId === HEADER_SELECTION
   const select = useCallback((blockId: string) => dispatch({ type: 'select', blockId }), [dispatch])
   const selectHeader = useCallback(() => dispatch({ type: 'select', blockId: HEADER_SELECTION }), [dispatch])

@@ -53,7 +53,8 @@ export function useOutlineDrag(
     (clientY: number): { targetIndex: number; lineTop: number } => {
       const list = listRef.current
       if (list === null) return { targetIndex: 0, lineTop: 0 }
-      const items = Array.from(list.children) as HTMLElement[]
+      // 只有顶层条目参与排序（综合题中的小题随综合题移动）
+      const items = Array.from(list.querySelectorAll<HTMLElement>(':scope > li[data-top-index]'))
       const listRect = list.getBoundingClientRect()
       for (let i = 0; i < items.length; i++) {
         const r = items[i]!.getBoundingClientRect()

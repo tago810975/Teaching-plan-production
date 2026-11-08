@@ -6,7 +6,9 @@
  */
 import type {
   ChoiceOption,
+  CompositeBlock,
   KnowledgeBlock,
+  QuestionBlock,
   Inline,
   OptionColumns,
   Project,
@@ -60,6 +62,16 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
       case 'knowledge':
         out.push(...buildKnowledge(block, variant, project.layout.keepKnowledgeTogether[variant]))
         break
+      case 'composite': {
+        const kt = project.layout.keepQuestionTogether[variant]
+        out.push(
+          ...buildComposite(block, variant, (item) => {
+            questionNo += 1
+            return buildQuestion(item.id, item.question, questionNo, variant, kt)
+          })
+        )
+        break
+      }
       case 'question':
         questionNo += 1
         out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant]))
@@ -256,42 +268,7 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
     paras.push({ key: key('title'), sourceBlockId: k.id, style: 'topic', runs: [{ kind: 'text', text: k.title }], keepNext: true })
   }
   const content: RichText = k.content.length > 0 ? k.content : k.title.trim() === '' ? [{ inlines: [] }] : []
-  const last = Math.max(0, content.length - 1)
-
-  // 图：右侧环绕与自由位置挂在锚定段落上；“第 N 段之后”的图紧跟该段（同一位置的多张并排）
-  const contentParas: DocParagraph[] = content.map((p, i) => ({
-    key: key(`c${i}`),
-    anchorIndex: i,
-    sourceBlockId: k.id,
-    style: 'body',
-    ...formatProps(p),
-    runs: toRuns(p, { blockId: k.id, path: ['content', i] })
-  }))
-  const after = new Map<number, FigItem[]>()
-  for (const [index, fig] of k.figures.entries()) {
-    const anchor = Math.min(fig.anchorParagraph ?? last, last)
-    const host = contentParas[anchor]
-    if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) {
-      addFloating(host, rightFloating(fig, k.id, index, 'vertical'))
-    } else if (fig.placement === 'free' && host !== undefined) {
-      addFloating(host, freeFloating(fig, k.id, index))
-    } else {
-      const list = after.get(anchor) ?? []
-      list.push({ fig, index })
-      after.set(anchor, list)
-    }
-  }
-  contentParas.forEach((p, i) => {
-    paras.push(p)
-    const figsAfter = after.get(i)
-    if (figsAfter !== undefined) paras.push(imageParagraph(key(`fig${i}`), figsAfter, k.id))
-    const spacer = spacerAfter(content[i], key(`gap${i}`), k.id)
-    if (spacer !== null) paras.push(spacer)
-  })
-  if (contentParas.length === 0) {
-    const figsAfter = after.get(0)
-    if (figsAfter !== undefined) paras.push(imageParagraph(key('fig0'), figsAfter, k.id))
-  }
+  paras.push(...contentWithFigures(k.id, 'content', content, k.figures, 'body'))
 
   const spaceLines = variant === 'student' ? k.layout.studentSpaceLines : k.layout.teacherSpaceLines
   if (spaceLines > 0) {
@@ -309,6 +286,109 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
   })
   const first = paras[0]
   if (k.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
+  return paras
+}
+
+/**
+ * 正文段落与锚定在其上的图（知识点正文、综合题背景共用）：
+ * 右侧环绕与自由位置的图挂在锚定段落上；“第 N 段之后”的图紧跟该段（同一位置的多张并排）；段后空行。
+ */
+function contentWithFigures(
+  blockId: string,
+  field: string,
+  content: RichText,
+  figures: QuestionFigure[],
+  style: StyleKey
+): DocParagraph[] {
+  const out: DocParagraph[] = []
+  const last = Math.max(0, content.length - 1)
+  const key = (suffix: string): string => `${blockId}:${field}:${suffix}`
+  const paras: DocParagraph[] = content.map((p, i) => ({
+    key: key(`c${i}`),
+    anchorIndex: i,
+    sourceBlockId: blockId,
+    style,
+    ...formatProps(p),
+    runs: toRuns(p, { blockId, path: [field, i] })
+  }))
+  const after = new Map<number, FigItem[]>()
+  for (const [index, fig] of figures.entries()) {
+    const anchor = Math.min(fig.anchorParagraph ?? last, last)
+    const host = paras[anchor]
+    if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) {
+      addFloating(host, rightFloating(fig, blockId, index, 'vertical'))
+    } else if (fig.placement === 'free' && host !== undefined) {
+      addFloating(host, freeFloating(fig, blockId, index))
+    } else {
+      const list = after.get(anchor) ?? []
+      list.push({ fig, index })
+      after.set(anchor, list)
+    }
+  }
+  paras.forEach((p, i) => {
+    out.push(p)
+    const figsAfter = after.get(i)
+    if (figsAfter !== undefined) out.push(imageParagraph(key(`fig${i}`), figsAfter, blockId))
+    const spacer = spacerAfter(content[i], key(`gap${i}`), blockId)
+    if (spacer !== null) out.push(spacer)
+  })
+  if (paras.length === 0) {
+    const figsAfter = after.get(0)
+    if (figsAfter !== undefined) out.push(imageParagraph(key('fig0'), figsAfter, blockId))
+  }
+  return out
+}
+
+// ---------------- 综合题 ----------------
+
+function buildComposite(
+  c: CompositeBlock,
+  variant: Variant,
+  buildItem: (item: QuestionBlock) => DocParagraph[]
+): DocParagraph[] {
+  const paras: DocParagraph[] = []
+  const key = (suffix: string): string => `${c.id}:${suffix}`
+  if (c.title.trim() !== '') {
+    paras.push({ key: key('title'), sourceBlockId: c.id, style: 'compositeTitle', runs: [{ kind: 'text', text: c.title }], keepNext: true })
+  }
+  const background = contentWithFigures(c.id, 'background', c.background, c.figures, 'compositeBackground')
+  // 背景与第一道小题保持在同一页
+  background.forEach((p) => (p.keepNext = true))
+  paras.push(...background)
+  for (const item of c.items) paras.push(...buildItem(item))
+
+  if (variant === 'teacher') {
+    const start = paras.length
+    c.answer.forEach((p, i) => {
+      paras.push({
+        key: key(`ans${i}`),
+        sourceBlockId: c.id,
+        style: 'answer',
+        ...(i === 0 ? { label: '【答案】' } : {}),
+        runs: toRuns(p, { blockId: c.id, path: ['answer', i] })
+      })
+    })
+    c.analysis.forEach((p, i) => {
+      paras.push({ key: key(`ana${i}`), sourceBlockId: c.id, style: 'analysis', ...formatProps(p), runs: toRuns(p, { blockId: c.id, path: ['analysis', i] }) })
+    })
+    for (let i = start; i < paras.length; i++) paras[i]!.shaded = true
+  }
+
+  const spaceLines = variant === 'student' ? c.layout.studentSpaceLines : c.layout.teacherSpaceLines
+  if (spaceLines > 0) {
+    paras.push({ key: key('space'), sourceBlockId: c.id, style: 'body', runs: [], spacerTwip: Math.round(spaceLines * BODY_LINE_HEIGHT_TWIP) })
+    const prev = paras[paras.length - 2]
+    if (prev !== undefined) prev.keepNext = true
+  }
+  // 综合题通常较长：只有设为“整题同页”时才整体保持在同一页
+  if (c.layout.keepTogether === 'always') {
+    paras.forEach((p, i) => {
+      p.keepLines = true
+      if (i < paras.length - 1) p.keepNext = true
+    })
+  }
+  const first = paras[0]
+  if (c.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
   return paras
 }
 

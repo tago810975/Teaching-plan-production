@@ -6,11 +6,12 @@
 import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
-import { createKnowledge, newId, plainText } from '@core/model/factory'
+import { createKnowledge, createQuestion, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
 import type {
   Block,
   BlockLayout,
+  CompositeBlock,
   KeepTogether,
   KnowledgeBlock,
   OptionColumns,
@@ -86,6 +87,13 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             assetUrls={assetUrls}
             dispatch={dispatch}
           />
+        ) : block.type === 'composite' ? (
+          <CompositeForm
+            block={block}
+            update={update as (fn: (b: CompositeBlock) => CompositeBlock) => void}
+            assetUrls={assetUrls}
+            dispatch={dispatch}
+          />
         ) : block.type === 'paragraph' ? (
           <Field label="内容">
             <RichTextField
@@ -110,7 +118,8 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
   topic: '题型分组',
   paragraph: '正文段落',
   question: '题目',
-  knowledge: '知识点'
+  knowledge: '知识点',
+  composite: '综合题'
 }
 
 // ---------------- 版式设置 ----------------
@@ -149,6 +158,80 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
       </fieldset>
       <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
+    </>
+  )
+}
+
+// ---------------- 综合题表单 ----------------
+
+function CompositeForm({
+  block,
+  update,
+  assetUrls,
+  dispatch
+}: {
+  block: CompositeBlock
+  update: (fn: (b: CompositeBlock) => CompositeBlock) => void
+  assetUrls: ReadonlyMap<string, string>
+  dispatch: Dispatch<EditorAction>
+}) {
+  const set = (patch: Partial<CompositeBlock>): void => update((b) => ({ ...b, ...patch }))
+  const setLayout = (patch: Partial<BlockLayout>): void => update((b) => ({ ...b, layout: { ...b.layout, ...patch } }))
+  const addItem = (kind: 'single-choice' | 'solve'): void => {
+    const options = kind === 'single-choice' ? ['A', 'B', 'C', 'D'].map((label) => ({ label, content: { inlines: [] } })) : []
+    const item = { id: newId(), type: 'question' as const, question: createQuestion({ kind, options }) }
+    set({ items: [...block.items, item] })
+    dispatch({ type: 'select', blockId: item.id })
+  }
+  return (
+    <>
+      <Field label="标题" hint="如“材料一”；居中显示">
+        <TextInput value={block.title} onChange={(title) => set({ title })} />
+      </Field>
+      <Field label="背景材料（可选）" hint="小题共用的情境、材料；留空则不显示">
+        <RichTextField value={block.background} rows={6} onChange={(background) => set({ background })} />
+      </Field>
+      <FigureList
+        title="背景配图"
+        kind="knowledge"
+        paragraphs={block.background}
+        figures={block.figures}
+        assetUrls={assetUrls}
+        onChange={(figures) => set({ figures })}
+        onAddAsset={(asset) => dispatch({ type: 'add-asset', asset })}
+      />
+      <fieldset className="group">
+        <legend>小题</legend>
+        {block.items.length === 0 && <p className="field-hint">还没有小题。</p>}
+        <ol className="composite-items">
+          {block.items.map((item, i) => (
+            <li key={item.id}>
+              <button type="button" className="link" onClick={() => dispatch({ type: 'select', blockId: item.id })}>
+                {i + 1}. {plainText(item.question.stem).replace(/\$[^$]*\$/g, '…').slice(0, 24) || '（空题目）'}
+              </button>
+            </li>
+          ))}
+        </ol>
+        <p className="field-hint">点击小题进入编辑；题号与全卷连续编排。</p>
+        <div className="group-actions">
+          <button type="button" onClick={() => addItem('single-choice')}>
+            添加选择题
+          </button>
+          <button type="button" onClick={() => addItem('solve')}>
+            添加解答题
+          </button>
+        </div>
+      </fieldset>
+      <fieldset className="group group--teacher">
+        <legend>仅教师版：共用的答案与详解</legend>
+        <Field label="答案" hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写">
+          <RichTextField value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
+        </Field>
+        <Field label="详解">
+          <RichTextField value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
+        </Field>
+      </fieldset>
+      <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整题同页" />
     </>
   )
 }

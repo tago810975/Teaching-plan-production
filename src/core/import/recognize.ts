@@ -6,10 +6,11 @@
  * 2. 文字：其他文档按“1.”题号、“A．”选项、“【答案】”“【详解】”等标记识别。
  * 样式规则优先；某段没有可用样式时才看文字。
  */
-import { createKnowledge, createQuestion, newId } from '../model/factory'
+import { createComposite, createKnowledge, createQuestion, newId } from '../model/factory'
 import type {
   Block,
   ChoiceOption,
+  CompositeBlock,
   Inline,
   KnowledgeBlock,
   ParagraphBlock,
@@ -30,6 +31,8 @@ type Role =
   | 'difficultPoint'
   | 'analysis'
   | 'subQuestion'
+  | 'compositeTitle'
+  | 'compositeBackground'
   | 'body'
 
 /** 样式名 → 角色。按“包含”匹配，兼容样式名的细微差别 */
@@ -43,7 +46,9 @@ const STYLE_ROLES: Array<[RegExp, Role]> = [
   [/物理排版\s*题目\s*难点/, 'difficultPoint'],
   [/物理排版\s*题目\s*次级题目/, 'subQuestion'],
   [/物理排版\s*详解/, 'analysis'],
-  [/物理排版\s*(综合题题目|题目)$/, 'question']
+  [/物理排版\s*综合题题目/, 'compositeTitle'],
+  [/物理排版\s*综合题背景/, 'compositeBackground'],
+  [/物理排版\s*题目$/, 'question']
 ]
 
 /** 常见的栏目标题，在没有样式的文档中按文字识别 */
@@ -83,9 +88,14 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
   /** 可以继续合并普通段落的正文块（中间出现其他内容时清空） */
   let openParagraph: ParagraphBlock | null = null
   let inKnowledgeSection = false
+  /** 正在收集小题的综合题；sharedAnswer 为 true 时答案与详解归综合题共用 */
+  let composite: CompositeBlock | null = null
+  let sharedAnswer = false
   const closeOpen = (): void => {
     knowledge = null
     openParagraph = null
+    composite = null
+    sharedAnswer = false
   }
 
   /** 第 index 段之后的第一个非空段落 */
@@ -106,7 +116,10 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
   const finishQuestion = (): void => {
     if (current === null) return
     finalizeQuestion(current.q)
-    blocks.push({ id: newId(), type: 'question', question: current.q })
+    const block: Block = { id: newId(), type: 'question', question: current.q }
+    const c: CompositeBlock | null = composite
+    if (c !== null) c.items.push(block)
+    else blocks.push(block)
     current = null
   }
 
@@ -115,6 +128,16 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     const text = textOf(para)
     if (isBlank(para)) continue
     const role = styleRole(para.styleName)
+
+    // ---------- 综合题标题 ----------
+    if (role === 'compositeTitle') {
+      finishQuestion()
+      closeOpen()
+      const c = createComposite({ title: text.trim() })
+      composite = c
+      blocks.push(c)
+      continue
+    }
 
     // ---------- 标题类 ----------
     if (role === 'title' || role === 'section' || role === 'topic' || (!usesStyles && SECTION_TITLES.test(text.trim()))) {
@@ -150,7 +173,13 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     const startsByNumber = !usesStyles && !inKnowledgeSection && QUESTION_NUMBER.test(text) && !OPTION_START.test(text)
     if (startsByStyle || startsByNumber) {
       finishQuestion()
-      closeOpen()
+      // 综合题仍在收集小题时继续收集；共用答案出现后，下一题已在综合题之外
+      const c: CompositeBlock | null = composite
+      if (c === null || sharedAnswer) closeOpen()
+      else {
+        knowledge = null
+        openParagraph = null
+      }
       const q = createQuestion({ kind: 'solve' })
       let inlines = para.inlines
       if (startsByNumber) inlines = stripPrefix(inlines, QUESTION_NUMBER)
@@ -163,6 +192,26 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       addFloating(q, para.floating)
       current = { q, stage: 'stem' }
       continue
+    }
+
+    // ---------- 综合题背景：标题与第一道小题之间的内容 ----------
+    {
+      const c: CompositeBlock | null = composite
+      if (c !== null && current === null && c.items.length === 0) {
+        if (isImageOnly(para)) {
+          for (const i of para.inlines) {
+            if (i.type !== 'image') continue
+            c.figures.push({ assetId: i.assetId, widthEmu: i.widthEmu, heightEmu: i.heightEmu, placement: 'below', anchorParagraph: Math.max(0, c.background.length - 1) })
+          }
+        } else {
+          const rp = withFormat(clean(para.inlines), para)
+          if (rp.inlines.length > 0) c.background.push(rp)
+        }
+        for (const img of para.floating) {
+          c.figures.push({ assetId: img.assetId, widthEmu: img.widthEmu, heightEmu: img.heightEmu, placement: 'right', anchorParagraph: Math.max(0, c.background.length - 1) })
+        }
+        continue
+      }
     }
 
     // ---------- 不在题目中：未使用样式的知识标题（“一、……”） ----------
@@ -237,6 +286,21 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
                 ? 'analysis'
                 : null
 
+    // 综合题中一次写出多道小题答案的，归综合题共用（其后的详解也一并归入）
+    const comp: CompositeBlock | null = composite
+    if (comp !== null && (sharedAnswer || (teacherRole === 'answer' && isSharedAnswer(text)))) {
+      cur.stage = 'teacher'
+      if (!sharedAnswer && teacherRole === 'answer') comp.answer.push(clean(stripPrefix(para.inlines, ANSWER_LABEL)))
+      else if (teacherRole === 'answer') comp.answer.push(clean(stripPrefix(para.inlines, ANSWER_LABEL)))
+      else {
+        const p = withFormat(clean(para.inlines), para)
+        if (p.inlines.length > 0) comp.analysis.push(p)
+        for (const img of para.floating) comp.analysis.push({ inlines: [imageInline(img)] })
+      }
+      sharedAnswer = true
+      continue
+    }
+
     if (teacherRole !== null) {
       cur.stage = 'teacher'
       switch (teacherRole) {
@@ -265,9 +329,11 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       continue
     }
 
-    // 选项
-    if (OPTION_START.test(text) || (cur.stage === 'options' && /^\s*[B-H]\s*[．.、]/.test(text))) {
-      const options = splitOptions(para.inlines, q.options.length)
+    // 选项。“A．”由 Word 自动编号生成时文字里没有它，只能看到其后的“B．”
+    const numberedOptions = para.numbered && q.options.length === 0 && !OPTION_START.test(text) && /[\t\s　]B\s*[．.]/.test(text)
+    if (OPTION_START.test(text) || numberedOptions || (cur.stage === 'options' && /^\s*[B-H]\s*[．.、]/.test(text))) {
+      const inlines: Inline[] = numberedOptions ? [{ type: 'text', text: 'A．' }, ...para.inlines] : para.inlines
+      const options = splitOptions(inlines, q.options.length)
       if (options.length > 0) {
         q.options.push(...options)
         addFloating(q, para.floating, 0, 'right-items')
@@ -316,7 +382,7 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
 
   return {
     blocks,
-    questionCount: blocks.filter((b) => b.type === 'question').length,
+    questionCount: blocks.reduce((n, b) => n + (b.type === 'question' ? 1 : b.type === 'composite' ? b.items.length : 0), 0),
     ...(firstTitle !== undefined ? { firstTitle } : {})
   }
 }
@@ -419,6 +485,11 @@ export function splitOptions(inlines: Inline[], startIndex = 0): ChoiceOption[] 
 }
 
 // ---------------- 工具函数 ----------------
+
+/** 答案中出现两个以上的题号（如“1.横波 2. 1.8 3.A”）：综合题的共用答案 */
+function isSharedAnswer(text: string): boolean {
+  return (text.match(/(^|[\s　])\d{1,2}\s*[.．、]/g) ?? []).length >= 2
+}
 
 /** 带上原段落的格式（首行缩进、对齐） */
 function withFormat(rp: RichParagraph, para: ReadParagraph): RichParagraph {
