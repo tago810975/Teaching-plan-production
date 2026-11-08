@@ -138,6 +138,7 @@ class ExportContext {
 
     let runs = ''
     if (p.floatingImage !== undefined) runs += this.drawing(p.floatingImage, 'anchor')
+    for (const img of p.freeImages ?? []) runs += this.drawing(img, 'free', { x: img.offsetXEmu, y: img.offsetYEmu })
     if (p.label !== undefined && spec.autoNumbered !== true) runs += textRun(p.label, undefined)
     for (const run of p.runs) runs += this.run(run)
     return `<w:p><w:pPr>${pPr}</w:pPr>${runs}</w:p>`
@@ -204,7 +205,11 @@ class ExportContext {
     return rid
   }
 
-  private drawing(img: { assetId: string; widthEmu: number; heightEmu: number }, mode: 'inline' | 'anchor'): string {
+  private drawing(
+    img: { assetId: string; widthEmu: number; heightEmu: number },
+    mode: 'inline' | 'anchor' | 'free',
+    offset?: { x: number; y: number }
+  ): string {
     const rid = this.mediaRel(img.assetId)
     const id = ++this.drawingId
     const cx = Math.round(img.widthEmu)
@@ -221,6 +226,15 @@ class ExportContext {
       return (
         `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">` +
         `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${graphic}</wp:inline></w:drawing></w:r>`
+      )
+    }
+    if (mode === 'free') {
+      // 自由位置：浮于文字上方，相对栏左侧与所在段落顶端定位
+      return (
+        `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">` +
+        `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>${Math.round(offset?.x ?? 0)}</wp:posOffset></wp:positionH>` +
+        `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${Math.round(offset?.y ?? 0)}</wp:posOffset></wp:positionV>` +
+        `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>${graphic}</wp:anchor></w:drawing></w:r>`
       )
     }
     // 右侧环绕：靠栏右侧对齐，文字排在图片左边

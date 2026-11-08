@@ -24,7 +24,7 @@ export interface InlineRef {
 export type DocRun =
   | { kind: 'text'; text: string; marks?: TextMarks }
   | ({ kind: 'math'; ref?: InlineRef } & Omit<MathInline, 'type'>)
-  | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number }
+  | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef }
   | { kind: 'blank'; widthChars: number }
   /** 制表符，用于选项分列 */
   | { kind: 'tab' }
@@ -35,6 +35,7 @@ export interface FloatingImage {
   heightEmu: number
   /** 目前只支持靠右、文字四周环绕 */
   side: 'right'
+  ref?: FigureRef
 }
 
 export interface DocParagraph {
@@ -73,6 +74,26 @@ export interface DocParagraph {
   restartNumbering?: boolean
   /** 锚定在本段的浮动图片 */
   floatingImage?: FloatingImage
+  /** 锚定在本段、自由摆放的图片 */
+  freeImages?: FreeImage[]
+}
+
+/** 自由位置的图片：浮于文字上方，相对所在段落定位 */
+export interface FreeImage {
+  assetId: string
+  widthEmu: number
+  heightEmu: number
+  /** 相对栏左侧与段落顶端的偏移（EMU） */
+  offsetXEmu: number
+  offsetYEmu: number
+  /** 在工程数据中的位置，供预览中拖动、缩放后回写 */
+  ref: FigureRef
+}
+
+/** 图片在工程数据中的位置：所在块与 figures 中的序号 */
+export interface FigureRef {
+  blockId: string
+  figureIndex: number
 }
 
 export interface DocIR {

@@ -11,12 +11,13 @@ import type {
   OptionColumns,
   Project,
   Question,
+  QuestionFigure,
   RichParagraph,
   RichText,
   Variant
 } from '../model/types'
 import { bodyTopTwip } from './header'
-import type { DocIR, DocParagraph, DocRun } from './ir'
+import type { DocIR, DocParagraph, DocRun, FloatingImage, FreeImage } from './ir'
 import { BODY_LINE_HEIGHT_TWIP, OPTION_TAB_STOPS, STYLE_SPECS, type StyleKey } from './styles'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
@@ -52,6 +53,8 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
             ...formatProps(p),
             runs: toRuns(p, { blockId: block.id, path: ['content', i] })
           })
+          const spacer = spacerAfter(p, `${block.id}:gap${i}`, block.id)
+          if (spacer !== null) out.push(spacer)
         })
         break
       case 'knowledge':
@@ -106,29 +109,50 @@ function buildQuestion(
     })
   })
 
-  // 题图：靠右浮动的图挂在锚定的题干段落上（默认第一段）；下方的图各占一段
-  const first = paras[0]
-  for (const [i, fig] of q.figures.entries()) {
-    const host = paras[Math.min(fig.anchorParagraph ?? 0, stem.length - 1)] ?? first
+  // ---- 题图 ----
+  const stemParas = paras.slice()
+  const figs = q.figures.map((fig, index) => ({ fig, index }))
+  const hasItems = q.options.length > 0 || q.subQuestions.length > 0
+  /** 按位置分组；放不下的（如同一段已有右侧图）退回题干下方 */
+  const below: FigItem[] = []
+  const rightItems: FigItem[] = []
+  const belowItem = new Map<number, FigItem[]>()
+  const belowAll: FigItem[] = []
+  for (const item of figs) {
+    const { fig } = item
+    const host = stemParas[Math.min(fig.anchorParagraph ?? 0, stemParas.length - 1)]
     if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
-      host.floatingImage = {
-        assetId: fig.assetId,
-        widthEmu: fig.widthEmu,
-        heightEmu: fig.heightEmu,
-        side: 'right'
-      }
+      host.floatingImage = floating(fig, blockId, item.index)
+    } else if (fig.placement === 'free' && host !== undefined) {
+      ;(host.freeImages ??= []).push(freeImage(fig, blockId, item.index))
+    } else if (fig.placement === 'right-items' && hasItems) {
+      rightItems.push(item)
+    } else if (fig.placement === 'below-item' && fig.anchorItem !== undefined && fig.anchorItem < q.subQuestions.length) {
+      const list = belowItem.get(fig.anchorItem) ?? []
+      list.push(item)
+      belowItem.set(fig.anchorItem, list)
+    } else if (fig.placement === 'below-all' || fig.placement === 'below-item') {
+      belowAll.push(item)
     } else {
-      push({
-        key: key(`fig${i}`),
-        style: 'body',
-        runs: [{ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu }]
-      })
+      below.push(item)
     }
   }
+  if (below.length > 0) push(imageParagraph(key('fig-below'), below, blockId))
 
-  // 选项
+  /** 选项或小问的第一段：挂“位于选项/小问右侧”的图（多张时其余排在全部文字之后） */
+  let itemsHostKey: string | null = null
+  const attachRightItems = (p: DocParagraph): void => {
+    if (itemsHostKey !== null || rightItems.length === 0) return
+    itemsHostKey = p.key
+    const [firstFig, ...rest] = rightItems
+    p.floatingImage = floating(firstFig!.fig, blockId, firstFig!.index)
+    belowAll.unshift(...rest)
+  }
+
+  // 选项：右侧有图时自动排成每行 1 项，避免与图重叠
   if (q.options.length > 0) {
-    const columns = resolveOptionColumns(q.options, q.layout.optionColumns)
+    const setting = rightItems.length > 0 && q.layout.optionColumns === 'auto' ? 1 : q.layout.optionColumns
+    const columns = resolveOptionColumns(q.options, setting)
     chunk(q.options, columns).forEach((row, i) => {
       const runs: DocRun[] = []
       row.forEach((opt, j) => {
@@ -141,10 +165,11 @@ function buildQuestion(
         runs,
         ...(columns > 1 ? { tabStopsTwip: OPTION_TAB_STOPS[columns as 2 | 4] } : {})
       })
+      attachRightItems(paras[paras.length - 1]!)
     })
   }
 
-  // 小问
+  // 小问，及排在各小问之后的图
   q.subQuestions.forEach((sq, i) => {
     sq.content.forEach((p, j) => {
       push({
@@ -153,8 +178,13 @@ function buildQuestion(
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
         runs: toRuns(p, at('subQuestions', i, 'content', j))
       })
+      attachRightItems(paras[paras.length - 1]!)
     })
+    const list = belowItem.get(i)
+    if (list !== undefined) push(imageParagraph(key(`fig-sub${i}`), list, blockId))
   })
+
+  if (belowAll.length > 0) push(imageParagraph(key('fig-all'), belowAll, blockId))
 
   /** 题目主体（题干、题图、选项、小问）的段落数，主体始终保持在同一页 */
   const bodyCount = paras.length
@@ -210,7 +240,8 @@ function buildQuestion(
     }
     if (nextIsSpacer) p.keepNext = true
   })
-  if (q.layout.pageBreakBefore && first !== undefined) first.pageBreakBefore = true
+  const firstPara = paras[0]
+  if (q.layout.pageBreakBefore && firstPara !== undefined) firstPara.pageBreakBefore = true
 
   return paras
 }
@@ -223,31 +254,41 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
   if (k.title.trim() !== '') {
     paras.push({ key: key('title'), sourceBlockId: k.id, style: 'topic', runs: [{ kind: 'text', text: k.title }], keepNext: true })
   }
-  const contentStart = paras.length
   const content: RichText = k.content.length > 0 ? k.content : k.title.trim() === '' ? [{ inlines: [] }] : []
-  content.forEach((p, i) => {
-    paras.push({
-      key: key(`c${i}`),
-      sourceBlockId: k.id,
-      style: 'body',
-      ...formatProps(p),
-      runs: toRuns(p, { blockId: k.id, path: ['content', i] })
-    })
-  })
+  const last = Math.max(0, content.length - 1)
 
-  // 图：右侧环绕的挂在锚定段落上，其余排在正文之后
-  for (const [i, fig] of k.figures.entries()) {
-    const host = paras[contentStart + Math.min(fig.anchorParagraph ?? 0, Math.max(0, content.length - 1))]
+  // 图：右侧环绕与自由位置挂在锚定段落上；“第 N 段之后”的图紧跟该段（同一位置的多张并排）
+  const contentParas: DocParagraph[] = content.map((p, i) => ({
+    key: key(`c${i}`),
+    sourceBlockId: k.id,
+    style: 'body',
+    ...formatProps(p),
+    runs: toRuns(p, { blockId: k.id, path: ['content', i] })
+  }))
+  const after = new Map<number, FigItem[]>()
+  for (const [index, fig] of k.figures.entries()) {
+    const anchor = Math.min(fig.anchorParagraph ?? last, last)
+    const host = contentParas[anchor]
     if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
-      host.floatingImage = { assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, side: 'right' }
+      host.floatingImage = floating(fig, k.id, index)
+    } else if (fig.placement === 'free' && host !== undefined) {
+      ;(host.freeImages ??= []).push(freeImage(fig, k.id, index))
     } else {
-      paras.push({
-        key: key(`fig${i}`),
-        sourceBlockId: k.id,
-        style: 'body',
-        runs: [{ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu }]
-      })
+      const list = after.get(anchor) ?? []
+      list.push({ fig, index })
+      after.set(anchor, list)
     }
+  }
+  contentParas.forEach((p, i) => {
+    paras.push(p)
+    const figsAfter = after.get(i)
+    if (figsAfter !== undefined) paras.push(imageParagraph(key(`fig${i}`), figsAfter, k.id))
+    const spacer = spacerAfter(content[i], key(`gap${i}`), k.id)
+    if (spacer !== null) paras.push(spacer)
+  })
+  if (contentParas.length === 0) {
+    const figsAfter = after.get(0)
+    if (figsAfter !== undefined) paras.push(imageParagraph(key('fig0'), figsAfter, k.id))
   }
 
   const spaceLines = variant === 'student' ? k.layout.studentSpaceLines : k.layout.teacherSpaceLines
@@ -357,13 +398,51 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
 const INDENT_CHAR_TWIP = 210
 
 /** 段落格式 → DocIR 字段 */
-function formatProps(p: RichParagraph): Pick<DocParagraph, 'firstLineIndentTwip' | 'align'> {
+function formatProps(p: RichParagraph): Pick<DocParagraph, 'firstLineIndentTwip' | 'align' | 'pageBreakBefore'> {
   const f = p.format
   if (f === undefined) return {}
   return {
+    ...(f.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     ...(f.firstLineChars !== undefined && f.firstLineChars > 0 ? { firstLineIndentTwip: Math.round(f.firstLineChars * INDENT_CHAR_TWIP) } : {}),
     ...(f.align !== undefined ? { align: f.align } : {})
   }
+}
+
+/** 段后空行：一个固定高度的空段落，与前一段同页 */
+function spacerAfter(p: RichParagraph | undefined, key: string, blockId: string): DocParagraph | null {
+  const lines = p?.format?.spaceAfterLines ?? 0
+  if (lines <= 0) return null
+  return { key, sourceBlockId: blockId, style: 'body', runs: [], spacerTwip: Math.round(lines * BODY_LINE_HEIGHT_TWIP) }
+}
+
+interface FigItem {
+  fig: QuestionFigure
+  index: number
+}
+
+function floating(fig: QuestionFigure, blockId: string, figureIndex: number): FloatingImage {
+  return { assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, side: 'right', ref: { blockId, figureIndex } }
+}
+
+function freeImage(fig: QuestionFigure, blockId: string, figureIndex: number): FreeImage {
+  return {
+    assetId: fig.assetId,
+    widthEmu: fig.widthEmu,
+    heightEmu: fig.heightEmu,
+    offsetXEmu: fig.offsetXEmu ?? 0,
+    offsetYEmu: fig.offsetYEmu ?? 0,
+    ref: { blockId, figureIndex }
+  }
+}
+
+/** 同一位置的一张或多张图：放在同一段里并排显示 */
+function imageParagraph(key: string, items: FigItem[], blockId: string): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
+  const runs: DocRun[] = []
+  items.forEach(({ fig, index }, j) => {
+    if (j > 0) runs.push({ kind: 'text', text: '\u3000' })
+    runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index } })
+  })
+  return { key, sourceBlockId: blockId, style: 'body', runs }
 }
 
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {

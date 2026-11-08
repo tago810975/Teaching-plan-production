@@ -181,7 +181,21 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       const rp = withFormat(clean(para.inlines), para)
       const k: KnowledgeBlock | null = knowledge
       if (k !== null) {
-        if (rp.inlines.length > 0) k.content.push(rp)
+        if (isImageOnly(para)) {
+          // 单独成段的图片 → 知识点插图，排在前一段之后（同一段中的多张图并排）
+          for (const i of para.inlines) {
+            if (i.type !== 'image') continue
+            k.figures.push({
+              assetId: i.assetId,
+              widthEmu: i.widthEmu,
+              heightEmu: i.heightEmu,
+              placement: 'below',
+              anchorParagraph: Math.max(0, k.content.length - 1)
+            })
+          }
+        } else if (rp.inlines.length > 0) {
+          k.content.push(rp)
+        }
         // 浮在文字旁的图：作为知识点的右侧环绕图，锚定在当前段落
         for (const img of para.floating) {
           k.figures.push({
@@ -256,7 +270,7 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       const options = splitOptions(para.inlines, q.options.length)
       if (options.length > 0) {
         q.options.push(...options)
-        addFloating(q, para.floating)
+        addFloating(q, para.floating, 0, 'right-items')
         cur.stage = 'options'
         continue
       }
@@ -266,14 +280,24 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
     if (role === 'subQuestion' || SUB_QUESTION.test(text)) {
       const inlines = role === 'subQuestion' ? para.inlines : stripPrefix(para.inlines, SUB_QUESTION)
       q.subQuestions.push({ id: newId(), content: [clean(inlines)] })
-      addFloating(q, para.floating)
+      addFloating(q, para.floating, 0, 'right-items')
       continue
     }
 
     // 单独成段的图片 → 题图
     if (isImageOnly(para)) {
+      // 题干之后：题干下方；小问之后：该小问下方；选项之后：全部题目文字下方
+      const subCount = q.subQuestions.length
+      const placement: QuestionFigure['placement'] = subCount > 0 ? 'below-item' : cur.stage === 'options' ? 'below-all' : 'below'
       for (const i of para.inlines) {
-        if (i.type === 'image') q.figures.push({ assetId: i.assetId, widthEmu: i.widthEmu, heightEmu: i.heightEmu, placement: 'below' })
+        if (i.type !== 'image') continue
+        q.figures.push({
+          assetId: i.assetId,
+          widthEmu: i.widthEmu,
+          heightEmu: i.heightEmu,
+          placement,
+          ...(placement === 'below-item' ? { anchorItem: subCount - 1 } : {})
+        })
       }
       addFloating(q, para.floating)
       continue
@@ -317,13 +341,18 @@ function finalizeQuestion(q: Question): void {
 
 type FigureWithDescription = QuestionFigure & { description?: string }
 
-function addFloating(q: Question, floating: DocxImage[], anchorParagraph = 0): void {
+function addFloating(
+  q: Question,
+  floating: DocxImage[],
+  anchorParagraph = 0,
+  placement: QuestionFigure['placement'] = 'right'
+): void {
   for (const img of floating) {
     const fig: FigureWithDescription = {
       assetId: img.assetId,
       widthEmu: img.widthEmu,
       heightEmu: img.heightEmu,
-      placement: 'right',
+      placement,
       ...(anchorParagraph > 0 ? { anchorParagraph } : {}),
       ...(img.description !== undefined ? { description: img.description } : {})
     }

@@ -43,7 +43,9 @@ const richParagraph = z.object({
   format: z
     .object({
       firstLineChars: z.number().optional(),
-      align: z.enum(['center', 'right']).optional()
+      align: z.enum(['center', 'right']).optional(),
+      spaceAfterLines: z.number().min(0).optional(),
+      pageBreakBefore: z.boolean().optional()
     })
     .optional()
 })
@@ -55,8 +57,11 @@ const figure = z.object({
   assetId: z.string(),
   widthEmu: z.number().positive(),
   heightEmu: z.number().positive(),
-  placement: z.enum(['below', 'right']),
-  anchorParagraph: z.number().int().min(0).optional()
+  placement: z.enum(['below', 'right', 'right-items', 'below-item', 'below-all', 'free']),
+  anchorParagraph: z.number().int().min(0).optional(),
+  anchorItem: z.number().int().min(0).optional(),
+  offsetXEmu: z.number().optional(),
+  offsetYEmu: z.number().optional()
 })
 
 const blockLayout = z.object({

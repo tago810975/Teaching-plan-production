@@ -64,6 +64,10 @@ export interface ParagraphFormat {
   /** 首行缩进，单位：字符 */
   firstLineChars?: number
   align?: 'center' | 'right'
+  /** 段后空行（知识点等长内容中插入的留白），单位：行 */
+  spaceAfterLines?: number
+  /** 从这一段开始换页 */
+  pageBreakBefore?: boolean
 }
 
 /** 一个段落的行内内容 */
@@ -85,14 +89,32 @@ export interface ChoiceOption {
   content: RichParagraph
 }
 
+/**
+ * 图片位置：
+ * - below：题目中为“题干下方”（选项之前）；知识点中为“第 anchorParagraph 段之后”
+ * - right：锚定段落右侧，文字环绕
+ * - right-items：题干下方，位于选项或小问右侧（文字环绕）
+ * - below-item：第 anchorItem 个小问之后
+ * - below-all：全部题目文字（选项与小问）之后
+ * - free：自由位置，浮于文字上方，在预览中拖动摆放
+ */
+export type FigurePlacement = 'below' | 'right' | 'right-items' | 'below-item' | 'below-all' | 'free'
+
 export interface QuestionFigure {
   assetId: string
   widthEmu: number
   heightEmu: number
-  /** 题图位置：题干下方，或浮动在题目右侧（选项在左、题图在右） */
-  placement: 'below' | 'right'
-  /** 右侧环绕时锚定在第几段（题干或知识点正文的段落序号，默认第 0 段） */
+  placement: FigurePlacement
+  /**
+   * 锚定的段落序号（题干或知识点正文）：
+   * right / free 时为图片所在的段落；知识点的 below 时图片排在这一段之后（不填则在正文末尾）
+   */
   anchorParagraph?: number
+  /** below-item：排在第几个小问之后 */
+  anchorItem?: number
+  /** free：相对锚定段落左上角（栏左侧、段落顶端）的偏移，单位 EMU */
+  offsetXEmu?: number
+  offsetYEmu?: number
 }
 
 export interface SubQuestion {
