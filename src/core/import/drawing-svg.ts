@@ -503,9 +503,10 @@ function textBox(wsp: Element, w: number, h: number): string {
     if (line.spans === '') return
     const x = line.align === 'center' ? w / 2 : line.align === 'right' ? w - rIns : lIns
     const anchorAttr = line.align === 'center' ? 'middle' : line.align === 'right' ? 'end' : 'start'
-    out += `<text x="${x}" y="${y - lh * 0.22}" text-anchor="${anchorAttr}" font-family="'Times New Roman', SimSun, serif">${line.spans}</text>`
+    out += `<text x="${pt(x)}" y="${pt(y - lh * 0.22)}" text-anchor="${anchorAttr}" font-family="'Times New Roman', SimSun, serif">${line.spans}</text>`
   })
-  return out
+  // 文字以“磅”为单位书写再整体放大：浏览器对字号有上限，直接用 EMU（9 磅 = 114300）会被截断成小点
+  return out === '' ? '' : `<g transform="scale(${EMU_PER_PT})">${out}</g>`
 }
 
 function tspan(
@@ -513,18 +514,24 @@ function tspan(
   sizeHalfPt: number,
   o: { italic?: boolean; bold?: boolean; script?: string | undefined; color?: string | undefined }
 ): string {
-  const size = (sizeHalfPt / 2) * EMU_PER_PT
+  const size = sizeHalfPt / 2 // 磅，见 textBox 中的说明
   const script = o.script === 'subscript' || o.script === 'superscript'
+  const r2 = (n: number): number => Math.round(n * 100) / 100
   const attrs = [
-    `font-size="${script ? size * 0.65 : size}"`,
+    `font-size="${r2(script ? size * 0.65 : size)}"`,
     o.italic === true ? 'font-style="italic"' : '',
     o.bold === true ? 'font-weight="bold"' : '',
     o.color !== undefined && o.color !== 'auto' ? `fill="#${o.color}"` : '',
-    o.script === 'subscript' ? `baseline-shift="${-size * 0.2}"` : o.script === 'superscript' ? `baseline-shift="${size * 0.35}"` : ''
+    o.script === 'subscript' ? `baseline-shift="${r2(-size * 0.2)}"` : o.script === 'superscript' ? `baseline-shift="${r2(size * 0.35)}"` : ''
   ]
     .filter(Boolean)
     .join(' ')
   return `<tspan ${attrs}>${escapeXml(text)}</tspan>`
+}
+
+/** EMU → 磅，保留两位小数 */
+function pt(emu: number): number {
+  return Math.round((emu / EMU_PER_PT) * 100) / 100
 }
 
 function sizeOf(rPr: Element | undefined): number | undefined {
