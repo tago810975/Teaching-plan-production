@@ -133,3 +133,26 @@ describe('选项图片：排版与预览', () => {
     }
   })
 })
+
+describe('选项图片：导出', () => {
+  it('缩放后的尺寸写入 Word', async () => {
+    const { default: JSZip } = await import('jszip')
+    const { writeDocx } = await import('@core/export/docx-writer')
+    const { createAsset } = await import('@core/project-file/codec')
+    // 1×1 的 PNG
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+    const asset = await createAsset(png, 'image/png')
+    const q = imageQuestion([[3, 2], [3, 2]])
+    q.options = q.options.map((o) => ({ ...o, content: { inlines: [{ ...(o.content.inlines[0] as ImageInline), assetId: asset.id }] } }))
+    const p = createEmptyProject()
+    p.blocks = [{ id: newId(), type: 'question', question: scaleOptionImages(q, 0.5) }]
+    const bytes = await writeDocx({
+      ir: buildDocument(p, 'student'),
+      assets: { [asset.id]: asset },
+      title: 't',
+      template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
+    })
+    const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
+    expect(doc.match(/<wp:extent cx="540000" cy="360000"\/>/g)?.length).toBe(2)
+  })
+})
