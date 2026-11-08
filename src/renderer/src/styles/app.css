@@ -302,6 +302,7 @@ body.is-resizing * {
 
 .outline-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 8px 10px;
   border-top: 1px solid var(--rule);
@@ -1007,4 +1008,55 @@ button.link.danger {
 /* 面板中的模板用正常大小的分数、上下限，便于辨认（工具栏图标保持紧凑） */
 .ftb-item math {
   math-style: normal;
+}
+
+/* ---------- 大纲拖拽排序 ---------- */
+
+.outline-list {
+  position: relative;
+}
+.outline-list li.is-dragging .outline-item {
+  opacity: 0.35;
+}
+.outline-drop-line {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 0;
+  border-top: 2px solid var(--focus);
+  pointer-events: none;
+}
+.outline-drop-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 6px;
+  height: 6px;
+  border: 2px solid var(--focus);
+  border-radius: 50%;
+  background: var(--panel);
+}
+.outline-ghost {
+  position: fixed;
+  z-index: 50;
+  max-width: 260px;
+  padding: 5px 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--panel-raised);
+  border: 1px solid var(--focus);
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(31, 42, 46, 0.22);
+  pointer-events: none;
+}
+body.is-dragging-outline,
+body.is-dragging-outline * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.outline-actions button {
+  white-space: nowrap;
 }

@@ -1,7 +1,8 @@
 /**
  * 大纲：按顺序列出全部内容块，用于定位、选择和调整顺序。
  */
-import type { Dispatch } from 'react'
+import { useRef, type Dispatch } from 'react'
+import { useOutlineDrag } from './useOutlineDrag'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
 import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction } from '../state/store'
@@ -16,6 +17,10 @@ interface Props {
 
 export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: Props) {
   const selectedIndex = blocks.findIndex((b) => b.id === selectedBlockId)
+  const listRef = useRef<HTMLOListElement>(null)
+  const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(listRef, (blockId, toIndex) =>
+    dispatch({ type: 'move-block-to', blockId, toIndex })
+  )
 
   return (
     <nav className="panel outline" aria-label="大纲">
@@ -39,13 +44,18 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
       {blocks.length === 0 ? (
         <p className="panel-empty">还没有内容。导入题目文档的功能完成后，可以从这里开始。</p>
       ) : (
-        <ol className="outline-list">
+        <ol className="outline-list" ref={listRef}>
           {blocks.map((block) => (
-            <li key={block.id}>
+            <li key={block.id} className={drag?.blockId === block.id ? 'is-dragging' : undefined}>
               <button
                 type="button"
                 className={`outline-item outline-item--${block.type}${block.id === selectedBlockId ? ' is-selected' : ''}`}
-                onClick={() => dispatch({ type: 'select', blockId: block.id })}
+                title="点击选中；按住拖动可调整顺序"
+                onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block))}
+                onClick={() => {
+                  if (consumeClick()) return
+                  dispatch({ type: 'select', blockId: block.id })
+                }}
               >
                 {block.type === 'question' && (
                   <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>
@@ -54,8 +64,21 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
               </button>
             </li>
           ))}
+          {drag !== null && <div className="outline-drop-line" style={{ top: `${drag.lineTop}px` }} aria-hidden="true" />}
         </ol>
       )}
+      {drag !== null && (
+        <div className="outline-ghost" style={{ left: drag.ghostX + 12, top: drag.ghostY - 12 }} aria-hidden="true">
+          {(() => {
+            const b = blocks.find((x) => x.id === drag.blockId)
+            const no = b?.type === 'question' ? questionNumbers.get(b.id) : undefined
+            return `${no !== undefined ? `${no} ` : ''}${drag.label}`
+          })()}
+        </div>
+      )}
+      <p className="visually-hidden" role="status" aria-live="polite">
+        {drag !== null ? `正在移动“${drag.label}”，松开放到插入线处，按 Esc 取消` : ''}
+      </p>
 
       <div className="outline-actions">
         <button

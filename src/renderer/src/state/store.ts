@@ -41,6 +41,8 @@ export type EditorAction =
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   | { type: 'delete-block'; blockId: string }
+  /** 拖拽排序：把内容块移到第 toIndex 个位置之前（toIndex 按移动前的顺序计算） */
+  | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
   /** 替换（inline 为 null 时删除）某个行内内容，如在预览中编辑的公式 */
@@ -92,6 +94,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ;[next[i], next[j]] = [next[j]!, next[i]!]
         return next
       })
+    case 'move-block-to': {
+      const next = withBlocks(state, (blocks) => {
+        const from = blocks.findIndex((b) => b.id === action.blockId)
+        if (from === -1) return blocks
+        let to = Math.max(0, Math.min(blocks.length, action.toIndex))
+        if (to > from) to -= 1
+        if (to === from) return blocks
+        const out = blocks.slice()
+        const [moved] = out.splice(from, 1)
+        out.splice(to, 0, moved!)
+        return out
+      })
+      return { ...next, selectedBlockId: action.blockId }
+    }
     case 'delete-block': {
       const next = withBlocks(state, (blocks) => blocks.filter((b) => b.id !== action.blockId))
       return next.selectedBlockId === action.blockId ? { ...next, selectedBlockId: null } : next
