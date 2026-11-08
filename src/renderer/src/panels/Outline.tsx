@@ -85,6 +85,15 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
   )
 }
 
+/** 大纲中的摘要：公式（$…$ 与 [公式]）显示为“…”，图片显示为“[图]” */
+function summary(text: string): string {
+  return text
+    .replace(/\$[^$]*\$/g, '…')
+    .replace(/\[公式\]/g, '…')
+    .replace(/\s+/g, ' ')
+    .slice(0, 40)
+}
+
 function describe(block: Block): string {
   switch (block.type) {
     case 'title':
@@ -92,8 +101,8 @@ function describe(block: Block): string {
     case 'topic':
       return block.text || '（无标题）'
     case 'paragraph':
-      return plainText(block.content).slice(0, 40) || '（空段落）'
+      return summary(plainText(block.content)) || '（空段落）'
     case 'question':
-      return plainText(block.question.stem).replace(/\$[^$]*\$/g, '…').slice(0, 40) || '（空题目）'
+      return summary(plainText(block.question.stem)) || '（空题目）'
   }
 }
