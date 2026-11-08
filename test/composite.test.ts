@@ -6,6 +6,7 @@ import { writeDocx } from '@core/export/docx-writer'
 import { importDocx } from '@core/import/import-docx'
 import { createComposite, createEmptyProject, createQuestion, newId, para, plainText } from '@core/model/factory'
 import type { Project } from '@core/model/types'
+import { summarizeProject } from '@core/project-file/codec'
 
 const q = (stem: string) => ({ id: newId(), type: 'question' as const, question: createQuestion({ stem: [para(stem)], answer: [para('略')] }) })
 
@@ -64,12 +65,25 @@ describe('综合题的排版', () => {
   })
 })
 
+describe('题目总数按题号计（首页列表）', () => {
+  it('综合题的每道小题各算一道，综合题本身不算', () => {
+    const p = project()
+    expect(summarizeProject(p).questionCount).toBe(4)
+    const labels = buildDocument(p, 'teacher').paragraphs.filter((x) => x.style === 'question' && x.label !== undefined)
+    expect(labels.map((x) => x.label)).toEqual(['1.', '2.', '3.', '4.'])
+  })
+})
+
 describe('导入综合题（期中试卷分析）', async () => {
   const r = await importDocx(new Uint8Array(readFileSync('reference/samples/2026秋季高二物理东湖_期中试卷分析/教案_T_期中试卷分析.docx')))
   const comps = r.blocks.filter((b) => b.type === 'composite')
 
   it('4 道综合题，共 21 道小题', () => {
     expect(r.questionCount).toBe(21)
+    // 导入后首页显示的题目总数与导入提示一致（此前首页只数独立题目，这份全是综合题，显示为 0）
+    const p = createEmptyProject()
+    p.blocks = r.blocks
+    expect(summarizeProject(p).questionCount).toBe(21)
     expect(comps.map((c) => (c.type === 'composite' ? [c.title, c.items.length] : []))).toEqual([
       ['材料一', 5],
       ['材料二', 6],

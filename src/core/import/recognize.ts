@@ -7,6 +7,7 @@
  * 样式规则优先；某段没有可用样式时才看文字。
  */
 import { createComposite, createKnowledge, createQuestion, newId } from '../model/factory'
+import { countQuestions } from '../model/stats'
 import type {
   Block,
   ChoiceOption,
@@ -382,7 +383,7 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
 
   return {
     blocks,
-    questionCount: blocks.reduce((n, b) => n + (b.type === 'question' ? 1 : b.type === 'composite' ? b.items.length : 0), 0),
+    questionCount: countQuestions(blocks),
     ...(firstTitle !== undefined ? { firstTitle } : {})
   }
 }

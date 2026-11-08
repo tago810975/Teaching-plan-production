@@ -6,6 +6,7 @@
  */
 import JSZip from 'jszip'
 import { projectSchema } from '../model/schema'
+import { countQuestions } from '../model/stats'
 import type { Asset, Project, ProjectBundle } from '../model/types'
 import {
   CURRENT_FORMAT_VERSION,
@@ -119,7 +120,7 @@ export interface ProjectSummary {
 export function summarizeProject(project: Project): ProjectSummary {
   return {
     title: project.meta.title,
-    questionCount: project.blocks.filter((b) => b.type === 'question').length,
+    questionCount: countQuestions(project.blocks),
     createdAt: project.meta.createdAt,
     updatedAt: project.meta.updatedAt
   }
