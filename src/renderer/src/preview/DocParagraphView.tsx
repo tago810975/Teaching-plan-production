@@ -67,32 +67,18 @@ export const DocParagraphView = memo(function DocParagraphView({
       </span>
     )
 
-  const fi = p.floatingImage
-  const floating =
-    fi === undefined ? null : (
-      <FigureImage
-        className="para-float"
-        src={assetUrls.get(fi.assetId)}
-        widthEmu={fi.widthEmu}
-        heightEmu={fi.heightEmu}
-        figureRef={fi.ref}
-        active={selected}
-        onChange={onFigureChange}
-      />
-    )
-
-  // 自由位置的图片：相对本段定位，浮于文字上方
-  const freeImages = (p.freeImages ?? []).map((img) => (
+  // 浮动图（右侧图、自由位置）：文字绕开图片
+  const floating = (p.floatingImages ?? []).map((f, i) => (
     <FigureImage
-      key={`free-${img.ref.figureIndex}`}
-      className="para-free"
-      src={assetUrls.get(img.assetId)}
-      widthEmu={img.widthEmu}
-      heightEmu={img.heightEmu}
-      figureRef={img.ref}
+      key={`float-${f.ref?.figureIndex ?? i}`}
+      className="para-float"
+      src={assetUrls.get(f.assetId)}
+      widthEmu={f.widthEmu}
+      heightEmu={f.heightEmu}
+      figureRef={f.ref}
       active={selected}
       onChange={onFigureChange}
-      free={{ offsetXEmu: img.offsetXEmu, offsetYEmu: img.offsetYEmu }}
+      float={f}
     />
   ))
 
@@ -111,10 +97,10 @@ export const DocParagraphView = memo(function DocParagraphView({
       className={className}
       style={style}
       data-block-id={p.sourceBlockId}
+      data-anchor-index={p.anchorIndex}
       onClick={onSelect === undefined ? undefined : () => onSelect(p.sourceBlockId)}
     >
       {floating}
-      {freeImages}
       {label}
       {p.tabStopsTwip === undefined ? (
         renderRuns(p.runs, assetUrls, onEditMath, { active: selected, onChange: onFigureChange })

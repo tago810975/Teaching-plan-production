@@ -1114,3 +1114,19 @@ body.is-dragging-outline * {
   width: 3.5em;
   padding: 2px 4px;
 }
+
+.figure-offsets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.figure-offsets label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.figure-offsets input {
+  width: 4.5em;
+  padding: 2px 4px;
+}

@@ -9,7 +9,8 @@
  * - 大标题处重新开始题号（如“作业单”）。
  */
 import JSZip from 'jszip'
-import type { DocIR, DocParagraph, DocRun } from '../document/ir'
+import type { DocIR, DocParagraph, DocRun, FloatingImage } from '../document/ir'
+import { A4_PAGE, contentWidthTwip } from '../document/units'
 import { STYLE_SPECS, TEACHER_SHADING, type StyleKey } from '../document/styles'
 import { latexToOmml } from '../math/mathml-to-omml'
 import type { Asset, HeaderImage, TextMarks } from '../model/types'
@@ -137,8 +138,7 @@ class ExportContext {
     if (p.align !== undefined) pPr += `<w:jc w:val="${p.align}"/>`
 
     let runs = ''
-    if (p.floatingImage !== undefined) runs += this.drawing(p.floatingImage, 'anchor')
-    for (const img of p.freeImages ?? []) runs += this.drawing(img, 'free', { x: img.offsetXEmu, y: img.offsetYEmu })
+    for (const f of p.floatingImages ?? []) runs += this.drawing(f, 'anchor', f)
     if (p.label !== undefined && spec.autoNumbered !== true) runs += textRun(p.label, undefined)
     for (const run of p.runs) runs += this.run(run)
     return `<w:p><w:pPr>${pPr}</w:pPr>${runs}</w:p>`
@@ -207,8 +207,8 @@ class ExportContext {
 
   private drawing(
     img: { assetId: string; widthEmu: number; heightEmu: number },
-    mode: 'inline' | 'anchor' | 'free',
-    offset?: { x: number; y: number }
+    mode: 'inline' | 'anchor',
+    float?: FloatingImage
   ): string {
     const rid = this.mediaRel(img.assetId)
     const id = ++this.drawingId
@@ -228,21 +228,21 @@ class ExportContext {
         `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${graphic}</wp:inline></w:drawing></w:r>`
       )
     }
-    if (mode === 'free') {
-      // 自由位置：浮于文字上方，相对栏左侧与所在段落顶端定位
-      return (
-        `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">` +
-        `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>${Math.round(offset?.x ?? 0)}</wp:posOffset></wp:positionH>` +
-        `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${Math.round(offset?.y ?? 0)}</wp:posOffset></wp:positionV>` +
-        `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>${graphic}</wp:anchor></w:drawing></w:r>`
-      )
-    }
-    // 右侧环绕：靠栏右侧对齐，文字排在图片左边
+    // 浮动图：四周型环绕。贴右边的图用右对齐，其余按距栏左侧的距离定位；垂直方向相对所在段落
+    const f = float!
+    const columnEmu = contentWidthTwip(A4_PAGE) * 635
+    const positionH =
+      f.side === 'right' && f.edgeEmu === 0
+        ? '<wp:positionH relativeFrom="column"><wp:align>right</wp:align></wp:positionH>'
+        : `<wp:positionH relativeFrom="column"><wp:posOffset>${Math.round(f.side === 'right' ? columnEmu - f.edgeEmu - cx : f.edgeEmu)}</wp:posOffset></wp:positionH>`
+    const distL = f.side === 'right' ? 114300 : 0
+    const distR = f.side === 'left' ? 114300 : 0
     return (
-      `<w:r><w:drawing><wp:anchor distT="0" distB="45720" distL="114300" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="0">` +
-      `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:align>right</wp:align></wp:positionH>` +
-      `<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>` +
-      `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapSquare wrapText="left"/>${graphic}</wp:anchor></w:drawing></w:r>`
+      `<w:r><w:drawing><wp:anchor distT="0" distB="45720" distL="${distL}" distR="${distR}" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="0">` +
+      `<wp:simplePos x="0" y="0"/>${positionH}` +
+      `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${Math.round(f.offsetYEmu)}</wp:posOffset></wp:positionV>` +
+      `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+      `<wp:wrapSquare wrapText="${f.side === 'right' ? 'left' : 'right'}"/>${graphic}</wp:anchor></w:drawing></w:r>`
     )
   }
 

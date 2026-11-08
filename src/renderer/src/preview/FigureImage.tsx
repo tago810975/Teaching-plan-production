@@ -6,7 +6,7 @@
  * 拖动过程中只在本地显示效果，松开后才写回工程数据，避免每一像素都触发重新排版。
  */
 import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import type { FigureRef } from '@core/document/ir'
+import type { FigureRef, FloatingImage } from '@core/document/ir'
 import { emuToPt } from '@core/document/units'
 
 export interface FigurePatch {
@@ -14,6 +14,7 @@ export interface FigurePatch {
   heightEmu?: number
   offsetXEmu?: number
   offsetYEmu?: number
+  anchorParagraph?: number
 }
 
 export type FigureChangeHandler = (ref: FigureRef, patch: FigurePatch) => void
@@ -26,8 +27,8 @@ interface Props {
   /** 所在内容是否被选中；选中时才显示手柄 */
   active: boolean
   onChange: FigureChangeHandler | undefined
-  /** 自由位置：相对所在段落的偏移 */
-  free?: { offsetXEmu: number; offsetYEmu: number }
+  /** 浮动图（右侧图、自由位置）：可拖动摆放，文字绕开 */
+  float?: FloatingImage
   className: string
   style?: CSSProperties
 }
@@ -44,15 +45,14 @@ function previewZoom(el: Element): number {
 }
 
 export function FigureImage(props: Props) {
-  const { src, widthEmu, heightEmu, figureRef, active, onChange, free, className, style } = props
-  const [draft, setDraft] = useState<FigurePatch | null>(null)
+  const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style } = props
+  const [draft, setDraft] = useState<{ widthEmu?: number; heightEmu?: number; dx?: number; dy?: number } | null>(null)
   const start = useRef<{ x: number; y: number; zoom: number; mode: 'move' | 'resize' } | null>(null)
+  const boxRef = useRef<HTMLSpanElement>(null)
   const interactive = active && figureRef !== undefined && onChange !== undefined
 
   const w = draft?.widthEmu ?? widthEmu
   const h = draft?.heightEmu ?? heightEmu
-  const ox = draft?.offsetXEmu ?? free?.offsetXEmu ?? 0
-  const oy = draft?.offsetYEmu ?? free?.offsetYEmu ?? 0
 
   const begin = (e: PointerEvent<HTMLElement>, mode: 'move' | 'resize'): void => {
     if (!interactive || e.button !== 0) return
@@ -65,23 +65,30 @@ export function FigureImage(props: Props) {
   const move = (e: PointerEvent<HTMLElement>): void => {
     const s = start.current
     if (s === null) return
-    const dx = ((e.clientX - s.x) / s.zoom) * PX_TO_EMU
-    const dy = ((e.clientY - s.y) / s.zoom) * PX_TO_EMU
+    const dxPx = (e.clientX - s.x) / s.zoom
+    const dyPx = (e.clientY - s.y) / s.zoom
     if (s.mode === 'resize') {
+      const dx = dxPx * PX_TO_EMU
+      const dy = dyPx * PX_TO_EMU
       // 等比例：以拖动距离较大的方向为准
       const scale = Math.max((widthEmu + dx) / widthEmu, (heightEmu + dy) / heightEmu)
       const nw = Math.max(MIN_EMU, Math.round(widthEmu * scale))
       setDraft({ widthEmu: nw, heightEmu: Math.round((heightEmu * nw) / widthEmu) })
     } else {
-      setDraft({ offsetXEmu: Math.round((free?.offsetXEmu ?? 0) + dx), offsetYEmu: Math.round((free?.offsetYEmu ?? 0) + dy) })
+      // 拖动中只做视觉位移，松开后再重新排版
+      setDraft({ dx: float?.movable === 'free' ? dxPx : 0, dy: dyPx })
     }
   }
 
   const end = (e: PointerEvent<HTMLElement>): void => {
-    if (start.current === null) return
+    const s = start.current
+    if (s === null) return
     start.current = null
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-    if (draft !== null && figureRef !== undefined) onChange?.(figureRef, draft)
+    if (draft !== null && figureRef !== undefined) {
+      if (s.mode === 'resize') onChange?.(figureRef, { widthEmu: draft.widthEmu!, heightEmu: draft.heightEmu! })
+      else if (boxRef.current !== null && float !== undefined) onChange?.(figureRef, placeAfterDrag(boxRef.current, figureRef, float, s.zoom))
+    }
     setDraft(null)
   }
 
@@ -89,18 +96,27 @@ export function FigureImage(props: Props) {
     ...style,
     width: `${emuToPt(w)}pt`,
     height: `${emuToPt(h)}pt`,
-    ...(free !== undefined ? { left: `${emuToPt(ox)}pt`, top: `${emuToPt(oy)}pt` } : {})
+    ...(float !== undefined
+      ? {
+          float: float.side,
+          clear: float.side,
+          [float.side === 'right' ? 'marginRight' : 'marginLeft']: `${emuToPt(float.edgeEmu)}pt`,
+          [float.side === 'right' ? 'marginLeft' : 'marginRight']: '6pt'
+        }
+      : {}),
+    ...(draft?.dx !== undefined || draft?.dy !== undefined ? { transform: `translate(${draft.dx ?? 0}px, ${draft.dy ?? 0}px)` } : {})
   }
 
-  return (
+  const image = (
     <span
-      className={[className, 'figure', interactive ? 'figure--active' : '', free !== undefined ? 'figure--free' : ''].filter(Boolean).join(' ')}
+      ref={boxRef}
+      className={[className, 'figure', interactive ? 'figure--active' : '', float !== undefined ? 'figure--movable' : ''].filter(Boolean).join(' ')}
       style={boxStyle}
-      onPointerDown={free !== undefined ? (e) => begin(e, 'move') : undefined}
+      onPointerDown={float !== undefined ? (e) => begin(e, 'move') : undefined}
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={end}
-      title={interactive ? (free !== undefined ? '拖动摆放；拖动右下角调整大小' : '拖动右下角调整大小') : undefined}
+      title={interactive ? (float !== undefined ? (float.movable === 'free' ? '拖动摆放；拖动右下角调整大小' : '上下拖动调整位置；拖动右下角调整大小') : '拖动右下角调整大小') : undefined}
     >
       <img src={src} alt="" draggable={false} />
       {interactive && (
@@ -117,4 +133,41 @@ export function FigureImage(props: Props) {
       )}
     </span>
   )
+
+  if (float === undefined) return image
+  // 浮动图之前放一个宽度为 0、高度等于上下偏移的浮动占位条：图片停在任意高度，
+  // 文字只在图片实际占据的几行绕开
+  return (
+    <>
+      <span className="float-strut" style={{ float: float.side, height: `${emuToPt(float.offsetYEmu)}pt` }} aria-hidden="true" />
+      {image}
+    </>
+  )
+}
+
+/**
+ * 松开鼠标后，根据图片的实际位置计算新的锚定段落与偏移：
+ * 拖过所在段落的边界时，改为锚定在图片顶端所在的那一段（同一内容中可锚定的段落）。
+ */
+function placeAfterDrag(box: HTMLElement, ref: FigureRef, float: FloatingImage, zoom: number): FigurePatch {
+  const rect = box.getBoundingClientRect()
+  const host = box.closest('.para') as HTMLElement | null
+  const toEmu = (px: number): number => Math.round((px / zoom) * PX_TO_EMU)
+  const canReanchor = host?.dataset.anchorIndex !== undefined
+  let anchor: HTMLElement | null = host
+  if (canReanchor) {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(`.page [data-block-id="${CSS.escape(ref.blockId)}"][data-anchor-index]`)
+    )
+    for (const c of candidates) {
+      if (c.getBoundingClientRect().top <= rect.top + 1) anchor = c
+    }
+    anchor ??= candidates[0] ?? host
+  }
+  if (anchor === null) return {}
+  const a = anchor.getBoundingClientRect()
+  const patch: FigurePatch = { offsetYEmu: Math.max(0, toEmu(rect.top - a.top)) }
+  if (canReanchor) patch.anchorParagraph = Number(anchor.dataset.anchorIndex)
+  if (float.movable === 'free') patch.offsetXEmu = Math.max(0, toEmu(rect.left - a.left))
+  return patch
 }

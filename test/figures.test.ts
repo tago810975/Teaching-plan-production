@@ -42,9 +42,8 @@ function questionProject(figures: QuestionFigure[], withSubs = true): Project {
 function outline(p: Project): string[] {
   return buildDocument(p, 'student').paragraphs.map((x) => {
     const img = x.runs.filter((r) => r.kind === 'image').map((r) => (r.kind === 'image' ? r.assetId : '')).join('+')
-    const float = x.floatingImage ? ` ⟶右:${x.floatingImage.assetId}` : ''
-    const free = x.freeImages?.length ? ` ⟶自由:${x.freeImages.map((f) => f.assetId).join(',')}` : ''
-    return `${x.style}${img ? `[${img}]` : ''}${float}${free}`
+    const floats = (x.floatingImages ?? []).map((f) => ` ⟶${f.movable === 'free' ? '自由' : '右'}:${f.assetId}`).join('')
+    return `${x.style}${img ? `[${img}]` : ''}${floats}`
   })
 }
 
@@ -75,13 +74,31 @@ describe('题目图片的位置', () => {
     ])
   })
 
-  it('自由位置：挂在锚定段落上，带偏移与回写位置', () => {
-    const p = questionProject([fig('free', { anchorParagraph: 1, offsetXEmu: 100, offsetYEmu: 200 })], false)
+  it('自由位置：挤开文字的浮动图，按中心所在的半边决定靠哪一侧', () => {
+    const p = questionProject(
+      [
+        fig('free', { anchorParagraph: 1, offsetXEmu: 100, offsetYEmu: 200 }),
+        { ...fig('free', { offsetXEmu: 5000000, offsetYEmu: 0 }), assetId: 'img-r' }
+      ],
+      false
+    )
     const ir = buildDocument(p, 'student')
-    const host = ir.paragraphs[1]!
-    expect(host.freeImages).toEqual([
-      { assetId: 'img-free', widthEmu: 900000, heightEmu: 600000, offsetXEmu: 100, offsetYEmu: 200, ref: { blockId: 'q', figureIndex: 0 } }
+    expect(ir.paragraphs[1]!.floatingImages).toEqual([
+      { assetId: 'img-free', widthEmu: 900000, heightEmu: 600000, side: 'left', edgeEmu: 100, offsetYEmu: 200, movable: 'free', ref: { blockId: 'q', figureIndex: 0 } }
     ])
+    const r = ir.paragraphs[0]!.floatingImages![0]!
+    expect([r.side, r.edgeEmu]).toEqual(['right', 10466 * 635 - 5000000 - 900000])
+  })
+
+  it('右侧图可上下移动：带上下偏移', () => {
+    const p = questionProject([fig('right', { offsetYEmu: 360000 })], false)
+    const f = buildDocument(p, 'student').paragraphs[0]!.floatingImages![0]!
+    expect([f.side, f.edgeEmu, f.offsetYEmu, f.movable]).toEqual(['right', 0, 360000, 'vertical'])
+  })
+
+  it('题干段落带锚定序号，供预览中拖动时改换段落', () => {
+    const ir = buildDocument(questionProject([], false), 'student')
+    expect(ir.paragraphs.map((x) => x.anchorIndex)).toEqual([0, 1, undefined]) // 题干两段 + 一行四个选项
   })
 
   it('同一位置的多张图放在同一段里并排', () => {
@@ -100,7 +117,7 @@ describe('知识点的插图与段落设置', () => {
     })
     p.blocks = [k]
     const ir = buildDocument(p, 'student')
-    expect(ir.paragraphs.map((x) => [x.style, x.spacerTwip ?? 0, x.pageBreakBefore ?? false, x.floatingImage?.assetId ?? ''])).toEqual([
+    expect(ir.paragraphs.map((x) => [x.style, x.spacerTwip ?? 0, x.pageBreakBefore ?? false, x.floatingImages?.[0]?.assetId ?? ''])).toEqual([
       ['topic', 0, false, ''],
       ['body', 0, false, ''],
       ['body', 0, false, ''], // 第一段之后的插图
@@ -113,7 +130,7 @@ describe('知识点的插图与段落设置', () => {
 })
 
 describe('导出自由位置的图片', () => {
-  it('写为浮于文字上方、相对段落定位的图片', async () => {
+  it('写为四周型环绕、按栏左侧与段落顶端定位的图片', async () => {
     const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png')), 'image/png')
     const p = questionProject([{ ...fig('free', { offsetXEmu: 1234, offsetYEmu: 5678 }), assetId: png.id }], false)
     const bytes = await writeDocx({
@@ -123,7 +140,7 @@ describe('导出自由位置的图片', () => {
       template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
     })
     const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
-    expect(doc).toContain('<wp:wrapNone/>')
+    expect(doc).toContain('<wp:wrapSquare wrapText="right"/>')
     expect(doc).toContain('<wp:positionH relativeFrom="column"><wp:posOffset>1234</wp:posOffset></wp:positionH>')
     expect(doc).toContain('<wp:positionV relativeFrom="paragraph"><wp:posOffset>5678</wp:posOffset></wp:positionV>')
   })

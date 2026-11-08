@@ -33,13 +33,13 @@ const QUESTION_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
   ['right-items', '题干下方，位于选项或小问右侧'],
   ['below-item', '某个小问下方'],
   ['below-all', '全部题目文字下方'],
-  ['free', '自由位置（在预览中拖动）']
+  ['free', '自由位置（文字环绕，可拖动）']
 ]
 
 const KNOWLEDGE_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
   ['below', '某段之后'],
   ['right', '某段右侧（文字环绕）'],
-  ['free', '自由位置（在预览中拖动）']
+  ['free', '自由位置（文字环绕，可拖动）']
 ]
 
 /** EMU / twip */
@@ -139,7 +139,47 @@ export function FigureList({
                 ))}
               </select>
             )}
-            {f.placement === 'free' && <p className="field-hint figure-free-hint">选中内容后，在预览中按住图片拖动摆放。</p>}
+            {(f.placement === 'right' || f.placement === 'right-items' || f.placement === 'free') && (
+              <div className="figure-offsets">
+                <label>
+                  距段落顶端
+                  <input
+                    type="number"
+                    min={0}
+                    max={25}
+                    step={0.1}
+                    value={toCm(f.offsetYEmu ?? 0)}
+                    onChange={(e) => {
+                      const cm = Number(e.target.value)
+                      if (Number.isFinite(cm) && cm >= 0) update(i, { offsetYEmu: Math.round(cm * EMU_PER_CM) })
+                    }}
+                  />
+                  厘米
+                </label>
+                {f.placement === 'free' && (
+                  <label>
+                    距栏左侧
+                    <input
+                      type="number"
+                      min={0}
+                      max={18}
+                      step={0.1}
+                      value={toCm(f.offsetXEmu ?? 0)}
+                      onChange={(e) => {
+                        const cm = Number(e.target.value)
+                        if (Number.isFinite(cm) && cm >= 0) update(i, { offsetXEmu: Math.round(cm * EMU_PER_CM) })
+                      }}
+                    />
+                    厘米
+                  </label>
+                )}
+              </div>
+            )}
+            {(f.placement === 'right' || f.placement === 'right-items' || f.placement === 'free') && (
+              <p className="field-hint figure-free-hint">
+                {f.placement === 'free' ? '文字会绕开图片。选中内容后，在预览中按住图片拖动摆放。' : '选中内容后，在预览中按住图片上下拖动。'}
+              </p>
+            )}
             <label className="figure-width">
               宽度
               <input
@@ -196,6 +236,10 @@ export function FigureList({
       />
     </fieldset>
   )
+}
+
+function toCm(emu: number): number {
+  return Math.round((emu / EMU_PER_CM) * 10) / 10
 }
 
 function needsParagraph(kind: 'question' | 'knowledge', placement: FigurePlacement): boolean {

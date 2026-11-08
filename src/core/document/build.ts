@@ -17,7 +17,7 @@ import type {
   Variant
 } from '../model/types'
 import { bodyTopTwip } from './header'
-import type { DocIR, DocParagraph, DocRun, FloatingImage, FreeImage } from './ir'
+import type { DocIR, DocParagraph, DocRun, FloatingImage } from './ir'
 import { BODY_LINE_HEIGHT_TWIP, OPTION_TAB_STOPS, STYLE_SPECS, type StyleKey } from './styles'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
@@ -103,6 +103,7 @@ function buildQuestion(
     }
     push({
       key: key(`stem${i}`),
+      anchorIndex: i,
       style: i === 0 ? 'question' : 'questionContinued',
       ...(i === 0 ? { label: `${no}.` } : {}),
       runs
@@ -121,10 +122,10 @@ function buildQuestion(
   for (const item of figs) {
     const { fig } = item
     const host = stemParas[Math.min(fig.anchorParagraph ?? 0, stemParas.length - 1)]
-    if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
-      host.floatingImage = floating(fig, blockId, item.index)
+    if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) {
+      addFloating(host, rightFloating(fig, blockId, item.index, 'vertical'))
     } else if (fig.placement === 'free' && host !== undefined) {
-      ;(host.freeImages ??= []).push(freeImage(fig, blockId, item.index))
+      addFloating(host, freeFloating(fig, blockId, item.index))
     } else if (fig.placement === 'right-items' && hasItems) {
       rightItems.push(item)
     } else if (fig.placement === 'below-item' && fig.anchorItem !== undefined && fig.anchorItem < q.subQuestions.length) {
@@ -145,7 +146,7 @@ function buildQuestion(
     if (itemsHostKey !== null || rightItems.length === 0) return
     itemsHostKey = p.key
     const [firstFig, ...rest] = rightItems
-    p.floatingImage = floating(firstFig!.fig, blockId, firstFig!.index)
+    addFloating(p, rightFloating(firstFig!.fig, blockId, firstFig!.index, 'vertical'))
     belowAll.unshift(...rest)
   }
 
@@ -260,6 +261,7 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
   // 图：右侧环绕与自由位置挂在锚定段落上；“第 N 段之后”的图紧跟该段（同一位置的多张并排）
   const contentParas: DocParagraph[] = content.map((p, i) => ({
     key: key(`c${i}`),
+    anchorIndex: i,
     sourceBlockId: k.id,
     style: 'body',
     ...formatProps(p),
@@ -269,10 +271,10 @@ function buildKnowledge(k: KnowledgeBlock, variant: Variant, keepTogetherByDefau
   for (const [index, fig] of k.figures.entries()) {
     const anchor = Math.min(fig.anchorParagraph ?? last, last)
     const host = contentParas[anchor]
-    if (fig.placement === 'right' && host !== undefined && host.floatingImage === undefined) {
-      host.floatingImage = floating(fig, k.id, index)
+    if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) {
+      addFloating(host, rightFloating(fig, k.id, index, 'vertical'))
     } else if (fig.placement === 'free' && host !== undefined) {
-      ;(host.freeImages ??= []).push(freeImage(fig, k.id, index))
+      addFloating(host, freeFloating(fig, k.id, index))
     } else {
       const list = after.get(anchor) ?? []
       list.push({ fig, index })
@@ -420,19 +422,49 @@ interface FigItem {
   index: number
 }
 
-function floating(fig: QuestionFigure, blockId: string, figureIndex: number): FloatingImage {
-  return { assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, side: 'right', ref: { blockId, figureIndex } }
-}
+/** 栏宽（EMU）：自由位置的图片据此判断靠哪一侧 */
+const COLUMN_EMU = contentWidthTwip(A4_PAGE) * 635
 
-function freeImage(fig: QuestionFigure, blockId: string, figureIndex: number): FreeImage {
+/** 靠右的图（题干右侧、选项/小问右侧）：贴栏右边，可上下移动 */
+function rightFloating(fig: QuestionFigure, blockId: string, figureIndex: number, movable: FloatingImage['movable']): FloatingImage {
   return {
     assetId: fig.assetId,
     widthEmu: fig.widthEmu,
     heightEmu: fig.heightEmu,
-    offsetXEmu: fig.offsetXEmu ?? 0,
-    offsetYEmu: fig.offsetYEmu ?? 0,
+    side: 'right',
+    edgeEmu: 0,
+    offsetYEmu: Math.max(0, fig.offsetYEmu ?? 0),
+    movable,
     ref: { blockId, figureIndex }
   }
+}
+
+/**
+ * 自由位置的图：文字绕开图片。图片中心在栏的右半边时靠右（文字在左），否则靠左（文字在右），
+ * 与 Word“四周型环绕、文字只在较宽一侧”的效果一致。
+ */
+function freeFloating(fig: QuestionFigure, blockId: string, figureIndex: number): FloatingImage {
+  const x = Math.max(0, Math.min(fig.offsetXEmu ?? 0, COLUMN_EMU - fig.widthEmu))
+  const right = x + fig.widthEmu / 2 > COLUMN_EMU / 2
+  return {
+    assetId: fig.assetId,
+    widthEmu: fig.widthEmu,
+    heightEmu: fig.heightEmu,
+    side: right ? 'right' : 'left',
+    edgeEmu: Math.round(right ? Math.max(0, COLUMN_EMU - x - fig.widthEmu) : x),
+    offsetYEmu: Math.max(0, fig.offsetYEmu ?? 0),
+    movable: 'free',
+    ref: { blockId, figureIndex }
+  }
+}
+
+function addFloating(p: DocParagraph, f: FloatingImage): void {
+  ;(p.floatingImages ??= []).push(f)
+}
+
+/** 每段只放一张“贴右边”的图，多出的退回下方 */
+function hasRightAligned(p: DocParagraph): boolean {
+  return (p.floatingImages ?? []).some((f) => f.movable === 'vertical')
 }
 
 /** 同一位置的一张或多张图：放在同一段里并排显示 */

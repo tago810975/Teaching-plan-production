@@ -29,13 +29,29 @@ export type DocRun =
   /** 制表符，用于选项分列 */
   | { kind: 'tab' }
 
+/**
+ * 浮动图片：四周型环绕，文字绕开图片排布（右侧图与自由位置的图都是这种）。
+ * 位置用“靠哪一侧 + 距该侧栏边的距离 + 距锚定段落顶端的距离”描述，预览与 Word 导出共用。
+ */
 export interface FloatingImage {
   assetId: string
   widthEmu: number
   heightEmu: number
-  /** 目前只支持靠右、文字四周环绕 */
-  side: 'right'
+  /** 图片靠栏的哪一侧；文字从另一侧绕过 */
+  side: 'left' | 'right'
+  /** 距该侧栏边的距离（EMU） */
+  edgeEmu: number
+  /** 距锚定段落顶端的距离（EMU） */
+  offsetYEmu: number
+  /** 在预览中如何拖动：free 可上下左右移动；vertical 只能上下移动（右侧图） */
+  movable: 'free' | 'vertical'
   ref?: FigureRef
+}
+
+/** 图片在工程数据中的位置：所在内容（块或综合题中的小题）的 ID 与 figures 中的序号 */
+export interface FigureRef {
+  blockId: string
+  figureIndex: number
 }
 
 export interface DocParagraph {
@@ -72,28 +88,13 @@ export interface DocParagraph {
   align?: 'center' | 'right'
   /** 从本段之后重新开始题号（如“作业单”大标题） */
   restartNumbering?: boolean
-  /** 锚定在本段的浮动图片 */
-  floatingImage?: FloatingImage
-  /** 锚定在本段、自由摆放的图片 */
-  freeImages?: FreeImage[]
-}
-
-/** 自由位置的图片：浮于文字上方，相对所在段落定位 */
-export interface FreeImage {
-  assetId: string
-  widthEmu: number
-  heightEmu: number
-  /** 相对栏左侧与段落顶端的偏移（EMU） */
-  offsetXEmu: number
-  offsetYEmu: number
-  /** 在工程数据中的位置，供预览中拖动、缩放后回写 */
-  ref: FigureRef
-}
-
-/** 图片在工程数据中的位置：所在块与 figures 中的序号 */
-export interface FigureRef {
-  blockId: string
-  figureIndex: number
+  /** 锚定在本段的浮动图片（文字环绕） */
+  floatingImages?: FloatingImage[]
+  /**
+   * 本段是可锚定图片的段落（题干、知识点正文、综合题背景）时，它在原字段中的序号。
+   * 预览中拖动图片越过段落边界时，据此改换锚定段落。
+   */
+  anchorIndex?: number
 }
 
 export interface DocIR {

@@ -66,7 +66,7 @@ export function Preview({
       const next = els[i + 1]?.offsetTop ?? bottom
       const spaceAfter = el === undefined ? 0 : parseFloat(getComputedStyle(el).paddingBottom) || 0
       // 作答留白与带浮动图片的段落不拆分；其余未设“段中不分页”的段落可按行拆分
-      const splittable = el !== undefined && p.keepLines !== true && p.spacerTwip === undefined && p.floatingImage === undefined
+      const splittable = el !== undefined && p.keepLines !== true && p.spacerTwip === undefined && (p.floatingImages ?? []).length === 0
       return {
         height: next - top,
         spaceAfter,

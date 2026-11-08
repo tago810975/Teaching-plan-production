@@ -163,7 +163,7 @@ describe('版式参数', () => {
   it('右侧题图挂在题干段落上', async () => {
     const { project } = await createDemoBundle()
     const ir = buildDocument(project, 'student')
-    const withFloat = ir.paragraphs.filter((p) => p.floatingImage !== undefined)
+    const withFloat = ir.paragraphs.filter((p) => (p.floatingImages ?? []).length > 0)
     expect(withFloat).toHaveLength(1)
     expect(withFloat[0]?.style).toBe('question')
   })

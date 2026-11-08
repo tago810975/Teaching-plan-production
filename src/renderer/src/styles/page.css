@@ -149,8 +149,7 @@
 }
 
 .para-float {
-  float: right;
-  margin: 0 0 4pt 9pt;
+  margin-bottom: 4pt;
   text-indent: 0;
 }
 
@@ -175,13 +174,12 @@
 }
 .para-float.figure {
   display: block;
-  float: right;
 }
-.figure--free {
-  position: absolute;
-  z-index: 2;
+/* 浮动图之前的占位条：宽度为 0，只用来把图片推到指定高度 */
+.float-strut {
+  width: 0;
 }
-.figure--free.figure--active {
+.figure--movable.figure--active {
   cursor: move;
 }
 .figure-handle {
