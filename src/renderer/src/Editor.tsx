@@ -317,6 +317,7 @@ function EditorBody({
           onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
           onOptionImageResize={resizeOptionImageFromPreview}
           onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
+          onTableWidths={(ref, widths) => dispatch({ type: 'set-table-widths', ref, widths })}
           formatColors={preset.textColors}
           keyPoint={preset.keyPoint}
           linkOptionImages={state.linkOptionImages}

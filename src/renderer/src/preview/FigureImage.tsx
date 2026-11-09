@@ -49,7 +49,7 @@ const PX_TO_EMU = 9525
 /** 最小尺寸：0.5 厘米 */
 const MIN_EMU = 180000
 
-function previewZoom(el: Element): number {
+export function previewZoom(el: Element): number {
   const pages = el.closest('.preview-pages') as HTMLElement | null
   const z = pages === null ? 1 : parseFloat(pages.style.zoom)
   return Number.isFinite(z) && z > 0 ? z : 1

@@ -172,9 +172,45 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             </button>
           </>
         ) : (
-          <Field label="文字">
-            <TextInput fieldId="text" value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
-          </Field>
+          <>
+            <Field label="文字">
+              <TextInput fieldId="text" value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
+            </Field>
+            {block.type === 'title' && (
+              <fieldset className="group">
+                <legend>版式</legend>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={block.pageBreakBefore === true}
+                    onChange={(e) =>
+                      update((b) => {
+                        if (b.type !== 'title') return b
+                        const { pageBreakBefore: _p, ...rest } = b
+                        return e.target.checked ? { ...rest, pageBreakBefore: true } : rest
+                      })
+                    }
+                  />
+                  从新的一页开始
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={block.restartNumbering === true}
+                    onChange={(e) =>
+                      update((b) => {
+                        if (b.type !== 'title') return b
+                        const { restartNumbering: _r, ...rest } = b
+                        return e.target.checked ? { ...rest, restartNumbering: true } : rest
+                      })
+                    }
+                  />
+                  之后的题号从 1 重新开始
+                </label>
+                <p className="field-hint">如知识点手册的第二章、教学案中另起的一部分。文档开头的大标题不会另起一页。</p>
+              </fieldset>
+            )}
+          </>
         )}
       </div>
       </PresetContext.Provider>

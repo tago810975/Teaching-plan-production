@@ -239,6 +239,8 @@ export interface TitleBlock {
   text: string
   /** 是否从此处重新开始题号 */
   restartNumbering?: boolean
+  /** 是否从新的一页开始（如知识点手册的第二章） */
+  pageBreakBefore?: boolean
 }
 
 /** 二级标题，如“知识梳理”“例题精讲”“课堂练习” */

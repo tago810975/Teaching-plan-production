@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 10
+export const CURRENT_FORMAT_VERSION = 11
 
 /*
  * 版本记录：
@@ -35,6 +35,7 @@ export const CURRENT_FORMAT_VERSION = 10
  *      选项列位置的默认值加宽：工程的列位置仍是旧默认值或模板原值（未改过）时换成新的默认值
  * 9 —— 公式颜色 math.color（只增加可选字段，无需迁移）
  * 10 —— 表格（行内元素 type: 'table'，独占一段；单元格内容为富文本，可合并、可有底纹）。无需迁移
+ * 11 —— 大标题可从新的一页开始（title.pageBreakBefore）。无需迁移
  */
 
 export interface Manifest {

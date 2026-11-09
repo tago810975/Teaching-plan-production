@@ -142,7 +142,8 @@ const block = z.discriminatedUnion('type', [
     id: z.string(),
     type: z.literal('title'),
     text: z.string(),
-    restartNumbering: z.boolean().optional()
+    restartNumbering: z.boolean().optional(),
+    pageBreakBefore: z.boolean().optional()
   }),
   z.object({ id: z.string(), type: z.literal('section'), text: z.string() }),
   z.object({ id: z.string(), type: z.literal('worksheet'), title: z.string(), fields: z.array(z.string()) }),

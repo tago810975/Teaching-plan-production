@@ -37,7 +37,7 @@ export type DocRun =
   | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef; optionRef?: OptionImageRef }
   | { kind: 'blank'; widthChars: number }
   /** 表格：独占一段；预览中画成表格，导出为 <w:tbl> */
-  | { kind: 'table'; table: DocTable }
+  | { kind: 'table'; table: DocTable; ref?: InlineRef }
   /** 制表符，用于选项分列 */
   | { kind: 'tab' }
 

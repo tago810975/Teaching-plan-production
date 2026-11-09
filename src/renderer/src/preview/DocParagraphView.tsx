@@ -1,13 +1,14 @@
 /**
  * 单个段落的预览渲染。只依据 DocIR 与 STYLE_SPECS，不包含任何排版规则。
  */
-import { useContext, memo, type CSSProperties, type ReactNode } from 'react'
-import type { DocParagraph, DocRun, DocTable, OptionImageRef } from '@core/document/ir'
+import { useContext, memo, type CSSProperties, type ReactNode, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import type { DocParagraph, DocRun, DocTable, InlineRef, OptionImageRef } from '@core/document/ir'
+import { TableResizeContext } from './table-resize'
 import { previewCss } from '@core/document/styles'
 import { StylesContext } from './styles-context'
-import { emuToPt, twipToPt } from '@core/document/units'
+import { A4_PAGE, contentWidthTwip, emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
-import { FigureImage, type FigureChangeHandler } from './FigureImage'
+import { FigureImage, previewZoom, type FigureChangeHandler } from './FigureImage'
 
 interface Props {
   paragraph: DocParagraph
@@ -323,7 +324,7 @@ function renderRuns(
       case 'tab':
         return <span key={i} className="run-tab" />
       case 'table':
-        return <TableView key={i} table={run.table} assetUrls={assetUrls} onEditMath={onEditMath} />
+        return <TableView key={i} table={run.table} tableRef={run.ref} assetUrls={assetUrls} onEditMath={onEditMath} />
     }
   })
 }
@@ -339,13 +340,83 @@ function srcAttrs(blockId: string, path: ReadonlyArray<string | number>, inline:
 }
 
 /** 表格：与导出一致——细实线边框、固定列宽、居中；单元格内容垂直居中，不首行缩进 */
-function TableView({ table, assetUrls, onEditMath }: { table: DocTable; assetUrls: ReadonlyMap<string, string>; onEditMath: ((run: MathRun) => void) | undefined }) {
-  const total = table.colWidthsTwip.reduce((a, b) => a + b, 0)
+function TableView({
+  table,
+  tableRef,
+  assetUrls,
+  onEditMath
+}: {
+  table: DocTable
+  tableRef: InlineRef | undefined
+  assetUrls: ReadonlyMap<string, string>
+  onEditMath: ((run: MathRun) => void) | undefined
+}) {
+  const onResize = useContext(TableResizeContext)
+  // 拖动列边框时的列宽（松开后才写回工程数据）
+  const [draft, setDraft] = useState<number[] | null>(null)
+  const widths = draft ?? table.colWidthsTwip
+  const total = widths.reduce((a, b) => a + b, 0)
+  const resizable = onResize !== null && tableRef !== undefined
+
+  /** 拖动第 i 条竖线（第 i 列的右边）：中间的线左右两列此消彼长，最右边的线改变表格总宽（不超过版心） */
+  const startDrag = (e: ReactPointerEvent<HTMLSpanElement>, i: number): void => {
+    if (!resizable) return
+    e.preventDefault()
+    e.stopPropagation()
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    const zoom = previewZoom(handle)
+    const startX = e.clientX
+    const start = table.colWidthsTwip.slice()
+    const sum = start.reduce((a, b) => a + b, 0)
+    let current = start
+    const move = (ev: PointerEvent): void => {
+      const d = ((ev.clientX - startX) / zoom) * 20 // 1pt = 20twip
+      const next = start.slice()
+      if (i < start.length - 1) {
+        const dd = Math.max(MIN_COL_TWIP - start[i]!, Math.min(start[i + 1]! - MIN_COL_TWIP, d))
+        next[i] = start[i]! + dd
+        next[i + 1] = start[i + 1]! - dd
+      } else {
+        next[i] = Math.max(MIN_COL_TWIP, Math.min(CONTENT_TWIP - (sum - start[i]!), start[i]! + d))
+      }
+      current = next.map((w) => Math.round(w))
+      setDraft(current)
+    }
+    const up = (): void => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+      setDraft(null)
+      if (current.some((w, k) => w !== start[k])) onResize(tableRef, current)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+
+  let x = 0
   return (
     <span className="doc-table-wrap">
+      <span className={draft !== null ? 'doc-table-box is-resizing' : 'doc-table-box'} style={{ width: `${twipToPt(total)}pt` }}>
+      {resizable &&
+        widths.map((w, i) => {
+          x += w
+          return (
+            <span
+              key={i}
+              className="col-resize"
+              style={{ left: `${twipToPt(x)}pt` }}
+              title="拖动调整列宽"
+              aria-hidden="true"
+              onPointerDown={(e) => startDrag(e, i)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )
+        })}
       <table className="doc-table" style={{ width: `${twipToPt(total)}pt` }}>
         <colgroup>
-          {table.colWidthsTwip.map((w, i) => (
+          {widths.map((w, i) => (
             <col key={i} style={{ width: `${twipToPt(w)}pt` }} />
           ))}
         </colgroup>
@@ -374,6 +445,10 @@ function TableView({ table, assetUrls, onEditMath }: { table: DocTable; assetUrl
           ))}
         </tbody>
       </table>
+      </span>
     </span>
   )
 }
+
+const MIN_COL_TWIP = 300
+const CONTENT_TWIP = contentWidthTwip(A4_PAGE)

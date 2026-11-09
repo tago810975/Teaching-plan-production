@@ -40,12 +40,13 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   for (const block of project.blocks) {
     switch (block.type) {
       case 'title':
-        if (block.restartNumbering === true) {
-          questionNo = 0
-          out.push({ ...textPara(block.id, 'title', block.text), restartNumbering: true })
-        } else {
-          out.push(textPara(block.id, 'title', block.text))
-        }
+        if (block.restartNumbering === true) questionNo = 0
+        out.push({
+          ...textPara(block.id, 'title', block.text),
+          ...(block.restartNumbering === true ? { restartNumbering: true } : {}),
+          // 从新的一页开始（文档开头的大标题不另起一页，免得出现空白页）
+          ...(block.pageBreakBefore === true && out.length > 0 ? { pageBreakBefore: true } : {})
+        })
         break
       case 'section':
         out.push(textPara(block.id, 'section', block.text))
@@ -619,8 +620,11 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
         return { kind: 'image', assetId: i.assetId, widthEmu: i.widthEmu, heightEmu: i.heightEmu }
       case 'blank':
         return { kind: 'blank', widthChars: i.widthChars }
-      case 'table':
-        return { kind: 'table', table: toDocTable(i, base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }) }
+      case 'table': {
+        // 表格的位置：预览中拖动列边框后写回列宽
+        const ref = base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }
+        return { kind: 'table', table: toDocTable(i, ref), ...(ref !== undefined ? { ref } : {}) }
+      }
     }
   })
 }

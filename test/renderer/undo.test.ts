@@ -183,3 +183,23 @@ describe('在预览中选中文字改格式', () => {
     expect(r).toBe(s)
   })
 })
+
+describe('在预览中拖动表格列边框', () => {
+  it('设置列宽为一步，可撤销；属性面板重新读取', () => {
+    let s = start()
+    const table = { type: 'table' as const, rows: [{ cells: [{ content: [para('甲')] }, { content: [para('乙')] }] }] }
+    s = reduceAt(s, { type: 'update-block', blockId: 'q1', update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, stem: [{ inlines: [table] }] } } : b) }, 1000)
+    const rev = s.revision
+    s = reduceAt(s, { type: 'set-table-widths', ref: { blockId: 'q1', path: ['question', 'stem', 0, 'inlines', 0] }, widths: [3000, 5000] }, 5000)
+    const t = (st: EditorState): unknown => {
+      const b = st.bundle.project.blocks.find((x) => x.id === 'q1')
+      return b?.type === 'question' ? b.question.stem[0]!.inlines[0] : undefined
+    }
+    expect(t(s)).toMatchObject({ colWidthsTwip: [3000, 5000] })
+    expect(s.revision).toBe(rev + 1)
+    s = reduceAt(s, { type: 'undo' }, 6000)
+    expect((t(s) as { colWidthsTwip?: number[] }).colWidthsTwip).toBeUndefined()
+    // 路径不是表格时不改
+    expect(reduceAt(s, { type: 'set-table-widths', ref: { blockId: 'q1', path: ['question', 'stem', 9] }, widths: [1] }, 7000)).toBe(s)
+  })
+})

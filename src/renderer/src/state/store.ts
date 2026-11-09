@@ -9,6 +9,7 @@ import { createEmptyBundle } from '@core/model/factory'
 import type { FigureRef, InlineRef } from '@core/document/ir'
 import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
+import { setColumnWidths } from '@core/model/table'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -128,6 +129,8 @@ export type EditorAction =
    * 选区跨几段时有几个范围，合为一步撤销
    */
   | { type: 'format-range'; ranges: TextRange[]; op: FormatOp }
+  /** 在预览中拖动表格列边框后设置列宽（twip） */
+  | { type: 'set-table-widths'; ref: InlineRef; widths: number[] }
   | { type: 'undo'; focus?: CaretAt }
   | { type: 'redo'; focus?: CaretAt }
   /** 修改页眉文字或图片；image 为 null 表示移除该图片，asset 为新图片的资源 */
@@ -250,6 +253,20 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
         )
       )
       // 属性面板的输入框重新读取内容
+      return changed ? { ...next, revision: next.revision + 1 } : state
+    }
+    case 'set-table-widths': {
+      const { ref, widths } = action
+      let changed = false
+      const next = withBlocks(state, (blocks) =>
+        mapBlockById(blocks, ref.blockId, (b) => {
+          const t = getAt(b, ref.path) as Inline | undefined
+          if (t?.type !== 'table') return b
+          changed = true
+          return replaceAt(b, ref.path, setColumnWidths(t, widths)) as Block
+        })
+      )
+      // 属性面板（表格编辑器读取的表格）随之更新
       return changed ? { ...next, revision: next.revision + 1 } : state
     }
     case 'set-file-path':

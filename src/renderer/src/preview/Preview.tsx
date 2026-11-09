@@ -6,11 +6,12 @@
  * DocIR 随之重建，预览即时重排，实现所改即所见。
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { DocIR, OptionImageRef } from '@core/document/ir'
+import type { DocIR, InlineRef, OptionImageRef } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { StylesContext } from './styles-context'
 import { SelectionToolbar } from './SelectionToolbar'
+import { TableResizeContext } from './table-resize'
 import type { FormatOp } from '@core/model/markup'
 import type { FormatPreset } from '@core/presets'
 import type { TextRange } from '../state/store'
@@ -35,6 +36,8 @@ interface Props {
   onOptionImageResize?: (ref: OptionImageRef, widthEmu: number, group: boolean) => void
   /** 在预览中拖动一张选项图片时，默认是否全部一起缩放 */
   linkOptionImages?: boolean
+  /** 在预览中拖动表格列边框后设置列宽（不提供时不显示拖动手柄） */
+  onTableWidths?: (ref: InlineRef, widthsTwip: number[]) => void
   /** 在预览中选中文字后改格式（不提供时不显示选区工具条） */
   onFormatRange?: (ranges: TextRange[], op: FormatOp) => void
   formatColors?: FormatPreset['textColors']
@@ -54,6 +57,7 @@ export function Preview({
   onOptionImageResize,
   linkOptionImages = false,
   onFormatRange,
+  onTableWidths,
   formatColors = [],
   keyPoint
 }: Props) {
@@ -177,6 +181,7 @@ export function Preview({
 
   return (
     <StylesContext.Provider value={ir.styles ?? STYLE_SPECS}>
+    <TableResizeContext.Provider value={onTableWidths ?? null}>
     <div className="preview" ref={scrollRef}>
       <div className="preview-measure" aria-hidden="true">
         <div ref={measureRef} style={{ width: bodyStyle.width }}>
@@ -238,6 +243,7 @@ export function Preview({
       </div>
     </div>
       {onFormatRange !== undefined && <SelectionToolbar container={scrollRef} onApply={onFormatRange} colors={formatColors} keyPoint={keyPoint} />}
+    </TableResizeContext.Provider>
     </StylesContext.Provider>
   )
 }

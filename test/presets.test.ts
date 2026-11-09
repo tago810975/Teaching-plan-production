@@ -171,3 +171,22 @@ describe('作业单姓名栏在预览中不折行', () => {
     expect(fields.noWrap).toBe(true)
   })
 })
+
+describe('大标题从新的一页开始', async () => {
+  const { buildDocument: build } = await import('@core/document/build')
+  it('设置后段前分页；文档开头的大标题不另起一页；可与题号重新开始同时使用', async () => {
+    const p = createEmptyProject()
+    p.blocks = [
+      { id: 'a', type: 'title', text: '光的折射 全反射', pageBreakBefore: true },
+      { id: 'q', type: 'question', question: createQuestion({ stem: [{ inlines: [{ type: 'text', text: '题' }] }] }) },
+      { id: 'b', type: 'title', text: '光的现象', pageBreakBefore: true, restartNumbering: true },
+      { id: 'q2', type: 'question', question: createQuestion({ stem: [{ inlines: [{ type: 'text', text: '题' }] }] }) }
+    ]
+    const titles = build(p, 'teacher').paragraphs.filter((x) => x.style === 'title')
+    expect(titles.map((t) => t.pageBreakBefore === true)).toEqual([false, true])
+    expect(titles[1]!.restartNumbering).toBe(true)
+    const doc = await (await JSZip.loadAsync(await writeDocx({ ir: build(p, 'teacher'), assets: {}, title: 't', template: TEMPLATE }))).file('word/document.xml')!.async('string')
+    expect(doc).toMatch(/<w:pageBreakBefore\/>[\s\S]*?光的现象/)
+    expect(doc).not.toMatch(/<w:pageBreakBefore\/>[^]*?光的折射 全反射/)
+  })
+})

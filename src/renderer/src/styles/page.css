@@ -285,8 +285,12 @@
   text-indent: 0;
   margin: 2pt 0;
 }
-.doc-table {
+.doc-table-box {
+  position: relative;
+  display: block;
   margin: 0 auto;
+}
+.doc-table {
   border-collapse: collapse;
   table-layout: fixed;
   text-indent: 0;
@@ -306,4 +310,30 @@
   /* 图片比单元格宽时按比例缩小 */
   max-width: 100% !important;
   height: auto !important;
+}
+
+/* 拖动列边框调整列宽：鼠标移到表格上时显示 */
+.col-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 7pt;
+  margin-left: -3.5pt;
+  cursor: col-resize;
+  touch-action: none;
+}
+.doc-table-box:hover .col-resize::after,
+.doc-table-box.is-resizing .col-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3pt;
+  width: 1pt;
+  background: rgba(47, 111, 181, 0.55);
+}
+.col-resize:hover::after,
+.doc-table-box.is-resizing .col-resize::after {
+  background: rgba(47, 111, 181, 0.9) !important;
 }
