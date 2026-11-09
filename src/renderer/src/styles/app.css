@@ -1401,3 +1401,30 @@ body.is-dragging-outline * {
   height: 10px;
   border-radius: 2px;
 }
+
+/* 选项间距方案 */
+.option-stops-scheme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+.option-stops-scheme select {
+  flex: 1;
+  min-width: 0;
+}
+.option-stops-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.option-stops-save input {
+  flex: 1;
+  min-width: 10em;
+}
+.field-error {
+  font-size: 12px;
+  color: var(--red-pen);
+}

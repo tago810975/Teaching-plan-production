@@ -18,6 +18,7 @@ import type { LibraryListing, OpenedProject, ProjectListItem } from '@shared/ipc
 import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project-io'
 import { readTemplateDefaults } from './template-io'
 import { getPreset } from '@core/presets'
+import { sanitizeSchemes, type OptionStopScheme } from '@core/model/option-stop-schemes'
 
 const MAX_RECENT = 30
 /** 扫描库目录时的最大子目录深度（库目录本身为 0） */
@@ -27,6 +28,8 @@ interface Settings {
   libraryDir?: string
   /** 导入（从 Word 新建）时默认使用的格式预设 */
   defaultPresetId?: string
+  /** 用户保存的选项间距方案 */
+  optionStopSchemes?: unknown
 }
 
 interface RecentEntry {
@@ -70,6 +73,21 @@ export async function getDefaultPresetId(): Promise<string> {
 export async function setDefaultPresetId(presetId: string): Promise<void> {
   const settings = await readJsonFile<Settings>(settingsPath(), {})
   await writeFile(settingsPath(), JSON.stringify({ ...settings, defaultPresetId: getPreset(presetId).id }, null, 2))
+}
+
+// ---------- 选项间距方案 ----------
+
+export async function getOptionStopSchemes(): Promise<OptionStopScheme[]> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  return sanitizeSchemes(settings.optionStopSchemes)
+}
+
+/** 保存并返回整理后的方案列表 */
+export async function setOptionStopSchemes(schemes: unknown): Promise<OptionStopScheme[]> {
+  const clean = sanitizeSchemes(schemes)
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, optionStopSchemes: clean }, null, 2))
+  return clean
 }
 
 // ---------- 最近打开 ----------

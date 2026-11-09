@@ -4,6 +4,7 @@
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
 import type { Asset, Block, ProjectBundle, Variant } from '@core/model/types'
+import type { OptionStopScheme } from '@core/model/option-stop-schemes'
 import type { ProjectSummary } from '@core/project-file/codec'
 import type { TemplateDefaults } from '@core/template/defaults'
 
@@ -23,6 +24,8 @@ export const IPC = {
   importDocx: 'import:docx',
   createFromDocx: 'project:create-from-docx',
   getDefaultPreset: 'settings:get-default-preset',
+  getOptionStopSchemes: 'settings:get-option-stop-schemes',
+  setOptionStopSchemes: 'settings:set-option-stop-schemes',
   setDefaultPreset: 'settings:set-default-preset',
   exportCheck: 'export:check',
   exportWord: 'export:word',
@@ -134,6 +137,9 @@ export interface RendererApi {
   /** 设置：导入（从 Word 新建）时默认使用的格式预设 */
   getDefaultPreset(): Promise<string>
   setDefaultPreset(presetId: string): Promise<void>
+  /** 设置：用户保存的选项间距方案（所有教学案通用） */
+  getOptionStopSchemes(): Promise<OptionStopScheme[]>
+  setOptionStopSchemes(schemes: OptionStopScheme[]): Promise<OptionStopScheme[]>
   /** 导出的默认位置：工程文件所在文件夹，未保存时为教学案库 */
   defaultExportDir(projectPath: string | null): Promise<string>
   /** 目标位置已存在的同名文件 */

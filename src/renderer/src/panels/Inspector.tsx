@@ -17,7 +17,7 @@ import { DifficultyField } from './DifficultyField'
 import { difficultyOf, getPreset, type FormatPreset } from '@core/presets'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
-import { copyStops, DEFAULT_OPTION_STOPS, LEGACY_OPTION_STOPS } from '@core/model/factory'
+import { copyStops, DEFAULT_OPTION_STOPS } from '@core/model/factory'
 import { optionImageSignature } from '@core/model/option-images'
 import type {
   Block,
@@ -239,16 +239,8 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
       </fieldset>
       <fieldset className="group">
         <legend>选项位置</legend>
-        <p className="field-hint">选择题选项排成每行 2 项、4 项时，各列从哪里开始。</p>
+        <p className="field-hint">选择题选项排成每行 2 项、4 项时，各列从哪里开始。可以把调好的间距另存为方案，所有教学案都能选用。</p>
         <OptionStopsEditor stops={layout.optionStops} onChange={(optionStops) => dispatch({ type: 'update-layout', layout: { ...layout, optionStops } })} />
-        <div className="group-actions">
-          <button type="button" onClick={() => dispatch({ type: 'update-layout', layout: { ...layout, optionStops: copyStops(DEFAULT_OPTION_STOPS) } })}>
-            恢复默认
-          </button>
-          <button type="button" onClick={() => dispatch({ type: 'update-layout', layout: { ...layout, optionStops: copyStops(LEGACY_OPTION_STOPS) } })}>
-            用模板原来的位置（较窄）
-          </button>
-        </div>
       </fieldset>
       <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
     </>

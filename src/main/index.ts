@@ -28,10 +28,12 @@ import {
   addRecent,
   createProject,
   getDefaultPresetId,
+  getOptionStopSchemes,
   getLibraryDir,
   listProjects,
   removeRecent,
   setDefaultPresetId,
+  setOptionStopSchemes,
   setLibraryDir
 } from './library'
 
@@ -216,6 +218,8 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.getDefaultPreset, () => getDefaultPresetId())
   ipcMain.handle(IPC.setDefaultPreset, (_event, presetId: string) => setDefaultPresetId(presetId))
+  ipcMain.handle(IPC.getOptionStopSchemes, () => getOptionStopSchemes())
+  ipcMain.handle(IPC.setOptionStopSchemes, (_event, schemes: unknown) => setOptionStopSchemes(schemes))
 
   ipcMain.handle(IPC.removeRecent, (_event, filePath: string) => removeRecent(filePath))
 
