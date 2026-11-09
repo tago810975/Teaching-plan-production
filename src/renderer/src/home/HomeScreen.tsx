@@ -3,7 +3,7 @@
  * 右键文件可以打开、导出 Word、重命名、删除（移到回收站）等。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { FolderListing, LibraryListing, ProjectListItem } from '@shared/ipc'
+import type { FolderListing, LibraryListing, LocalPlace, ProjectListItem } from '@shared/ipc'
 import type { ProjectBundle } from '@core/model/types'
 import { PRESETS } from '@core/presets'
 import { ExportDialog, ExportDoneNotice } from '../export/ExportDialog'
@@ -28,6 +28,10 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
   const [query, setQuery] = useState('')
   const [exporting, setExporting] = useState<{ bundle: ProjectBundle; path: string } | null>(null)
   const [exported, setExported] = useState<string[] | null>(null)
+  const [places, setPlaces] = useState<LocalPlace[]>([])
+  useEffect(() => {
+    void window.api.getLocalPlaces().then(setPlaces)
+  }, [])
 
   const refresh = useCallback(async () => {
     const result = await window.api.listProjects()
@@ -111,14 +115,21 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
     }
   }
 
-  const title = view.kind === 'recent' ? '最近' : (view.title ?? lastSegment(view.path))
   const libraryDir = listing?.libraryDir ?? null
+  // 标题：左侧栏中有的位置用左侧栏上的叫法（如“桌面”），其余用文件夹名
+  const title =
+    view.kind === 'recent'
+      ? '最近'
+      : libraryDir !== null && samePath(view.path, libraryDir)
+        ? '教学案库'
+        : (places.find((p) => samePath(p.path, view.path))?.label ?? view.title ?? lastSegment(view.path))
   const inLibrary = view.kind === 'folder' && libraryDir !== null && samePath(view.path, libraryDir)
 
   return (
     <div className="home">
       <HomeSidebar
         view={view}
+        places={places}
         libraryDir={libraryDir}
         onView={go}
         onNew={onNew}

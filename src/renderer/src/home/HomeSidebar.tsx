@@ -9,6 +9,7 @@ export type HomeView = { kind: 'recent' } | { kind: 'folder'; path: string; titl
 
 interface Props {
   view: HomeView
+  places: LocalPlace[]
   libraryDir: string | null
   onView: (view: HomeView) => void
   onNew: () => void
@@ -16,12 +17,15 @@ interface Props {
   onOpenOther: () => void
 }
 
-export function HomeSidebar({ view, libraryDir, onView, onNew, onCreateFromDocx, onOpenOther }: Props) {
-  const [places, setPlaces] = useState<LocalPlace[]>([])
-  useEffect(() => {
-    void window.api.getLocalPlaces().then(setPlaces)
-  }, [])
+export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateFromDocx, onOpenOther }: Props) {
   const current = view.kind === 'folder' ? view.path : null
+  // 当前文件夹只在“离它最近”的那个位置下展开、高亮（如桌面在 C 盘里，点桌面时不展开 C 盘）
+  const scope =
+    current === null
+      ? null
+      : (places
+          .filter((p) => samePath(p.path, current) || isInside(current, p.path))
+          .sort((a, b) => b.path.length - a.path.length)[0]?.path ?? null)
 
   return (
     <nav className="home-side" aria-label="首页导航">
@@ -66,7 +70,7 @@ export function HomeSidebar({ view, libraryDir, onView, onNew, onCreateFromDocx,
       <h2 className="home-side-heading">本地</h2>
       <ul className="folder-tree" role="tree" aria-label="本地文件夹">
         {places.map((p) => (
-          <FolderNode key={p.path} name={p.label} path={p.path} icon={ICONS[p.kind]} depth={0} current={current} onOpen={(path, name) => onView({ kind: 'folder', path, ...(path === p.path ? { title: p.label } : { title: name }) })} />
+          <FolderNode key={p.path} name={p.label} path={p.path} icon={ICONS[p.kind]} depth={0} current={p.path === scope ? current : null} onOpen={(path, name) => onView({ kind: 'folder', path, ...(path === p.path ? { title: p.label } : { title: name }) })} />
         ))}
       </ul>
     </nav>
