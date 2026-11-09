@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProjectBundle, Variant } from '@core/model/types'
 import { rasterizeForWord } from './rasterize'
+import { exportFileName } from '@shared/export-name'
 
 interface Props {
   bundle: ProjectBundle
@@ -84,7 +85,7 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
         <p className="field-hint">
           {variants.length === 0
             ? '请至少选择一个版本'
-            : variants.map((v) => `${baseName.trim() || '…'}（${v === 'teacher' ? '教案' : '学案'}）.docx`).join('、')}
+            : variants.map((v) => exportFileName(baseName.trim() || '…', v)).join('、')}
         </p>
       </div>
 

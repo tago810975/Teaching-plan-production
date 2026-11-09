@@ -22,7 +22,7 @@ export interface DocxImportResult {
 }
 
 export interface DocxImportOptions {
-  /** 格式预设，决定作业单、解析等的整理规则；默认物理教案 V1.0 */
+  /** 格式预设，决定作业单、解析等的整理规则；默认物理教学案 V1.0 */
   presetId?: string
 }
 

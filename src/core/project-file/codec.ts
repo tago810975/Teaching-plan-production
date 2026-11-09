@@ -204,7 +204,7 @@ function migrateV7toV8(raw: unknown): unknown {
   return project
 }
 
-/** 版本 6 → 7：补上格式预设（此前只有物理教案 V1.0 一种格式） */
+/** 版本 6 → 7：补上格式预设（此前只有物理教学案 V1.0 一种格式） */
 function migrateV6toV7(raw: unknown): unknown {
   if (raw === null || typeof raw !== 'object') return raw
   const project = raw as Record<string, unknown>

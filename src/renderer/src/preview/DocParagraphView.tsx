@@ -171,6 +171,7 @@ export const DocParagraphView = memo(function DocParagraphView({
           assetUrls={assetUrls}
           onEditMath={onEditMath}
           figures={figures}
+          {...(p.noWrap === true ? { noWrap: true } : {})}
         />
       )}
     </div>
@@ -185,6 +186,7 @@ function TabbedRuns(props: {
   assetUrls: ReadonlyMap<string, string>
   onEditMath: ((run: MathRun) => void) | undefined
   figures: FigureOptions
+  noWrap?: boolean
 }): ReactNode {
   const segments: DocRun[][] = [[]]
   for (const run of props.runs) {
@@ -201,7 +203,10 @@ function TabbedRuns(props: {
             key={i}
             data-cell={i}
             className="tab-cell"
-            style={width === undefined ? { flex: 1 } : { width: `${twipToPt(width)}pt` }}
+            style={{
+              ...(width === undefined ? { flex: 1 } : { width: `${twipToPt(width)}pt` }),
+              ...(props.noWrap === true ? { whiteSpace: 'nowrap' as const } : {})
+            }}
           >
             {renderRuns(seg, props.assetUrls, props.onEditMath, props.figures)}
           </span>

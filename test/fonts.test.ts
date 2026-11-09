@@ -127,7 +127,7 @@ describe('导入时识别字体、加粗与颜色', async () => {
     return out
   }
 
-  it('解析统一为黑色（物理教案 V1.0），知识梳理中的红字保留', () => {
+  it('解析统一为黑色（物理教学案 V1.0），知识梳理中的红字保留', () => {
     const colored = (field: 'analysis' | 'knowledge'): number =>
       r.blocks
         .flatMap((b) =>

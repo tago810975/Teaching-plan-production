@@ -20,13 +20,13 @@ function styleEl(xml: string, name: string): string {
 }
 
 describe('格式预设', () => {
-  it('物理教案 V1.0：可读取，找不到的 ID 回到默认预设', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['物理教案 V1.0'])
+  it('物理教学案 V1.0：可读取，找不到的 ID 回到默认预设', () => {
+    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0'])
     expect(getPreset('不存在').id).toBe('physics-v1')
     expect(createEmptyProject().presetId).toBe('physics-v1')
   })
 
-  it('物理教案 V1.0 的标题格式与模板一致：导出时写回样式不改变格式', async () => {
+  it('物理教学案 V1.0 的标题格式与模板一致：导出时写回样式不改变格式', async () => {
     const zip = await JSZip.loadAsync(TEMPLATE)
     const before = await zip.file('word/styles.xml')!.async('string')
     const after = applyHeadingStyles(before, presetStyles(getPreset('physics-v1')))
@@ -151,5 +151,23 @@ describe('导入时的星级难度', () => {
     // 没有对应等级的星数单独记为星级
     expect(d!.question).toMatchObject({ stars: 5 })
     expect(d!.question.difficulty).toBeUndefined()
+  })
+})
+
+describe('导出文件名', async () => {
+  const { exportFileName } = await import('@shared/export-name')
+  it('版本标记放在最前面：(T) 教师版、(S) 学生版', () => {
+    expect(exportFileName('知识点清单-光', 'teacher')).toBe('(T)知识点清单-光.docx')
+    expect(exportFileName('知识点清单-光', 'student')).toBe('(S)知识点清单-光.docx')
+    expect(exportFileName('a/b:c', 'student')).toBe('(S)a_b_c.docx')
+  })
+})
+
+describe('作业单姓名栏在预览中不折行', () => {
+  it('姓名栏段落带 noWrap', () => {
+    const p = createEmptyProject()
+    p.blocks = [{ id: newId(), type: 'worksheet', title: '作业单-带电粒子在磁场中的运动', fields: ['姓名', '教室', '正确率'] }]
+    const fields = buildDocument(p, 'teacher').paragraphs.find((x) => x.tabStopsTwip !== undefined)!
+    expect(fields.noWrap).toBe(true)
   })
 })

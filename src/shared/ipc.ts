@@ -82,7 +82,7 @@ export interface ExportRequest {
   bundle: ProjectBundle
   variants: Variant[]
   dir: string
-  /** 文件名主体，如“动态圆专题”，实际文件名为“动态圆专题（教案）.docx” */
+  /** 文件名主体，如“动态圆专题”，实际文件名为“(T)动态圆专题.docx”“(S)动态圆专题.docx” */
   baseName: string
   /** Word 不支持的图片（SVG、WebP）在界面中转成的 PNG，按原资源 ID 替换 */
   replacementAssets: Record<string, Asset>

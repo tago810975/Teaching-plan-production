@@ -9,6 +9,7 @@ import { basename, dirname, extname, join } from 'node:path'
 import { decodeBundle, encodeBundle } from '@core/project-file/codec'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import type { ProjectBundle } from '@core/model/types'
+import { sanitizeFileName } from '@shared/export-name'
 
 export async function readProjectFile(filePath: string): Promise<ProjectBundle> {
   const bytes = await readFile(filePath)
@@ -68,7 +69,4 @@ export function isProjectFilePath(arg: string): boolean {
 }
 
 /** 去掉 Windows / macOS 文件名中不允许的字符 */
-export function sanitizeFileName(name: string): string {
-  const cleaned = name.replace(/[\\/:*?"<>|]/g, '_').replace(/[. ]+$/, '').trim()
-  return cleaned === '' ? '未命名教学案' : cleaned
-}
+export { sanitizeFileName }

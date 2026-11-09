@@ -68,7 +68,7 @@ describe('导入样例教案（教师版）', async () => {
     expect(q.options.map((o) => o.label)).toEqual(['A', 'B', 'C', 'D'])
     expect(plainText(q.answer)).toBe('BC')
     expect(q.knowledgePoints).toEqual(['放缩圆'])
-    // 物理教案 V1.0：【详解】统一改为【解析】
+    // 物理教学案 V1.0：【详解】统一改为【解析】
     expect(plainText(q.analysis)).toContain('【解析】')
     expect(plainText(q.analysis)).not.toContain('【详解】')
     expect(q.figures).toHaveLength(1)

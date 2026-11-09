@@ -128,6 +128,7 @@ function buildWorksheet(w: WorksheetBlock, preset: FormatPreset): DocParagraph[]
       sourceBlockId: w.id,
       style: 'body',
       keepNext: true,
+      noWrap: true,
       ...(tabs.length > 0 ? { tabStopsTwip: tabs } : {}),
       runs
     },

@@ -7,14 +7,10 @@ import { buildDocument } from '@core/document/build'
 import { writeDocx } from '@core/export/docx-writer'
 import type { Variant } from '@core/model/types'
 import type { ExportRequest, ExportResult } from '@shared/ipc'
-import { sanitizeFileName } from './project-io'
+import { exportFileName } from '@shared/export-name'
 import { templateDir } from './template-io'
 
-const VARIANT_NAME: Record<Variant, string> = { teacher: '教案', student: '学案' }
-
-export function exportFileName(baseName: string, variant: Variant): string {
-  return `${sanitizeFileName(baseName)}（${VARIANT_NAME[variant]}）.docx`
-}
+export { exportFileName }
 
 /** 返回目标位置已存在的文件名，用于询问是否覆盖 */
 export async function existingExportFiles(dir: string, baseName: string, variants: Variant[]): Promise<string[]> {

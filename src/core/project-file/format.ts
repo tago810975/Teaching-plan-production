@@ -30,7 +30,7 @@ export const CURRENT_FORMAT_VERSION = 9
  * 5 —— 新增综合题块（composite）；图片可上下偏移（right / right-items 的 offsetYEmu）。无需迁移
  * 6 —— 字体大类（文字格式 marks.font、段落格式 format.font）；project.layout 增加选项列位置 optionStops，
  *      题目 layout 可选 optionStops。旧工程迁移时 optionStops 取模板原有制表位，排版不变
- * 7 —— 格式预设 project.presetId；作业单块（worksheet）；题目星级难度 stars。旧工程迁移为物理教案 V1.0
+ * 7 —— 格式预设 project.presetId；作业单块（worksheet）；题目星级难度 stars。旧工程迁移为物理教学案 V1.0
  * 8 —— 难度显示开关 project.layout.difficultyDisplay；公式可加粗、加下划线（math.bold / math.underline）；
  *      选项列位置的默认值加宽：工程的列位置仍是旧默认值或模板原值（未改过）时换成新的默认值
  * 9 —— 公式颜色 math.color（只增加可选字段，无需迁移）

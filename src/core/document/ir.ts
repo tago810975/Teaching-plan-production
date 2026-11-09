@@ -92,6 +92,11 @@ export interface DocParagraph {
   shaded?: boolean
   /** 制表位（twip，相对页边距），用于选项分列 */
   tabStopsTwip?: readonly number[]
+  /**
+   * 整段排在一行内（如作业单的姓名栏）：预览中按制表位分开的各段不折行。
+   * Word 中行尾带下划线的空格可以略超出右边距，不会折到下一行；预览照此显示。
+   */
+  noWrap?: boolean
   /** 首行缩进（twip），来自段落格式 */
   firstLineIndentTwip?: number
   /** 对齐方式，覆盖样式中的对齐 */
