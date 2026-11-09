@@ -90,14 +90,34 @@ const BUTTONS: ReadonlyArray<readonly [MarkKind, string, string]> = [
 export function FormatToolbar({
   active,
   onApply,
-  colors
+  colors,
+  keyPoint
 }: {
   active: boolean
   onApply: (op: FormatOp) => void
   colors: FormatPreset['textColors']
+  /** 知识点中提供“重点”快捷按钮（红色加粗下划线，以后做默写单时挖空） */
+  keyPoint?: FormatPreset['keyPoint'] | undefined
 }) {
   return (
     <div className="format-toolbar" role="toolbar" aria-label="文字格式">
+      {keyPoint !== undefined && (
+        <>
+          <button
+            type="button"
+            className="format-button format-keypoint"
+            title={`${keyPoint.label}：${keyPoint.description}；再点一次取消`}
+            aria-label={`设为${keyPoint.label}`}
+            disabled={!active}
+            style={{ color: `#${keyPoint.marks.color}` }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onApply({ combo: keyPoint.marks })}
+          >
+            {keyPoint.label}
+          </button>
+          <span className="format-divider" aria-hidden="true" />
+        </>
+      )}
       {BUTTONS.map(([mark, label, title]) => (
         <button
           key={mark}

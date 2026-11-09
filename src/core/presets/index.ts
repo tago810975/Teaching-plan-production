@@ -39,6 +39,15 @@ const presetSchema = z.object({
   }),
   /** 格式工具中的文字颜色；不设 color 的一项表示黑色（去掉颜色） */
   textColors: z.array(z.object({ label: z.string().min(1), color: z.string().regex(/^[0-9A-Fa-f]{6}$/).optional() })),
+  /**
+   * 重点（知识梳理中需要记忆、以后做默写单时挖空的内容）：一组格式，格式工具中的快捷按钮一次设好。
+   * 默写单将按这组格式找出挖空内容。
+   */
+  keyPoint: z.object({
+    label: z.string().min(1),
+    description: z.string(),
+    marks: z.object({ bold: z.literal(true), underline: z.literal(true), color: z.string().regex(/^[0-9A-Fa-f]{6}$/) })
+  }),
   import: z.object({
     /** 导入时把这些标签改写，如【详解】→【解析】 */
     renameLabels: z.record(z.string(), z.string()),

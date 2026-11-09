@@ -90,12 +90,24 @@ describe('格式工具：加粗、倾斜、下划线', () => {
 })
 
 describe('公式加粗、下划线的导出', () => {
-  it('加粗：m:sty 改为粗体并设 w:b；下划线：w:u；属性按规范顺序', () => {
+  it('加粗：m:sty 改为粗体并设 w:b；属性按规范顺序', () => {
     const omml = '<m:oMath><m:r><m:rPr><m:sty m:val="p"/></m:rPr><w:rPr><w:rFonts w:ascii="Cambria Math"/><w:lang w:val="en-US"/></w:rPr><m:t>F</m:t></m:r><m:r><m:t>v</m:t></m:r></m:oMath>'
-    const out = applyMathMarks(omml, { bold: true, underline: true })
-    expect(out).toContain('<m:r><m:rPr><m:sty m:val="b"/></m:rPr><w:rPr><w:rFonts w:ascii="Cambria Math"/><w:b/><w:u w:val="single"/><w:lang w:val="en-US"/></w:rPr><m:t>F</m:t></m:r>')
-    expect(out).toContain('<m:r><m:rPr><m:sty m:val="bi"/></m:rPr><w:rPr><w:b/><w:u w:val="single"/></w:rPr><m:t>v</m:t></m:r>')
+    const out = applyMathMarks(omml, { bold: true })
+    expect(out).toContain('<m:r><m:rPr><m:sty m:val="b"/></m:rPr><w:rPr><w:rFonts w:ascii="Cambria Math"/><w:b/><w:lang w:val="en-US"/></w:rPr><m:t>F</m:t></m:r>')
+    expect(out).toContain('<m:r><m:rPr><m:sty m:val="bi"/></m:rPr><w:rPr><w:b/></w:rPr><m:t>v</m:t></m:r>')
     expect(applyMathMarks(omml, {})).toBe(omml)
+  })
+
+  it('下划线：整个公式放进底部的“下横线”结构，分式下方也是一条平直的线；横线随公式加粗、颜色', () => {
+    const frac = '<m:oMath xmlns:m="x"><m:f><m:num><m:r><m:t>1</m:t></m:r></m:num><m:den><m:r><m:t>2</m:t></m:r></m:den></m:f><m:r><m:t>m</m:t></m:r></m:oMath>'
+    const out = applyMathMarks(frac, { underline: true, bold: true, color: 'C00000' })
+    expect(out).toMatch(/^<m:oMath xmlns:m="x"><m:bar><m:barPr><m:pos m:val="bot"\/><m:ctrlPr><w:rPr><w:b\/><w:color w:val="C00000"\/><\/w:rPr><\/m:ctrlPr><\/m:barPr><m:e><m:f>/)
+    expect(out).toMatch(/<\/m:e><\/m:bar><\/m:oMath>$/)
+    // 不再给每个字符加 w:u
+    expect(out).not.toContain('<w:u ')
+    expect(applyMathMarks('<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>', { underline: true })).toBe(
+      '<m:oMath><m:bar><m:barPr><m:pos m:val="bot"/></m:barPr><m:e><m:r><m:t>x</m:t></m:r></m:e></m:bar></m:oMath>'
+    )
   })
 })
 
@@ -194,5 +206,49 @@ describe('标记重新编号：反复加粗、取消不会让编号一直增长'
     const r2 = toggleMark(t2, objects2, t2.indexOf('甲'), t2.length, 'bold')!
     expect(r2.text).toBe('⟦公式1⟧⟦公式2⟧⟦加粗3:甲⟧')
     expect(objects2.has(1)).toBe(false)
+  })
+})
+
+describe('重点（红色加粗下划线，知识梳理中的挖空内容）', async () => {
+  const { applyFormat, isKeyPoint, KEY_POINT_MARKS } = await import('@core/model/markup')
+  const { getPreset } = await import('@core/presets')
+  const op = { combo: getPreset('physics-v1').keyPoint.marks }
+  const run = (rich: RichText, sel: string): { text: string; rich: RichText } => {
+    const e = toEditable(rich)
+    const objects = new Map(e.objects) as Map<number, Inline>
+    const i = e.text.indexOf(sel)
+    const r = applyFormat(e.text, objects, i, i + sel.length, op)!
+    return { text: r.text, rich: fromEditable(r.text, objects) }
+  }
+
+  it('预设中的重点格式与 KEY_POINT_MARKS 一致', () => {
+    expect(getPreset('physics-v1').keyPoint.marks).toEqual(KEY_POINT_MARKS)
+  })
+
+  it('一次设好红色加粗下划线，标记写作“重点”；再点一次全部取消', () => {
+    const rich: RichText = [{ inlines: [{ type: 'text', text: '洛伦兹力不做功' }] }]
+    const a = run(rich, '不做功')
+    expect(a.text).toBe('洛伦兹力⟦重点1:不做功⟧')
+    expect(a.rich[0]!.inlines[1]).toEqual({ type: 'text', text: '不做功', marks: { bold: true, underline: true, color: 'C00000' } })
+    expect(run(a.rich, '不做功').rich).toEqual(rich)
+  })
+
+  it('已有部分格式（如加粗）时补全；取消时只去掉重点格式，保留别的（如倾斜）', () => {
+    const rich: RichText = [{ inlines: [{ type: 'text', text: '速度', marks: { bold: true, italic: true } }] }]
+    const a = run(rich, '速度')
+    expect(a.rich[0]!.inlines[0]).toEqual({ type: 'text', text: '速度', marks: { bold: true, italic: true, underline: true, color: 'C00000' } })
+    expect(run(a.rich, '速度').rich[0]!.inlines[0]).toEqual({ type: 'text', text: '速度', marks: { italic: true } })
+  })
+
+  it('公式也可设为重点', () => {
+    const rich: RichText = [{ inlines: [{ type: 'text', text: '半径' }, { type: 'math', latex: 'r=\\frac{mv}{qB}' }] }]
+    const a = run(rich, '半径$r=\\frac{mv}{qB}$')
+    expect(a.rich[0]!.inlines[1]).toEqual({ type: 'math', latex: 'r=\\frac{mv}{qB}', bold: true, underline: true, color: 'C00000' })
+  })
+
+  it('isKeyPoint：只有正好是红色加粗下划线才算', () => {
+    expect(isKeyPoint({ bold: true, underline: true, color: 'c00000' })).toBe(true)
+    expect(isKeyPoint({ bold: true, underline: true, color: '2F5597' })).toBe(false)
+    expect(isKeyPoint({ bold: true, underline: true, color: 'C00000', italic: true })).toBe(false)
   })
 })

@@ -64,6 +64,15 @@
       "color": "2F5597"
     }
   ],
+  "keyPoint": {
+    "label": "重点",
+    "description": "知识梳理中需要记忆的内容（以后做默写单时挖空）：红色加粗下划线",
+    "marks": {
+      "bold": true,
+      "underline": true,
+      "color": "C00000"
+    }
+  },
   "import": {
     "renameLabels": {
       "【详解】": "【解析】"

@@ -1377,8 +1377,11 @@ body.is-dragging-outline * {
   font-weight: 700;
 }
 .math-underline {
-  text-decoration: underline;
-  text-decoration-skip-ink: none;
+  /* 与导出的“下横线”一致：整个公式下方一条平直的线（分式在分母下方） */
+  display: inline-block;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+  line-height: 1;
 }
 
 .format-divider {
@@ -1449,4 +1452,17 @@ body.is-dragging-outline * {
 }
 .option-stops-row input {
   width: 3.6em;
+}
+
+/* 重点（红色加粗下划线）快捷按钮 */
+.format-button.format-keypoint {
+  width: auto;
+  padding: 0 8px;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.format-button.format-keypoint:disabled {
+  opacity: 0.45;
 }

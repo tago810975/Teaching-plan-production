@@ -19,7 +19,7 @@ export interface Editable {
   objects: ReadonlyMap<number, Inline>
 }
 
-const TOKEN = /⟦(公式|图|填空)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|颜色|字体|格式)(\d+):([^⟧]*)⟧/g
+const TOKEN = /⟦(公式|图|填空)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|颜色|字体|重点|格式)(\d+):([^⟧]*)⟧/g
 
 export function toEditable(rich: RichText): Editable {
   const objects = new Map<number, Inline>()
@@ -69,7 +69,21 @@ export function formatToken(n: number, marks: TextMarks, text: string): string {
   return `⟦${markName(marks)}${n}:${text}⟧`
 }
 
+/** 重点（知识梳理中的挖空内容）：红色加粗下划线，与格式预设 keyPoint 一致 */
+export const KEY_POINT_MARKS: Readonly<Required<Pick<TextMarks, 'bold' | 'underline' | 'color'>>> = Object.freeze({
+  bold: true,
+  underline: true,
+  color: 'C00000'
+})
+
+/** 是否正好是“重点”格式（红色加粗下划线，没有别的格式） */
+export function isKeyPoint(m: TextMarks): boolean {
+  const keys = Object.keys(m)
+  return keys.length === 3 && m.bold === true && m.underline === true && m.color?.toUpperCase() === KEY_POINT_MARKS.color
+}
+
 function markName(m: TextMarks): string {
+  if (isKeyPoint(m)) return '重点'
   const keys = Object.keys(m).filter((k) => m[k as keyof TextMarks] !== undefined)
   if (keys.length !== 1) return '格式'
   if (m.script === 'sub') return '下标'
@@ -153,8 +167,11 @@ function findClosingDollar(s: string, from: number): number {
 
 export type MarkKind = 'bold' | 'italic' | 'underline'
 
-/** 格式操作：切换加粗/倾斜/下划线，或设定颜色（color 为 undefined 表示恢复黑色） */
-export type FormatOp = { mark: MarkKind } | { color: string | undefined }
+/**
+ * 格式操作：切换加粗/倾斜/下划线；设定颜色（color 为 undefined 表示恢复黑色）；
+ * 或切换一组格式（如“重点”= 红色加粗下划线：都有时取消，否则全部加上）。
+ */
+export type FormatOp = { mark: MarkKind } | { color: string | undefined } | { combo: { bold?: boolean; underline?: boolean; color?: string } }
 
 export interface MarkEdit {
   text: string
@@ -207,10 +224,15 @@ export function applyFormat(text: string, objects: Map<number, Inline>, start: n
   if (last < range.length) pieces.push({ plain: range.slice(last) })
 
   const isMark = 'mark' in op
+  const combo = 'combo' in op ? { ...op.combo, ...(op.combo.color !== undefined ? { color: op.combo.color.toUpperCase() } : {}) } : null
+  const toggles = isMark || combo !== null
   const mathOk = !isMark || op.mark !== 'italic'
-  // 加粗等：所有可改的内容都已有该格式时取消，否则加上
+  /** 是否已有该格式（切换类操作用） */
+  const has = (o: Record<string, unknown>): boolean =>
+    isMark ? o[op.mark] === true : Object.entries(combo!).every(([k, v]) => (typeof v === 'string' ? String(o[k] ?? '').toUpperCase() === v : o[k] === v))
+  // 切换类：所有可改的内容都已有该格式时取消，否则加上
   let on = true
-  if (isMark) {
+  if (toggles) {
     const states: boolean[] = []
     for (const p of pieces) {
       if (p.plain !== undefined) {
@@ -218,8 +240,8 @@ export function applyFormat(text: string, objects: Map<number, Inline>, start: n
         continue
       }
       const obj = objects.get(Number(p.token![2] ?? p.token![4]))
-      if (obj?.type === 'text' && p.token![5] !== undefined) states.push(obj.marks?.[op.mark] === true)
-      else if (obj?.type === 'math' && mathOk) states.push(obj[op.mark as 'bold' | 'underline'] === true)
+      if (obj?.type === 'text' && p.token![5] !== undefined) states.push(has((obj.marks ?? {}) as Record<string, unknown>))
+      else if (obj?.type === 'math' && mathOk) states.push(has(obj as unknown as Record<string, unknown>))
     }
     if (states.length === 0) return null
     on = !states.every(Boolean)
@@ -231,7 +253,12 @@ export function applyFormat(text: string, objects: Map<number, Inline>, start: n
     if (isMark) {
       if (on) copy[op.mark] = true
       else delete copy[op.mark]
-    } else if (op.color !== undefined) copy.color = op.color
+    } else if (combo !== null) {
+      for (const [k, v] of Object.entries(combo)) {
+        if (on) copy[k] = v
+        else if (typeof v === 'string' ? String(copy[k] ?? '').toUpperCase() === v : copy[k] === v) delete copy[k]
+      }
+    } else if ('color' in op && op.color !== undefined) copy.color = op.color
     else delete copy.color
     return copy as T
   }
@@ -247,7 +274,7 @@ export function applyFormat(text: string, objects: Map<number, Inline>, start: n
   for (const p of pieces) {
     if (p.plain !== undefined) {
       // 普通文字：取消格式、恢复黑色时不用改
-      if ((isMark && !on) || (!isMark && op.color === undefined)) {
+      if ((toggles && !on) || ('color' in op && op.color === undefined)) {
         out += p.plain
         continue
       }
