@@ -6,6 +6,36 @@ import { STYLE_SPECS } from '@core/document/styles'
 import type { Block } from '@core/model/types'
 
 /** 读取模板 styles.xml：样式名 → 东亚字体（沿 basedOn 向上查找） */
+/** 读取模板 styles.xml：样式名 → 文字颜色（沿 basedOn 向上查找；auto 与未设视为黑色） */
+async function templateColors(): Promise<Map<string, string | undefined>> {
+  const zip = await JSZip.loadAsync(readFileSync('resources/templates/physics-default/template.docx'))
+  const xml = await zip.file('word/styles.xml')!.async('string')
+  const styles = new Map<string, { name: string; basedOn?: string; color?: string }>()
+  for (const m of xml.matchAll(/<w:style\b[^>]*w:styleId="([^"]+)"[^>]*>([\s\S]*?)<\/w:style>/g)) {
+    const body = m[2]!
+    const name = /<w:name w:val="([^"]+)"/.exec(body)?.[1] ?? m[1]!
+    const basedOn = /<w:basedOn w:val="([^"]+)"/.exec(body)?.[1]
+    // 只看样式自身的文字属性（不看段落标记的 rPr）
+    const rPr = /<\/w:pPr>[\s\S]*?<w:rPr>([\s\S]*?)<\/w:rPr>|^(?![\s\S]*<w:pPr>)[\s\S]*?<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(body)
+    const color = /<w:color w:val="([0-9A-Fa-f]{6}|auto)"/.exec(rPr?.[1] ?? rPr?.[2] ?? '')?.[1]
+    styles.set(m[1]!, { name, ...(basedOn !== undefined ? { basedOn } : {}), ...(color !== undefined ? { color } : {}) })
+  }
+  const out = new Map<string, string | undefined>()
+  for (const s of styles.values()) {
+    let cur: typeof s | undefined = s
+    let color: string | undefined
+    for (let i = 0; cur !== undefined && i < 10; i++) {
+      if (cur.color !== undefined) {
+        color = cur.color
+        break
+      }
+      cur = cur.basedOn === undefined ? undefined : styles.get(cur.basedOn)
+    }
+    out.set(s.name, color === undefined || color === 'auto' || color === '000000' ? undefined : color.toUpperCase())
+  }
+  return out
+}
+
 async function templateFonts(): Promise<Map<string, string | undefined>> {
   const zip = await JSZip.loadAsync(readFileSync('resources/templates/physics-default/template.docx'))
   const xml = await zip.file('word/styles.xml')!.async('string')
@@ -62,6 +92,18 @@ describe('字体大类', () => {
       const family = fontFamilyOf(font)
       // 模板没有指定可识别的东亚字体时，Word 用默认的宋体
       if ((family ?? 'song') !== spec.fontRole) mismatches.push(`${key}（${spec.wordStyleName}）：模板 ${font ?? '未指定'}，预览 ${spec.fontRole}`)
+    }
+    expect(mismatches).toEqual([])
+  })
+})
+
+describe('预览样式表的颜色与模板一致', () => {
+  it('逐个对照模板 styles.xml（含 basedOn 继承）：如“难点”基于“重点”，同为红色', async () => {
+    const colors = await templateColors()
+    const mismatches: string[] = []
+    for (const [key, spec] of Object.entries(STYLE_SPECS)) {
+      const t = colors.get(spec.wordStyleName)
+      if ((t ?? 'black') !== (spec.color?.toUpperCase() ?? 'black')) mismatches.push(`${key}（${spec.wordStyleName}）：模板 ${t ?? '黑色'}，预览 ${spec.color ?? '黑色'}`)
     }
     expect(mismatches).toEqual([])
   })

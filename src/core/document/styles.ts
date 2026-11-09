@@ -161,7 +161,8 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     fixedLabel: '【重点】',
     autoNumbered: true
   },
-  difficultPoint: { ...base, wordStyleName: '物理排版 题目 难点', fixedLabel: '【难点】', autoNumbered: true },
+  // 模板中“难点”基于“重点”样式，同为红色（此前预览中漏了颜色，显示为黑色）
+  difficultPoint: { ...base, wordStyleName: '物理排版 题目 难点', color: 'C00000', fixedLabel: '【难点】', autoNumbered: true },
   analysis: { ...base, wordStyleName: '物理排版 正文' }
 }
 
