@@ -34,7 +34,11 @@ const inline = z.discriminatedUnion('type', [
       latex: z.string().optional(),
       display: z.boolean().optional(),
       bold: z.boolean().optional(),
-      underline: z.boolean().optional()
+      underline: z.boolean().optional(),
+      color: z
+        .string()
+        .regex(/^[0-9A-Fa-f]{6}$/)
+        .optional()
     })
     .refine((m) => m.omml !== undefined || m.latex !== undefined, '公式至少需要 omml 或 latex'),
   z.object({

@@ -1380,3 +1380,24 @@ body.is-dragging-outline * {
   text-decoration: underline;
   text-decoration-skip-ink: none;
 }
+
+.format-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--rule);
+}
+.format-button.format-color {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+}
+.format-color-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

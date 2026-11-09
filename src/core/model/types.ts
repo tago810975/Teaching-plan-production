@@ -51,6 +51,8 @@ export interface MathInline {
   bold?: boolean
   /** 公式整体加下划线 */
   underline?: boolean
+  /** 公式颜色，十六进制，不含 # */
+  color?: string
 }
 
 export interface ImageInline {

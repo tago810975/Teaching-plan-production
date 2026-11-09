@@ -245,11 +245,11 @@ function renderRuns(
             {...(onEditMath !== undefined && run.ref !== undefined ? { onEdit: () => onEditMath(run) } : {})}
           />
         )
-        // 公式整体加粗、加下划线
-        if (run.bold !== true && run.underline !== true) return view
+        // 公式整体加粗、加下划线、设颜色
+        if (run.bold !== true && run.underline !== true && run.color === undefined) return view
         const cls = [run.bold === true ? 'math-bold' : '', run.underline === true ? 'math-underline' : ''].filter(Boolean).join(' ')
         return (
-          <span key={i} className={cls}>
+          <span key={i} className={cls} {...(run.color !== undefined ? { style: { color: `#${run.color}` } } : {})}>
             {view}
           </span>
         )

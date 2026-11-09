@@ -51,6 +51,19 @@
     "blankChars": 8,
     "pageBreakBefore": true
   },
+  "textColors": [
+    {
+      "label": "红",
+      "color": "C00000"
+    },
+    {
+      "label": "黑"
+    },
+    {
+      "label": "蓝",
+      "color": "2F5597"
+    }
+  ],
   "import": {
     "renameLabels": {
       "【详解】": "【解析】"

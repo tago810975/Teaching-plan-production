@@ -48,8 +48,10 @@ function paragraphText(p: RichParagraph, objects: Map<number, Inline>): string {
         break
       }
       case 'math':
-        if (inline.latex !== undefined && inline.display !== true) out += `$${inline.latex}$`
-        else out += `⟦公式${add(inline)}⟧`
+        // 带格式（加粗、下划线、颜色）的公式写成标记，否则改文字时 $…$ 重新解析会丢掉格式
+        if (inline.latex !== undefined && inline.display !== true && inline.bold !== true && inline.underline !== true && inline.color === undefined) {
+          out += `$${inline.latex}$`
+        } else out += `⟦公式${add(inline)}⟧`
         break
       case 'image':
         out += `⟦图${add(inline)}⟧`
@@ -147,9 +149,12 @@ function findClosingDollar(s: string, from: number): number {
   return -1
 }
 
-// ---------------- 格式工具：加粗、倾斜、下划线 ----------------
+// ---------------- 格式工具：加粗、倾斜、下划线、颜色 ----------------
 
 export type MarkKind = 'bold' | 'italic' | 'underline'
+
+/** 格式操作：切换加粗/倾斜/下划线，或设定颜色（color 为 undefined 表示恢复黑色） */
+export type FormatOp = { mark: MarkKind } | { color: string | undefined }
 
 export interface MarkEdit {
   text: string
@@ -158,15 +163,26 @@ export interface MarkEdit {
   end: number
 }
 
+/** 切换加粗、倾斜或下划线（像 Word 的 Ctrl+B）。规则见 applyFormat */
+export function toggleMark(text: string, objects: Map<number, Inline>, start: number, end: number, mark: MarkKind): MarkEdit | null {
+  return applyFormat(text, objects, start, end, { mark })
+}
+
+/** 设定文字颜色；color 为 undefined 时恢复黑色（去掉颜色） */
+export function setTextColor(text: string, objects: Map<number, Inline>, start: number, end: number, color: string | undefined): MarkEdit | null {
+  return applyFormat(text, objects, start, end, { color: color?.toUpperCase() })
+}
+
 /**
- * 在可编辑文本中给选中范围切换格式（像 Word 的 Ctrl+B）：
+ * 在可编辑文本中给选中范围改格式：
  * - 普通文字包成格式标记，如 ⟦加粗3:文字⟧；新写的 $公式$ 变成公式标记；
  * - 已有的格式标记、公式标记在原有格式上增减（选区只碰到标记的一部分时按整个标记处理）；
- * - 选中的内容都已有该格式时取消，否则加上；
- * - 公式只支持加粗、下划线（倾斜对公式不起作用）；图片、填空不受影响。
- * 新的标记编号登记在 objects 中（会修改传入的 Map）。没有可改的内容时返回 null。
+ * - 加粗/倾斜/下划线：选中的内容都已有该格式时取消，否则加上；颜色：一律设为所选颜色；
+ * - 公式可加粗、加下划线、设颜色（倾斜对公式不起作用）；图片、填空不受影响。
+ * 改完后整个文本的标记按出现顺序重新编号为 1、2、3……，objects 只保留用到的（会修改传入的 Map）。
+ * 没有可改的内容时返回 null。
  */
-export function toggleMark(text: string, objects: Map<number, Inline>, start: number, end: number, mark: MarkKind): MarkEdit | null {
+export function applyFormat(text: string, objects: Map<number, Inline>, start: number, end: number, op: FormatOp): MarkEdit | null {
   // 选区扩展到完整的标记
   for (const m of text.matchAll(TOKEN)) {
     const s = m.index
@@ -190,36 +206,48 @@ export function toggleMark(text: string, objects: Map<number, Inline>, start: nu
   }
   if (last < range.length) pieces.push({ plain: range.slice(last) })
 
-  // 当前状态：所有可改的内容都已有该格式？
-  const states: boolean[] = []
-  for (const p of pieces) {
-    if (p.plain !== undefined) {
-      if (p.plain.trim() !== '') states.push(false)
-      continue
+  const isMark = 'mark' in op
+  const mathOk = !isMark || op.mark !== 'italic'
+  // 加粗等：所有可改的内容都已有该格式时取消，否则加上
+  let on = true
+  if (isMark) {
+    const states: boolean[] = []
+    for (const p of pieces) {
+      if (p.plain !== undefined) {
+        if (p.plain.trim() !== '') states.push(false)
+        continue
+      }
+      const obj = objects.get(Number(p.token![2] ?? p.token![4]))
+      if (obj?.type === 'text' && p.token![5] !== undefined) states.push(obj.marks?.[op.mark] === true)
+      else if (obj?.type === 'math' && mathOk) states.push(obj[op.mark as 'bold' | 'underline'] === true)
     }
-    const obj = objects.get(Number(p.token![2] ?? p.token![4]))
-    if (obj?.type === 'text' && p.token![5] !== undefined) states.push(obj.marks?.[mark] === true)
-    else if (obj?.type === 'math' && mark !== 'italic') states.push(obj[mark] === true)
+    if (states.length === 0) return null
+    on = !states.every(Boolean)
   }
-  if (states.length === 0) return null
-  const on = !states.every(Boolean)
+
+  /** 改一组格式（TextMarks 或公式本身） */
+  const change = <T extends object>(o: T): T => {
+    const copy = { ...o } as Record<string, unknown>
+    if (isMark) {
+      if (on) copy[op.mark] = true
+      else delete copy[op.mark]
+    } else if (op.color !== undefined) copy.color = op.color
+    else delete copy.color
+    return copy as T
+  }
 
   let next = Math.max(0, ...objects.keys()) + 1
   const register = (inline: Inline): number => {
     objects.set(next, inline)
     return next++
   }
-  const setMark = <T extends object>(o: T, value: boolean): T => {
-    const copy = { ...o } as Record<string, unknown>
-    if (value) copy[mark] = true
-    else delete copy[mark]
-    return copy as T
-  }
 
+  let changed = false
   let out = ''
   for (const p of pieces) {
     if (p.plain !== undefined) {
-      if (!on) {
+      // 普通文字：取消格式、恢复黑色时不用改
+      if ((isMark && !on) || (!isMark && op.color === undefined)) {
         out += p.plain
         continue
       }
@@ -232,13 +260,15 @@ export function toggleMark(text: string, objects: Map<number, Inline>, start: nu
           return inlines
             .map((i) => {
               if (i.type === 'text') {
-                if (i.text.trim() === '') return i.text
-                const marks = { [mark]: true } as TextMarks
+                if (i.text.trim() === '') return i.text.replace(/\$/g, '\\$')
+                changed = true
+                const marks = change({} as TextMarks)
                 return formatToken(register({ type: 'text', text: i.text, marks }), marks, i.text)
               }
               if (i.type === 'math') {
-                if (mark === 'italic') return `$${i.latex ?? ''}$`
-                return `⟦公式${register(setMark(i, true))}⟧`
+                if (!mathOk) return `$${i.latex ?? ''}$`
+                changed = true
+                return `⟦公式${register(change(i))}⟧`
               }
               return ''
             })
@@ -250,13 +280,56 @@ export function toggleMark(text: string, objects: Map<number, Inline>, start: nu
     const m = p.token!
     const obj = objects.get(Number(m[2] ?? m[4]))
     if (obj?.type === 'text' && m[5] !== undefined) {
-      const marks = setMark(obj.marks ?? {}, on)
+      const marks = change(obj.marks ?? {})
+      changed = true
       out += Object.keys(marks).length === 0 ? m[5] : formatToken(register({ type: 'text', text: m[5], marks }), marks, m[5])
-    } else if (obj?.type === 'math' && mark !== 'italic') {
-      out += `⟦公式${register(setMark(obj, on))}⟧`
+    } else if (obj?.type === 'math' && mathOk) {
+      changed = true
+      out += `⟦公式${register(change(obj))}⟧`
     } else {
       out += m[0]
     }
   }
-  return { text: text.slice(0, start) + out + text.slice(end), start, end: start + out.length }
+  if (!changed) return null
+
+  // 重新编号：按出现顺序 1、2、3……（选区边界不会落在标记中间，可分三段处理）
+  const renumber = compactor(objects, text.slice(0, start) + out + text.slice(end))
+  const before = renumber(text.slice(0, start))
+  const middle = renumber(out)
+  const after = renumber(text.slice(end))
+  renumber.commit()
+  return { text: before + middle + after, start: before.length, end: before.length + middle.length }
+}
+
+/**
+ * 标记重新编号。依次调用返回的函数改写各段文字，最后 commit() 把 objects 换成新编号。
+ * 无效的编号（如从别处粘贴来的）原样保留，新编号会避开它们。
+ */
+function compactor(objects: Map<number, Inline>, whole: string): ((s: string) => string) & { commit(): void } {
+  const invalid = new Set<number>()
+  for (const m of whole.matchAll(TOKEN)) {
+    const n = Number(m[2] ?? m[4])
+    if (!objects.has(n)) invalid.add(n)
+  }
+  const fresh = new Map<number, Inline>()
+  let n = 0
+  const take = (): number => {
+    do n += 1
+    while (invalid.has(n))
+    return n
+  }
+  const fn = ((s: string) =>
+    s.replace(TOKEN, (whole, a: string | undefined, an: string | undefined, b: string | undefined, bn: string | undefined, inner: string | undefined) => {
+      const old = Number(an ?? bn)
+      const obj = objects.get(old)
+      if (obj === undefined) return whole
+      const k = take()
+      fresh.set(k, obj)
+      return a !== undefined ? `⟦${a}${k}⟧` : `⟦${b}${k}:${inner}⟧`
+    })) as ((s: string) => string) & { commit(): void }
+  fn.commit = () => {
+    objects.clear()
+    for (const [k, v] of fresh) objects.set(k, v)
+  }
+  return fn
 }

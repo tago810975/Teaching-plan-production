@@ -98,7 +98,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   return (
     <aside className="panel inspector" aria-label="属性">
       <h2 className="panel-title">{BLOCK_NAMES[block.type]}</h2>
-      <FormatToolbar active={format.active} onApply={format.apply} />
+      <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} />
       {/* key 保证切换选中项时各输入框重新初始化 */}
       <FormatTargetProvider value={format.provider}>
       <div key={`${block.id}:${revision}`} className="inspector-body">

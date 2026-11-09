@@ -113,3 +113,86 @@ describe('难度显示开关', () => {
     expect(prefix('none')).toBe('题')
   })
 })
+
+describe('格式工具：文字颜色', async () => {
+  const { setTextColor } = await import('@core/model/markup')
+  const color = (rich: RichText, sel: string, c: string | undefined): RichText => {
+    const e = toEditable(rich)
+    const objects = new Map(e.objects) as Map<number, Inline>
+    const i = e.text.indexOf(sel)
+    const r = setTextColor(e.text, objects, i, i + sel.length, c)!
+    return fromEditable(r.text, objects)
+  }
+
+  it('设为红色、蓝色，再恢复黑色；其他格式保留', () => {
+    const rich: RichText = [{ inlines: [{ type: 'text', text: '洛伦兹力' }, { type: 'text', text: '不做功', marks: { bold: true } }] }]
+    const red = color(rich, '洛伦兹力', 'c00000')
+    expect(red[0]!.inlines[0]).toEqual({ type: 'text', text: '洛伦兹力', marks: { color: 'C00000' } })
+    const blue = color(red, '不做功', '2F5597')
+    expect(blue[0]!.inlines[1]).toEqual({ type: 'text', text: '不做功', marks: { bold: true, color: '2F5597' } })
+    const black = color(blue, '不做功', undefined)
+    expect(black[0]!.inlines[1]).toEqual({ type: 'text', text: '不做功', marks: { bold: true } })
+    expect(color(black, '洛伦兹力', undefined)).toEqual(rich)
+  })
+
+  it('公式也可设颜色', () => {
+    const rich: RichText = [{ inlines: [{ type: 'math', latex: 'F=qvB' }] }]
+    const red = color(rich, '$F=qvB$', 'C00000')
+    expect(red[0]!.inlines[0]).toEqual({ type: 'math', latex: 'F=qvB', color: 'C00000' })
+    // 带颜色的公式在输入框中是标记，改文字时颜色不会丢
+    expect(toEditable(red).text).toBe('⟦公式1⟧')
+    expect(color(red, '⟦公式1⟧', undefined)).toEqual(rich)
+  })
+
+  it('普通文字恢复黑色：没有可改的内容', () => {
+    expect(setTextColor('文字', new Map(), 0, 2, undefined)).toBeNull()
+  })
+
+  it('导出：公式颜色写入 w:color', () => {
+    expect(applyMathMarks('<m:r><m:t>x</m:t></m:r>', { color: '2F5597' })).toBe('<m:r><w:rPr><w:color w:val="2F5597"/></w:rPr><m:t>x</m:t></m:r>')
+  })
+})
+
+describe('标记重新编号：反复加粗、取消不会让编号一直增长', () => {
+  const M = (n: string): Inline => ({ type: 'math', omml: `<m:oMath><m:r><m:t>${n}</m:t></m:r></m:oMath>` })
+  it('编号按出现顺序 1、2、3……，用不到的对象被清掉', () => {
+    const rich: RichText = [{ inlines: [M('a'), { type: 'text', text: '甲乙' }, M('b')] }]
+    const e = toEditable(rich)
+    const objects = new Map(e.objects) as Map<number, Inline>
+    let text = e.text
+    for (let k = 0; k < 10; k++) {
+      const i = text.indexOf('甲乙') - (text.includes('⟦加粗') ? '⟦加粗2:'.length : 0)
+      const j = text.indexOf('⟧', text.indexOf('甲乙')) + 1
+      const r = toggleMark(text, objects, k % 2 === 0 ? text.indexOf('甲乙') : i, k % 2 === 0 ? text.indexOf('甲乙') + 2 : j, 'bold')!
+      text = r.text
+    }
+    // 加粗、取消各 5 次后回到原样，编号仍是 1、2
+    expect(text).toBe('⟦公式1⟧甲乙⟦公式2⟧')
+    expect([...objects.keys()]).toEqual([1, 2])
+    expect(fromEditable(text, objects)).toEqual(rich)
+  })
+
+  it('加粗后的编号也按顺序；选区随之调整', () => {
+    const rich: RichText = [{ inlines: [M('a'), { type: 'text', text: '甲乙' }, M('b')] }]
+    const e = toEditable(rich)
+    const objects = new Map(e.objects) as Map<number, Inline>
+    const i = e.text.indexOf('甲乙')
+    const r = toggleMark(e.text, objects, i, i + 2, 'bold')!
+    expect(r.text).toBe('⟦公式1⟧⟦加粗2:甲乙⟧⟦公式3⟧')
+    expect(r.text.slice(r.start, r.end)).toBe('⟦加粗2:甲乙⟧')
+    expect([...objects.keys()]).toEqual([1, 2, 3])
+  })
+
+  it('无效编号（如从别处粘贴来的标记）原样保留，新编号避开它', () => {
+    const objects = new Map<number, Inline>([[1, M('a')]])
+    const t = '⟦公式1⟧⟦公式1⟧甲'
+    const r = toggleMark(t, objects, t.indexOf('甲'), t.length, 'bold')
+    // 两个 ⟦公式1⟧ 都有效，指向同一对象：分别编为 1、2
+    expect(r!.text).toBe('⟦公式1⟧⟦公式2⟧⟦加粗3:甲⟧')
+    const objects2 = new Map<number, Inline>([[5, M('a')]])
+    const t2 = '⟦公式1⟧⟦公式5⟧甲'
+    const r2 = toggleMark(t2, objects2, t2.indexOf('甲'), t2.length, 'bold')!
+    expect(r2.text).toBe('⟦公式1⟧⟦公式2⟧⟦加粗3:甲⟧')
+    expect(objects2.has(1)).toBe(false)
+  })
+})

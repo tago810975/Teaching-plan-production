@@ -37,6 +37,8 @@ const presetSchema = z.object({
     blankChars: z.number().min(1),
     pageBreakBefore: z.boolean()
   }),
+  /** 格式工具中的文字颜色；不设 color 的一项表示黑色（去掉颜色） */
+  textColors: z.array(z.object({ label: z.string().min(1), color: z.string().regex(/^[0-9A-Fa-f]{6}$/).optional() })),
   import: z.object({
     /** 导入时把这些标签改写，如【详解】→【解析】 */
     renameLabels: z.record(z.string(), z.string()),

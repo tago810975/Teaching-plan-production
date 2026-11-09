@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 8
+export const CURRENT_FORMAT_VERSION = 9
 
 /*
  * 版本记录：
@@ -33,6 +33,7 @@ export const CURRENT_FORMAT_VERSION = 8
  * 7 —— 格式预设 project.presetId；作业单块（worksheet）；题目星级难度 stars。旧工程迁移为物理教案 V1.0
  * 8 —— 难度显示开关 project.layout.difficultyDisplay；公式可加粗、加下划线（math.bold / math.underline）；
  *      选项列位置的默认值加宽：工程的列位置仍是旧默认值或模板原值（未改过）时换成新的默认值
+ * 9 —— 公式颜色 math.color（只增加可选字段，无需迁移）
  */
 
 export interface Manifest {
