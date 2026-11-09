@@ -19,7 +19,7 @@ export function buildAppMenu(send: (command: MenuCommand) => void): Menu {
       { type: 'separator' },
       { label: '导出 Word…', accelerator: 'CmdOrCtrl+E', click: () => send('export-word') },
       { type: 'separator' },
-      { label: '关闭教学案，返回首页', accelerator: 'CmdOrCtrl+W', click: () => send('close') },
+      { label: '关闭当前标签页', accelerator: 'CmdOrCtrl+W', click: () => send('close') },
       ...(isMac ? [] : [{ type: 'separator' } as const, { label: '退出', role: 'quit' } as const])
     ]
   }

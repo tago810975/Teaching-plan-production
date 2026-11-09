@@ -48,6 +48,7 @@ const api: RendererApi = {
   getStartupFile: () => ipcRenderer.invoke(IPC.getStartupFile),
   setWindowState: (state) => ipcRenderer.send(IPC.setWindowState, state),
   confirmClose: () => ipcRenderer.send(IPC.confirmClose),
+  askSaveChanges: (title) => ipcRenderer.invoke(IPC.askSaveChanges, title),
   onMenuCommand: (handler) => subscribe<[MenuCommand]>(IPC.menuCommand, handler),
   onSaveBeforeClose: (handler) => subscribe<[]>(IPC.saveBeforeClose, handler),
   onOpenFileRequest: (handler) => subscribe<[string]>(IPC.openFileRequest, handler)

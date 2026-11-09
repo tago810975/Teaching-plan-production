@@ -12,6 +12,8 @@ import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
 import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
+  /** 已在标签页中打开的文件：不能在首页重命名或删除（先关闭标签页） */
+  openPaths: string[]
   onOpen: (filePath: string) => void
   onOpenOther: () => void
   onNew: () => void
@@ -20,7 +22,7 @@ interface Props {
   onCreateFromDocx: (filePath?: string) => void
 }
 
-export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFromDocx }: Props) {
+export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, onCreateFromDocx }: Props) {
   const [view, setView] = useState<HomeView>({ kind: 'recent' })
   const [listing, setListing] = useState<LibraryListing | null>(null)
   const [folder, setFolder] = useState<FolderListing | null>(null)
@@ -81,6 +83,7 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
     return all.filter((i) => q === '' || i.name.toLowerCase().includes(q) || i.fileName.toLowerCase().includes(q))
   }, [view, listing, folder, query])
 
+  const isOpen = (item: FileItem): boolean => openPaths.some((p) => samePath(p, item.path))
   const actions: FileActions = {
     open: (item) => {
       if (item.kind === 'folder') go({ kind: 'folder', path: item.path })
@@ -94,6 +97,11 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
     },
     createFromDocx: (item) => onCreateFromDocx(item.path),
     rename: async (item, newStem) => {
+      if (isOpen(item)) {
+        const msg = `“${item.name}”正在上方的标签页中编辑，请先关闭它再重命名。`
+        setError(msg)
+        return msg
+      }
       const r = await window.api.renameFile(item.path, newStem)
       if (!r.ok) {
         setError(r.error)
@@ -103,6 +111,10 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
       return null
     },
     remove: async (item) => {
+      if (isOpen(item)) {
+        setError(`“${item.name}”正在上方的标签页中编辑，请先关闭它再删除。`)
+        return
+      }
       const what = item.kind === 'project' ? '教学案' : 'Word 文档'
       if (!window.confirm(`把${what}“${item.name}”移到回收站？\n\n${item.path}\n\n需要时可以从回收站还原。`)) return
       const r = await window.api.trashFile(item.path)

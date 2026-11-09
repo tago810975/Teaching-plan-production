@@ -24,12 +24,18 @@ import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
 import { findBlock, HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
-import type { ProjectFileActions } from './state/useProjectFile'
+
+/** 编辑器用到的文件操作（作用于本标签页） */
+export interface EditorFiles {
+  save(saveAs?: boolean): Promise<boolean>
+  /** 回到首页（不关闭本标签页） */
+  goHome(): void
+}
 
 interface Props {
   state: EditorState
   dispatch: Dispatch<EditorAction>
-  files: ProjectFileActions
+  files: EditorFiles
   error: string | null
   onDismissError: () => void
   importReport: ImportReport | null
@@ -218,7 +224,7 @@ function EditorBody({
     <div className="app">
       <header className="toolbar">
         <div className="toolbar-doc">
-          <button type="button" className="toolbar-home" onClick={files.closeProject} title="返回首页（Ctrl+W）">
+          <button type="button" className="toolbar-home" onClick={files.goHome} title="回到首页（教学案保持打开，可在上方标签页中切换回来）">
             ‹ 首页
           </button>
           <input

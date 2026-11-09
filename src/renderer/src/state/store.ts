@@ -88,6 +88,8 @@ export type EditorAction =
   /** 关闭当前教学案，回到首页 */
   | { type: 'close' }
   | { type: 'saved'; filePath: string }
+  /** 保存期间又有了新的修改：只记下新的文件路径，仍为“未保存” */
+  | { type: 'set-file-path'; filePath: string }
   | { type: 'set-variant'; variant: Variant }
   | { type: 'select'; blockId: string | null; focus?: Omit<FocusRequest, 'blockId' | 'nonce'> }
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
@@ -217,6 +219,8 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       return { ...initEditorState(createEmptyBundle()), variant: state.variant, linkOptionImages: state.linkOptionImages }
     case 'saved':
       return { ...state, filePath: action.filePath, dirty: false, savedProject: state.bundle.project }
+    case 'set-file-path':
+      return { ...state, filePath: action.filePath }
     case 'set-variant':
       return { ...state, variant: action.variant }
     case 'select':

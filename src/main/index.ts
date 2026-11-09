@@ -47,6 +47,8 @@ let mainWindow: BrowserWindow | null = null
 /** 启动时或窗口创建前收到的待打开文件 */
 let pendingFile: string | null = findProjectArg(process.argv)
 let windowDirty = false
+/** 未保存的教学案名称（所有标签页） */
+let dirtyTitles: string[] = []
 let closeConfirmed = false
 
 // ---------- 单实例：再次双击 .tplan 文件时交给已打开的窗口 ----------
@@ -122,14 +124,15 @@ function createWindow(): void {
   win.on('close', (event) => {
     if (!windowDirty || closeConfirmed) return
     event.preventDefault()
+    const many = dirtyTitles.length > 1
     const response = dialog.showMessageBoxSync(win, {
       type: 'question',
-      buttons: ['保存', '不保存', '取消'],
+      buttons: [many ? '全部保存' : '保存', '不保存', '取消'],
       defaultId: 0,
       cancelId: 2,
       noLink: true,
-      message: '是否保存对当前教学案的修改？',
-      detail: '如果不保存，所做的修改将会丢失。'
+      message: many ? `有 ${dirtyTitles.length} 个教学案未保存，是否保存？` : `是否保存对“${dirtyTitles[0] ?? '当前教学案'}”的修改？`,
+      detail: `${many ? dirtyTitles.map((t) => `· ${t}`).join('\n') + '\n\n' : ''}如果不保存，所做的修改将会丢失。`
     })
     if (response === 0) {
       win.webContents.send(IPC.saveBeforeClose)
@@ -363,12 +366,30 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.on(IPC.setWindowState, (event, state: { title: string; dirty: boolean }) => {
+  ipcMain.on(IPC.setWindowState, (event, state: { title: string; dirty: boolean; dirtyTitles: string[] }) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win === null) return
-    windowDirty = state.dirty
+    // 窗口关闭时要检查所有标签页；标题栏只显示当前标签页的“未保存”标记
+    dirtyTitles = state.dirtyTitles
+    windowDirty = dirtyTitles.length > 0
     win.setTitle(`${state.dirty ? '● ' : ''}${state.title} - ${APP_DISPLAY_NAME}`)
     if (process.platform === 'darwin') win.setDocumentEdited(state.dirty)
+  })
+
+  // 关闭某个有未保存修改的标签页时询问
+  ipcMain.handle(IPC.askSaveChanges, async (event, title: string): Promise<'save' | 'discard' | 'cancel'> => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      type: 'question' as const,
+      buttons: ['保存', '不保存', '取消'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+      message: `是否保存对“${title}”的修改？`,
+      detail: '如果不保存，所做的修改将会丢失。'
+    }
+    const { response } = win !== null ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+    return response === 0 ? 'save' : response === 1 ? 'discard' : 'cancel'
   })
 
   ipcMain.on(IPC.confirmClose, (event) => {

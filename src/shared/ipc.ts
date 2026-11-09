@@ -40,6 +40,7 @@ export const IPC = {
   openPath: 'shell:open-path',
   setWindowState: 'window:set-state',
   confirmClose: 'window:confirm-close',
+  askSaveChanges: 'window:ask-save-changes',
   /** 主进程 → 渲染进程：菜单命令 */
   menuCommand: 'menu:command',
   /** 主进程 → 渲染进程：用户在有未保存修改时关闭窗口，并选择了“保存” */
@@ -198,7 +199,10 @@ export interface RendererApi {
   saveProject(request: SaveRequest): Promise<Result<string | null>>
   /** 启动时通过命令行（如双击 .tplan 文件）传入的工程路径 */
   getStartupFile(): Promise<string | null>
-  setWindowState(state: { title: string; dirty: boolean }): void
+  /** title / dirty：当前标签页（标题栏）；dirtyTitles：所有未保存的教学案（关闭窗口时提示） */
+  setWindowState(state: { title: string; dirty: boolean; dirtyTitles: string[] }): void
+  /** 关闭有未保存修改的标签页时询问：保存、不保存、取消 */
+  askSaveChanges(title: string): Promise<'save' | 'discard' | 'cancel'>
   /** 渲染进程确认可以关闭窗口（已保存或用户放弃修改） */
   confirmClose(): void
   onMenuCommand(handler: (command: MenuCommand) => void): () => void
