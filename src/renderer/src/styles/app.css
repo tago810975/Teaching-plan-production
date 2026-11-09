@@ -1953,3 +1953,21 @@ body.is-dragging-outline * {
   border: 1px solid var(--rule);
   border-radius: 5px;
 }
+
+.table-editor-widths {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.table-editor-widths input {
+  width: 4.6em;
+}
+.table-editor-total {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.table-editor-total.is-over {
+  color: var(--red-pen);
+}

@@ -2,26 +2,29 @@
  * 表格编辑器：每个单元格一个输入框（可写 $公式$；⟦⟧ 为公式、图片或带格式文字）。
  *
  * - 格式：加粗、倾斜、下划线、重点、颜色（工具条或 Ctrl+B / I / U），表格中的重点在学生版中同样挖空；
- * - 结构：上下插入行、左右插入列、删除所在行列；按住 Shift 点另一个单元格选中矩形范围后合并，
- *   光标在合并单元格中时可拆分（有合并单元格时先拆分才能增删行列）；
+ * - 结构：上下插入行、左右插入列、删除所在行列（穿过合并单元格时把它拉长或缩短）；
+ *   按住 Shift 点另一个单元格选中矩形范围后合并，光标在合并单元格中时可拆分；
+ * - 列宽：以厘米设置，可平均分布或恢复为平分版心；
  * - 撤销：编辑器内 Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），同一单元格中连续输入合为一步。
  *   点“确定”后整个修改在教学案中也是一步，可以再撤销。
  */
 import { useContext, useEffect, useRef, useState } from 'react'
 import { fromEditable, toEditable } from '@core/model/markup'
 import {
+  columnWidths,
   deleteColumn,
   deleteRow,
   expandRect,
-  hasMerges,
   insertColumn,
   insertRow,
   layoutTable,
   mergeCells,
   normalizeTable,
+  setColumnWidths,
   splitCell,
   type CellRect
 } from '@core/model/table'
+import { A4_PAGE, contentWidthTwip } from '@core/document/units'
 import type { Inline, TableInline } from '@core/model/types'
 import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { PresetContext } from './preset-context'
@@ -108,9 +111,9 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
     setTick((t) => t + 1)
   }
   /** 改结构：先写回内容，再按新结构重建 */
-  const reshape = (fn: (t: TableInline) => TableInline, next?: { row: number; index: number }): void => {
+  const reshape = (fn: (t: TableInline) => TableInline, next?: { row: number; index: number }, key: string | null = null): void => {
     const shape = fn(toTable(state))
-    commit({ shape, cells: toDraft(shape) })
+    commit({ shape, cells: toDraft(shape) }, key)
     setSel(null)
     if (next !== undefined) setFocus(next)
     pendingFocus.current = true
@@ -119,7 +122,11 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
   const grid = layoutTable(state.shape.rows)
   const focused = grid.placed[focus.row]?.[focus.index]
   const col = focused?.col ?? 0
-  const merged = hasMerges(state.shape)
+  // 列宽（厘米）：当前实际列宽，总宽超出版心时导出按比例缩小
+  const effective = columnWidths(state.shape, CONTENT_TWIP)
+  // 设过列宽时为原值（可能超出版心），否则为平分版心的宽度
+  const widths = state.shape.colWidthsTwip !== undefined && state.shape.colWidthsTwip.length === grid.cols ? state.shape.colWidthsTwip.slice() : effective
+  const totalCm = cm(widths.reduce((a, b) => a + b, 0))
   const rect = sel !== null ? expandRect(grid, sel) : null
   const rectCells = rect === null ? 0 : new Set(grid.owner.slice(rect.r0, rect.r1 + 1).flatMap((row) => row.slice(rect.c0, rect.c1 + 1))).size
   const inRect = (p: { row: number; col: number; rowSpan: number; colSpan: number }): boolean =>
@@ -172,22 +179,22 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
         <span className="table-editor-size">
           {grid.rows} 行 × {grid.cols} 列
         </span>
-        <button type="button" disabled={merged} onClick={() => reshape((t) => insertRow(t, focus.row), { row: focus.row + 1, index: focus.index })}>
+        <button type="button" onClick={() => reshape((t) => insertRow(t, focus.row), { row: focus.row + 1, index: focus.index })}>
           上方插入行
         </button>
-        <button type="button" disabled={merged} onClick={() => reshape((t) => insertRow(t, focus.row + 1), { row: focus.row + 1, index: focus.index })}>
+        <button type="button" onClick={() => reshape((t) => insertRow(t, focus.row + 1), { row: focus.row + 1, index: focus.index })}>
           下方插入行
         </button>
-        <button type="button" disabled={merged} onClick={() => reshape((t) => insertColumn(t, col), { row: focus.row, index: focus.index + 1 })}>
+        <button type="button" onClick={() => reshape((t) => insertColumn(t, col), { row: focus.row, index: focus.index + 1 })}>
           左侧插入列
         </button>
-        <button type="button" disabled={merged} onClick={() => reshape((t) => insertColumn(t, col + 1), { row: focus.row, index: focus.index + 1 })}>
+        <button type="button" onClick={() => reshape((t) => insertColumn(t, col + 1), { row: focus.row, index: focus.index + 1 })}>
           右侧插入列
         </button>
-        <button type="button" disabled={merged || grid.rows <= 1} onClick={() => reshape((t) => deleteRow(t, focus.row), { row: Math.max(0, focus.row - 1), index: focus.index })}>
+        <button type="button" disabled={grid.rows <= 1} onClick={() => reshape((t) => deleteRow(t, focus.row), { row: Math.max(0, focus.row - 1), index: focus.index })}>
           删除所在行
         </button>
-        <button type="button" disabled={merged || grid.cols <= 1} onClick={() => reshape((t) => deleteColumn(t, col), { row: focus.row, index: Math.max(0, focus.index - 1) })}>
+        <button type="button" disabled={grid.cols <= 1} onClick={() => reshape((t) => deleteColumn(t, col), { row: focus.row, index: Math.max(0, focus.index - 1) })}>
           删除所在列
         </button>
         <button
@@ -213,12 +220,42 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
         </button>
       </div>
       <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={preset.keyPoint} />
+      <div className="table-editor-widths" role="group" aria-label="列宽">
+        <span className="table-editor-size">列宽（厘米）</span>
+        {widths.map((w, i) => (
+          <WidthInput
+            key={`${grid.cols}-${i}`}
+            label={`第 ${i + 1} 列的宽度（厘米）`}
+            cm={cm(w)}
+            onCommit={(v) => {
+              const next = widths.slice()
+              next[i] = Math.round(v * TWIP_PER_CM)
+              reshape((t) => setColumnWidths(t, next), undefined, `width:${i}`)
+            }}
+          />
+        ))}
+        <button type="button" onClick={() => reshape((t) => setColumnWidths(t, Array.from({ length: grid.cols }, () => Math.floor(CONTENT_TWIP / grid.cols))))}>
+          平均分布
+        </button>
+        <button type="button" disabled={state.shape.colWidthsTwip === undefined} onClick={() => reshape((t) => setColumnWidths(t, undefined))} title="不设列宽：平分版心宽度">
+          自动
+        </button>
+        <span className={totalCm > cm(CONTENT_TWIP) + 0.01 ? 'table-editor-total is-over' : 'table-editor-total'}>
+          共 {totalCm} / {cm(CONTENT_TWIP)} 厘米
+          {totalCm > cm(CONTENT_TWIP) + 0.01 ? '（超出版心，导出时按比例缩小）' : ''}
+        </span>
+      </div>
       <p className="field-hint">
-        按住 Shift 点另一个单元格可选中一片范围（用于合并）。{merged ? '有合并单元格时，先拆分才能增删行列。' : ''}
+        按住 Shift 点另一个单元格可选中一片范围（用于合并）。
       </p>
       <FormatTargetProvider value={format.provider}>
         <div className="table-editor-grid">
           <table>
+            <colgroup>
+              {effective.map((w, i) => (
+                <col key={i} style={{ width: `${(w / effective.reduce((a, b) => a + b, 0)) * 100}%` }} />
+              ))}
+            </colgroup>
             <tbody>
               {grid.placed.map((row, r) => (
                 <tr key={r}>
@@ -271,6 +308,31 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
         </button>
       </div>
     </dialog>
+  )
+}
+
+const TWIP_PER_CM = 567
+const CONTENT_TWIP = contentWidthTwip(A4_PAGE)
+const cm = (twip: number): number => Math.round((twip / TWIP_PER_CM) * 100) / 100
+
+/** 列宽输入框：输入过程中允许暂时无效的数字，有效时立即生效，离开时恢复为实际值 */
+function WidthInput({ cm: value, label, onCommit }: { cm: number; label: string; onCommit: (cm: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <input
+      type="number"
+      step={0.1}
+      min={0.5}
+      max={30}
+      aria-label={label}
+      value={draft ?? value}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        const v = Number(e.target.value)
+        if (e.target.value !== '' && Number.isFinite(v) && v >= 0.5 && v <= 30) onCommit(v)
+      }}
+      onBlur={() => setDraft(null)}
+    />
   )
 }
 

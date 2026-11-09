@@ -245,3 +245,58 @@ describe('导入表格时整理单元格中的字体', () => {
     expect(all).not.toContain('"font":"song"')
   })
 })
+
+describe('有合并单元格时增删行列', async () => {
+  const { mergeCells, setColumnWidths } = await import('@core/model/table')
+  const filled = (rows: number, cols: number): TableInline => ({
+    type: 'table',
+    colWidthsTwip: Array.from({ length: cols }, (_, i) => 1000 + i * 100),
+    rows: Array.from({ length: rows }, (_, r) => ({ cells: Array.from({ length: cols }, (_, c) => cell(`${r}${c}`)) }))
+  })
+  const text = (t: TableInline): string[][] =>
+    t.rows.map((r) => r.cells.map((c) => c.content.map((p) => p.inlines.map((i) => (i.type === 'text' ? i.text : '')).join('')).join('/') + (c.colSpan ? `c${c.colSpan}` : '') + (c.rowSpan ? `r${c.rowSpan}` : '')))
+  // 第 2 列（c=1）的前两行合并成跨两行；第 3 行的后两列合并成跨两列
+  const base = (): TableInline => mergeCells(mergeCells(filled(3, 3), { r0: 0, c0: 1, r1: 1, c1: 1 }), { r0: 2, c0: 1, r1: 2, c1: 2 })
+
+  it('基础表格', () => {
+    expect(text(base())).toEqual([['00', '01/11r2', '02'], ['10', '12'], ['20', '21/22c2']])
+  })
+
+  it('插入行：穿过跨行单元格时把它拉长；在表格边缘插入时补满格子', () => {
+    expect(text(insertRow(base(), 1))).toEqual([['00', '01/11r3', '02'], ['', ''], ['10', '12'], ['20', '21/22c2']])
+    expect(text(insertRow(base(), 0))[0]).toEqual(['', '', ''])
+    expect(text(insertRow(base(), 3))[3]).toEqual(['', '', ''])
+  })
+
+  it('删除行：删去跨行单元格的起始行时，内容移到下一行；从上方跨过来的缩短', () => {
+    expect(text(deleteRow(base(), 0))).toEqual([['10', '01/11', '12'], ['20', '21/22c2']])
+    expect(text(deleteRow(base(), 1))).toEqual([['00', '01/11', '02'], ['20', '21/22c2']])
+  })
+
+  it('插入列：穿过跨列单元格时把它拉宽；新列取相邻列的宽度', () => {
+    const t = insertColumn(base(), 2)
+    expect(text(t)).toEqual([['00', '01/11r2', '', '02'], ['10', '', '12'], ['20', '21/22c3']])
+    expect(t.colWidthsTwip).toEqual([1000, 1100, 1100, 1200])
+    expect(layoutTable(t.rows).cols).toBe(4)
+  })
+
+  it('删除列：跨过这一列的合并单元格变窄；列宽随之减少', () => {
+    const t = deleteColumn(base(), 2)
+    expect(text(t)).toEqual([['00', '01/11r2'], ['10'], ['20', '21/22']])
+    expect(t.colWidthsTwip).toEqual([1000, 1100])
+    expect(text(deleteColumn(base(), 1))).toEqual([['00', '02'], ['10', '12'], ['20', '21/22']])
+  })
+
+  it('增删后网格仍然完整（每格都有单元格）', () => {
+    for (const t of [insertRow(base(), 1), deleteRow(base(), 0), insertColumn(base(), 1), deleteColumn(base(), 1)]) {
+      const g = layoutTable(t.rows)
+      expect(g.owner.every((row) => row.length === g.cols && row.every((o) => o !== undefined))).toBe(true)
+    }
+  })
+
+  it('设置列宽；不设时平分栏宽', () => {
+    const t = setColumnWidths(createTable(2, 3), [1000, 2000, 3000])
+    expect(t.colWidthsTwip).toEqual([1000, 2000, 3000])
+    expect(setColumnWidths(t, undefined).colWidthsTwip).toBeUndefined()
+  })
+})

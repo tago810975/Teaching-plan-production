@@ -2,7 +2,7 @@
  * 表格的网格计算：合并单元格按 HTML 的方式记录（起始单元格写 colSpan / rowSpan，被覆盖的位置不出现），
  * 导入、预览、导出、编辑都要知道每个单元格实际占哪些格子。
  */
-import type { RichParagraph, TableCell, TableInline } from './types'
+import type { RichParagraph, TableCell, TableInline, TableRow } from './types'
 
 /** 只需要合并信息的单元格（工程数据中的单元格、排版数据中的单元格都可以） */
 export interface SpanCell {
@@ -69,29 +69,110 @@ export function normalizeTable(t: TableInline): TableInline {
   return { ...t, rows: t.rows.map((r) => ({ cells: [...r.cells, ...Array.from({ length: cols - r.cells.length }, emptyCell)] })) }
 }
 
-/** 在第 at 行之前插入一行（没有合并单元格时） */
+/** 按网格坐标重建各行的单元格顺序（cells 按列从左到右） */
+function rebuild(rows: number, items: Array<{ cell: TableCell; row: number; col: number }>): TableRow[] {
+  const out: TableRow[] = Array.from({ length: rows }, () => ({ cells: [] }))
+  for (const it of items.slice().sort((a, b) => a.row - b.row || a.col - b.col)) out[it.row]?.cells.push(it.cell)
+  return out
+}
+
+const withSpans = (cell: TableCell, colSpan: number, rowSpan: number): TableCell => {
+  const { colSpan: _c, rowSpan: _r, ...rest } = cell
+  return { ...rest, ...(colSpan > 1 ? { colSpan } : {}), ...(rowSpan > 1 ? { rowSpan } : {}) }
+}
+
+/**
+ * 在第 at 行之前插入一行。插入位置穿过跨行的合并单元格时，把它拉长一行（新行在这几列不补单元格）。
+ */
 export function insertRow(t: TableInline, at: number): TableInline {
-  const cols = layoutTable(t.rows).cols
-  const rows = t.rows.slice()
-  rows.splice(at, 0, { cells: Array.from({ length: cols }, emptyCell) })
-  return { ...t, rows }
+  const g = layoutTable(t.rows)
+  at = Math.max(0, Math.min(at, g.rows))
+  const items: Array<{ cell: TableCell; row: number; col: number }> = []
+  const crossing = new Set<PlacedCell>()
+  for (const line of g.placed) {
+    for (const p of line) {
+      const crosses = p.row < at && p.row + p.rowSpan > at
+      if (crosses) crossing.add(p)
+      items.push({ cell: withSpans(p.cell, p.colSpan, p.rowSpan + (crosses ? 1 : 0)), row: p.row >= at ? p.row + 1 : p.row, col: p.col })
+    }
+  }
+  for (let c = 0; c < g.cols; c++) {
+    const above = at > 0 ? g.owner[at - 1]?.[c] : undefined
+    if (above !== undefined && crossing.has(above)) continue
+    items.push({ cell: emptyCell(), row: at, col: c })
+  }
+  return { ...t, rows: rebuild(g.rows + 1, items) }
 }
 
+/**
+ * 删除第 at 行。从上方跨过来的合并单元格缩短一行；从这一行开始的跨行单元格，内容移到下一行继续占位。
+ */
 export function deleteRow(t: TableInline, at: number): TableInline {
-  if (t.rows.length <= 1) return t
-  return { ...t, rows: t.rows.filter((_, i) => i !== at) }
+  const g = layoutTable(t.rows)
+  if (g.rows <= 1 || at < 0 || at >= g.rows) return t
+  const items: Array<{ cell: TableCell; row: number; col: number }> = []
+  for (const line of g.placed) {
+    for (const p of line) {
+      const last = p.row + p.rowSpan - 1
+      if (p.row === at) {
+        if (p.rowSpan > 1) items.push({ cell: withSpans(p.cell, p.colSpan, p.rowSpan - 1), row: at, col: p.col })
+        continue
+      }
+      const covers = p.row < at && last >= at
+      items.push({ cell: withSpans(p.cell, p.colSpan, p.rowSpan - (covers ? 1 : 0)), row: p.row > at ? p.row - 1 : p.row, col: p.col })
+    }
+  }
+  return { ...t, rows: rebuild(g.rows - 1, items) }
 }
 
-/** 在第 at 列之前插入一列（没有合并单元格时） */
+/**
+ * 在第 at 列之前插入一列。插入位置穿过跨列的合并单元格时，把它拉宽一列。
+ * 有列宽时，新列取相邻列的宽度。
+ */
 export function insertColumn(t: TableInline, at: number): TableInline {
+  const g = layoutTable(t.rows)
+  at = Math.max(0, Math.min(at, g.cols))
+  const items: Array<{ cell: TableCell; row: number; col: number }> = []
+  const crossing = new Set<PlacedCell>()
+  for (const line of g.placed) {
+    for (const p of line) {
+      const crosses = p.col < at && p.col + p.colSpan > at
+      if (crosses) crossing.add(p)
+      items.push({ cell: withSpans(p.cell, p.colSpan + (crosses ? 1 : 0), p.rowSpan), row: p.row, col: p.col >= at ? p.col + 1 : p.col })
+    }
+  }
+  for (let r = 0; r < g.rows; r++) {
+    const left = at > 0 ? g.owner[r]?.[at - 1] : undefined
+    if (left !== undefined && crossing.has(left)) continue
+    items.push({ cell: emptyCell(), row: r, col: at })
+  }
+  const widths = t.colWidthsTwip !== undefined && t.colWidthsTwip.length === g.cols ? t.colWidthsTwip.slice() : undefined
+  if (widths !== undefined) widths.splice(at, 0, widths[Math.max(0, at - 1)] ?? widths[0] ?? 1000)
   const { colWidthsTwip: _w, ...rest } = t
-  return { ...rest, rows: t.rows.map((r) => ({ cells: [...r.cells.slice(0, at), emptyCell(), ...r.cells.slice(at)] })) }
+  return { ...rest, ...(widths !== undefined ? { colWidthsTwip: widths } : {}), rows: rebuild(g.rows, items) }
 }
 
+/** 删除第 at 列。跨过这一列的合并单元格变窄一列；只占这一列的单元格删去。 */
 export function deleteColumn(t: TableInline, at: number): TableInline {
-  if (layoutTable(t.rows).cols <= 1) return t
+  const g = layoutTable(t.rows)
+  if (g.cols <= 1 || at < 0 || at >= g.cols) return t
+  const items: Array<{ cell: TableCell; row: number; col: number }> = []
+  for (const line of g.placed) {
+    for (const p of line) {
+      const covers = p.col <= at && p.col + p.colSpan - 1 >= at
+      if (covers && p.colSpan === 1) continue
+      items.push({ cell: withSpans(p.cell, p.colSpan - (covers ? 1 : 0), p.rowSpan), row: p.row, col: p.col > at ? p.col - 1 : p.col })
+    }
+  }
+  const widths = t.colWidthsTwip !== undefined && t.colWidthsTwip.length === g.cols ? t.colWidthsTwip.filter((_, i) => i !== at) : undefined
   const { colWidthsTwip: _w, ...rest } = t
-  return { ...rest, rows: t.rows.map((r) => ({ cells: r.cells.filter((_, i) => i !== at) })) }
+  return { ...rest, ...(widths !== undefined ? { colWidthsTwip: widths } : {}), rows: rebuild(g.rows, items) }
+}
+
+/** 设置列宽（twip）；传 undefined 恢复为平分栏宽 */
+export function setColumnWidths(t: TableInline, widths: number[] | undefined): TableInline {
+  const { colWidthsTwip: _w, ...rest } = t
+  return widths === undefined ? rest : { ...rest, colWidthsTwip: widths.map((w) => Math.max(200, Math.round(w))) }
 }
 
 /** 各列宽度：表格自带的（列数相符时），否则平分 totalTwip */
