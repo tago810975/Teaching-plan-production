@@ -1,58 +1,50 @@
 /**
- * 题目难度：等级（如 A、B、C，显示为【B】）与星级（1～5 颗星，显示为 ★★★），可同时使用。
+ * 题目难度：按格式预设的等级选择，每个等级对应若干颗星（物理教案 V1.0：A=1 星简单、B=2 星中等、C=3 星难）。
+ * 显示在题干开头，如【B】★★。数据中只存等级；预设中没有的等级（旧数据手填的）也能看到并保留。
  */
 import { useId } from 'react'
+import type { FormatPreset } from '@core/presets'
 
 interface Props {
+  /** 当前等级（已按预设由星级换算） */
   grade: string | undefined
-  stars: number | undefined
-  /** 预设中的常用等级 */
-  grades: readonly string[]
-  maxStars: number
-  onChange: (grade: string | undefined, stars: number | undefined) => void
+  levels: FormatPreset['difficulty']['levels']
+  onChange: (grade: string | undefined) => void
 }
 
-export function DifficultyField({ grade, stars, grades, maxStars, onChange }: Props) {
+export function DifficultyField({ grade, levels, onChange }: Props) {
   const id = useId()
-  const custom = grade !== undefined && !grades.includes(grade)
+  const custom = grade !== undefined && !levels.some((l) => l.grade === grade)
   return (
     <div className="field" role="group" aria-labelledby={id}>
       <span className="field-label" id={id}>
         难度
       </span>
-      <div className="difficulty-row">
-        <div className="segmented" role="radiogroup" aria-label="难度等级">
-          {[undefined, ...grades, ...(custom ? [grade] : [])].map((g) => (
-            <button
-              key={g ?? 'none'}
-              type="button"
-              role="radio"
-              aria-checked={grade === g}
-              className={grade === g ? 'is-active' : undefined}
-              onClick={() => onChange(g, stars)}
-            >
-              {g ?? '无'}
-            </button>
-          ))}
-        </div>
-        <div className="stars" role="radiogroup" aria-label="星级难度">
-          {Array.from({ length: maxStars }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={stars === n}
-              aria-label={`${n} 星`}
-              title={stars === n ? '再点一次取消星级' : `${n} 星`}
-              className={stars !== undefined && n <= stars ? 'star is-on' : 'star'}
-              onClick={() => onChange(grade, stars === n ? undefined : n)}
-            >
-              {stars !== undefined && n <= stars ? '★' : '☆'}
-            </button>
-          ))}
-        </div>
+      <div className="segmented difficulty-levels" role="radiogroup" aria-label="难度">
+        <button type="button" role="radio" aria-checked={grade === undefined} className={grade === undefined ? 'is-active' : undefined} onClick={() => onChange(undefined)}>
+          无
+        </button>
+        {levels.map((l) => (
+          <button
+            key={l.grade}
+            type="button"
+            role="radio"
+            aria-checked={grade === l.grade}
+            aria-label={`${l.grade}，${l.stars} 星，${l.label}`}
+            title={l.label}
+            className={grade === l.grade ? 'is-active' : undefined}
+            onClick={() => onChange(l.grade)}
+          >
+            {l.grade} <span className="difficulty-stars">{'★'.repeat(l.stars)}</span> {l.label}
+          </button>
+        ))}
+        {custom && (
+          <button type="button" role="radio" aria-checked className="is-active" title="预设中没有这个等级">
+            {grade}
+          </button>
+        )}
       </div>
-      <p className="field-hint">显示在题干开头，如【B】★★★；星越多越难。都不选则不显示。</p>
+      <p className="field-hint">显示在题干开头，如【B】★★；星越多越难。</p>
     </div>
   )
 }

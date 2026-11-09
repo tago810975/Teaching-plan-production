@@ -248,6 +248,7 @@ function EditorBody({
           questionNumbers={questionNumbers}
           selectedBlockId={state.selectedBlockId}
           dispatch={dispatch}
+          preset={preset}
         />
         <Preview
           ir={ir}

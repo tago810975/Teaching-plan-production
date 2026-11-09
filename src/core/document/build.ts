@@ -24,7 +24,7 @@ import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun, FloatingImage } from './ir'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
-import { getPreset, presetStyles, starText, type FormatPreset } from '../presets'
+import { difficultyOf, getPreset, presetStyles, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
 const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: '(学案)' }
@@ -77,14 +77,14 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         out.push(
           ...buildComposite(block, variant, (item) => {
             questionNo += 1
-            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops)
+            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops, preset)
           })
         )
         break
       }
       case 'question':
         questionNo += 1
-        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops))
+        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset))
         break
     }
   }
@@ -142,7 +142,8 @@ function buildQuestion(
   no: number,
   variant: Variant,
   keepTogetherByDefault: boolean,
-  projectStops: OptionStops = DEFAULT_OPTION_STOPS
+  projectStops: OptionStops = DEFAULT_OPTION_STOPS,
+  preset: FormatPreset = getPreset(undefined)
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
@@ -156,9 +157,9 @@ function buildQuestion(
   const stem: RichText = q.stem.length > 0 ? q.stem : [{ inlines: [] }]
   stem.forEach((p, i) => {
     const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined)
-    // 难度：等级写作【B】，星级写作★★★，两者都有时为【B】★★★
-    const grade = q.difficulty !== undefined && q.difficulty !== '' ? `【${q.difficulty}】` : ''
-    const prefix = grade + starText(q.stars)
+    // 难度：等级写作【B】，其后是对应的星级，如【B】★★（等级与星级的对应见格式预设）
+    const d = difficultyOf(q, preset)
+    const prefix = (d.grade !== undefined ? `【${d.grade}】` : '') + starText(d.stars)
     if (i === 0 && prefix !== '') runs.unshift({ kind: 'text', text: prefix })
     push({
       key: key(`stem${i}`),

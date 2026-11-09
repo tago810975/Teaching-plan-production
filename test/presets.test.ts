@@ -100,34 +100,56 @@ describe('作业单模块', () => {
   })
 })
 
-describe('星级难度', () => {
-  it('题干前缀：等级与星级可单独或同时使用', () => {
-    const stemPrefix = (difficulty: string | undefined, stars: number | undefined): string => {
-      const p = createEmptyProject()
-      p.blocks = [{ id: newId(), type: 'question', question: createQuestion({ ...(difficulty ? { difficulty } : {}), ...(stars ? { stars } : {}), stem: [{ inlines: [{ type: 'text', text: '题' }] }] }) }]
-      const r = buildDocument(p, 'student').paragraphs.find((x) => x.style === 'question')!.runs[0]!
-      return r.kind === 'text' ? r.text : ''
-    }
-    expect(stemPrefix('B', undefined)).toBe('【B】')
-    expect(stemPrefix(undefined, 3)).toBe('★★★')
-    expect(stemPrefix('C', 2)).toBe('【C】★★')
+describe('星级难度（与等级对应：A=1 星简单、B=2 星、C=3 星难）', () => {
+  const stemPrefix = (difficulty: string | undefined, stars: number | undefined): string => {
+    const p = createEmptyProject()
+    p.blocks = [{ id: newId(), type: 'question', question: createQuestion({ ...(difficulty ? { difficulty } : {}), ...(stars ? { stars } : {}), stem: [{ inlines: [{ type: 'text', text: '题' }] }] }) }]
+    const r = buildDocument(p, 'student').paragraphs.find((x) => x.style === 'question')!.runs[0]!
+    return r.kind === 'text' ? r.text : ''
+  }
+
+  it('题干前缀：只存等级时自动显示对应星级（旧工程无需修改数据）', () => {
+    expect(stemPrefix('A', undefined)).toBe('【A】★')
+    expect(stemPrefix('B', undefined)).toBe('【B】★★')
+    expect(stemPrefix('C', undefined)).toBe('【C】★★★')
+  })
+
+  it('只有星级时换算成等级；等级与星级不一致时以等级为准', () => {
+    expect(stemPrefix(undefined, 3)).toBe('【C】★★★')
+    expect(stemPrefix('C', 1)).toBe('【C】★★★')
+  })
+
+  it('预设中没有的等级原样显示，不加星；没有难度时不显示', () => {
+    expect(stemPrefix('D', undefined)).toBe('【D】')
+    expect(stemPrefix(undefined, 5)).toBe('★★★★★')
     expect(stemPrefix(undefined, undefined)).toBe('题')
+  })
+
+  it('difficultyOf 给出等级、星级与说明', async () => {
+    const { difficultyOf } = await import('@core/presets')
+    expect(difficultyOf({ difficulty: 'A' }, getPreset('physics-v1'))).toEqual({ grade: 'A', stars: 1, label: '简单' })
+    expect(difficultyOf({ stars: 3 }, getPreset('physics-v1'))).toEqual({ grade: 'C', stars: 3, label: '难' })
+    expect(difficultyOf({}, getPreset('physics-v1'))).toEqual({})
   })
 })
 
 describe('导入时的星级难度', () => {
-  it('题干开头的★记为星级；【★★】也一样', async () => {
+  it('题干开头的★或【★★】换算成等级；已有等级时以等级为准', async () => {
     const { applyPresetRules } = await import('@core/import/preset-rules')
     const mk = (stem: string, difficulty?: string) => ({
       id: newId(),
       type: 'question' as const,
       question: createQuestion({ ...(difficulty ? { difficulty } : {}), stem: [{ inlines: [{ type: 'text', text: stem }] }] })
     })
-    const [a, b, c] = applyPresetRules([mk('★★★如图所示'), mk('如图所示', '★★'), mk('★☆☆题', 'B')], getPreset('physics-v1')) as Array<ReturnType<typeof mk>>
-    expect(a!.question.stars).toBe(3)
+    const [a, b, c, d] = applyPresetRules([mk('★★★如图所示'), mk('如图所示', '★★'), mk('★☆☆题', 'B'), mk('★★★★★题')], getPreset('physics-v1')) as Array<ReturnType<typeof mk>>
+    expect(a!.question).toMatchObject({ difficulty: 'C' })
+    expect(a!.question.stars).toBeUndefined()
     expect(a!.question.stem[0]!.inlines).toEqual([{ type: 'text', text: '如图所示' }])
-    expect(b!.question).toMatchObject({ stars: 2 })
-    expect(b!.question.difficulty).toBeUndefined()
-    expect(c!.question).toMatchObject({ difficulty: 'B', stars: 1 })
+    expect(b!.question).toMatchObject({ difficulty: 'B' })
+    expect(c!.question).toMatchObject({ difficulty: 'B' })
+    expect(c!.question.stem[0]!.inlines).toEqual([{ type: 'text', text: '题' }])
+    // 没有对应等级的星数单独记为星级
+    expect(d!.question).toMatchObject({ stars: 5 })
+    expect(d!.question.difficulty).toBeUndefined()
   })
 })

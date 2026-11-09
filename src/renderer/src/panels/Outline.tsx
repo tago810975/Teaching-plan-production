@@ -5,6 +5,7 @@ import { useRef, type Dispatch } from 'react'
 import { useOutlineDrag } from './useOutlineDrag'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
+import { difficultyOf, type FormatPreset } from '@core/presets'
 import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction } from '../state/store'
 
 interface Props {
@@ -13,9 +14,11 @@ interface Props {
   questionNumbers: ReadonlyMap<string, string>
   selectedBlockId: string | null
   dispatch: Dispatch<EditorAction>
+  /** 格式预设：等级与星级的对应 */
+  preset: FormatPreset
 }
 
-export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: Props) {
+export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset }: Props) {
   // 上移、下移：顶层块在大纲中移动；综合题中的小题在综合题内移动
   const parent = blocks.find((b) => b.type === 'composite' && b.items.some((it) => it.id === selectedBlockId))
   const siblings: Array<{ id: string }> = parent?.type === 'composite' ? parent.items : blocks
@@ -62,7 +65,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
               >
                 {block.type === 'question' && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
                 <span className="outline-text">{describe(block)}</span>
-                {block.type === 'question' && <Difficulty grade={block.question.difficulty} stars={block.question.stars} />}
+                {block.type === 'question' && <Difficulty {...difficultyOf(block.question, preset)} />}
               </button>
             </li>,
             // 综合题的小题：缩进列在综合题之下，随综合题一起拖动
@@ -79,7 +82,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
                     >
                       <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>
                       <span className="outline-text">{describe(item)}</span>
-                      <Difficulty grade={item.question.difficulty} stars={item.question.stars} />
+                      <Difficulty {...difficultyOf(item.question, preset)} />
                     </button>
                   </li>
                 ))
@@ -139,9 +142,9 @@ function summary(text: string): string {
 }
 
 /** 大纲中的难度：等级与星级，便于浏览 */
-function Difficulty({ grade, stars }: { grade: string | undefined; stars: number | undefined }) {
+function Difficulty({ grade, stars, label: name }: { grade?: string; stars?: number; label?: string }) {
   if ((grade === undefined || grade === '') && stars === undefined) return null
-  const label = [grade !== undefined && grade !== '' ? `难度 ${grade}` : '', stars !== undefined ? `${stars} 星` : ''].filter(Boolean).join('，')
+  const label = [grade !== undefined && grade !== '' ? `难度 ${grade}` : '', stars !== undefined ? `${stars} 星` : '', name ?? ''].filter(Boolean).join('，')
   return (
     <span className="outline-difficulty" title={label} aria-label={label}>
       {grade !== undefined && grade !== '' && <span className="outline-grade">{grade}</span>}

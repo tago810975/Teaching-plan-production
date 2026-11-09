@@ -13,7 +13,7 @@ import { OptionImageControls } from './OptionImageControls'
 import { FontSelect } from './FontSelect'
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
-import { getPreset, type FormatPreset } from '@core/presets'
+import { difficultyOf, getPreset, type FormatPreset } from '@core/presets'
 import { formatToken } from '@core/model/markup'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
@@ -533,11 +533,9 @@ function QuestionForm({
   return (
     <>
       <DifficultyField
-        grade={q.difficulty}
-        stars={q.stars}
-        grades={preset.difficulty.grades}
-        maxStars={Math.min(5, preset.difficulty.maxStars)}
-        onChange={(difficulty, stars) => set({ difficulty, stars })}
+        grade={difficultyOf(q, preset).grade}
+        levels={preset.difficulty.levels}
+        onChange={(difficulty) => set({ difficulty, stars: undefined })}
       />
       <Field
         label="题干"

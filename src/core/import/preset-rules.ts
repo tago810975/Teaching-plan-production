@@ -5,7 +5,7 @@
  * - 解析：标签改写（如【详解】→【解析】），文字统一为黑色（预设规定时）。
  */
 import { newId, plainText } from '../model/factory'
-import type { FormatPreset } from '../presets'
+import { gradeForStars, type FormatPreset } from '../presets'
 import type { Block, Inline, Question, QuestionBlock, RichText } from '../model/types'
 
 export function applyPresetRules(blocks: Block[], preset: FormatPreset): Block[] {
@@ -44,19 +44,28 @@ function mergeWorksheets(blocks: Block[]): Block[] {
 
 function question(b: QuestionBlock, preset: FormatPreset): QuestionBlock {
   let q: Question = b.question
+  let stars: number | undefined
   // 【★★★】被识别成等级时，改记为星级
   if (q.difficulty !== undefined && /^[★☆]+$/.test(q.difficulty)) {
+    stars = count(q.difficulty)
     const { difficulty: _d, ...rest } = q
-    q = { ...rest, stars: clampStars(count(q.difficulty), preset) }
+    q = rest
   }
+  // 题干开头的 ★★★
   const first = q.stem[0]?.inlines[0]
   if (first?.type === 'text') {
     const m = /^\s*([★☆]+)\s*/.exec(first.text)
     if (m !== null) {
+      stars ??= count(m[1]!)
       const text = first.text.slice(m[0].length)
       const inlines: Inline[] = [...(text !== '' ? [{ ...first, text }] : []), ...q.stem[0]!.inlines.slice(1)]
-      q = { ...q, stars: clampStars(count(m[1]!), preset), stem: [{ ...q.stem[0]!, inlines }, ...q.stem.slice(1)] }
+      q = { ...q, stem: [{ ...q.stem[0]!, inlines }, ...q.stem.slice(1)] }
     }
+  }
+  // 星级换算成等级（如 3 星 → C）；已有等级时以等级为准。没有对应等级的星数才单独记为星级
+  if (stars !== undefined && stars > 0 && (q.difficulty === undefined || q.difficulty === '')) {
+    const grade = gradeForStars(stars, preset)
+    q = grade !== undefined ? { ...q, difficulty: grade } : { ...q, stars: Math.min(stars, 5) }
   }
   return { ...b, question: { ...q, analysis: analysis(q.analysis, preset) } }
 }
@@ -64,10 +73,6 @@ function question(b: QuestionBlock, preset: FormatPreset): QuestionBlock {
 /** 实心星的个数（☆ 是空星，不计） */
 function count(s: string): number {
   return [...s].filter((c) => c === '★').length
-}
-
-function clampStars(n: number, preset: FormatPreset): number | undefined {
-  return n > 0 ? Math.min(n, preset.difficulty.maxStars, 5) : undefined
 }
 
 function analysis(text: RichText, preset: FormatPreset): RichText {

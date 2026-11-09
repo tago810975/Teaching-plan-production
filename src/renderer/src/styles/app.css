@@ -1333,3 +1333,13 @@ body.is-dragging-outline * {
   max-height: min(70vh, 640px);
   overflow-y: auto;
 }
+
+.difficulty-levels button {
+  padding: 3px 10px;
+}
+.difficulty-stars {
+  color: #d99a00;
+}
+.difficulty-levels button.is-active .difficulty-stars {
+  color: #ffd25e;
+}

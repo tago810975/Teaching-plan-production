@@ -50,7 +50,10 @@ const presetSchema = z.object({
     /** black：解析统一为黑色（去掉文字颜色）；keep：保留 */
     analysisColor: z.enum(['black', 'keep'])
   }),
-  difficulty: z.object({ grades: z.array(z.string()), maxStars: z.number().int().min(1).max(10) })
+  /** 难度等级，每级对应若干颗星（如 A=1 星简单、C=3 星难），从易到难 */
+  difficulty: z.object({
+    levels: z.array(z.object({ grade: z.string().min(1), stars: z.number().int().min(1).max(5), label: z.string() })).min(1)
+  })
 })
 
 export type FormatPreset = z.infer<typeof presetSchema>
@@ -70,6 +73,27 @@ export function getPreset(id: string | undefined): FormatPreset {
 /** 星级难度的显示：★ 重复 n 次 */
 export function starText(n: number | undefined): string {
   return n !== undefined && n > 0 ? '★'.repeat(n) : ''
+}
+
+/**
+ * 题目的难度：等级与星级按预设一一对应（物理教案 V1.0：A=1 星简单、B=2 星、C=3 星难）。
+ * 数据中通常只存等级，星级由此得出；只有星级时换算成等级。
+ * 预设中没有的等级（如手填的 D）原样保留，不显示星级。
+ */
+export function difficultyOf(q: { difficulty?: string; stars?: number }, preset: FormatPreset): { grade?: string; stars?: number; label?: string } {
+  const levels = preset.difficulty.levels
+  const grade = q.difficulty !== undefined && q.difficulty !== '' ? q.difficulty : undefined
+  const byGrade = grade !== undefined ? levels.find((l) => l.grade === grade) : undefined
+  if (byGrade !== undefined) return { grade: byGrade.grade, stars: byGrade.stars, label: byGrade.label }
+  if (grade !== undefined) return { grade, ...(q.stars !== undefined ? { stars: q.stars } : {}) }
+  const byStars = q.stars !== undefined ? levels.find((l) => l.stars === q.stars) : undefined
+  if (byStars !== undefined) return { grade: byStars.grade, stars: byStars.stars, label: byStars.label }
+  return q.stars !== undefined ? { stars: q.stars } : {}
+}
+
+/** 星数 → 等级（预设中没有对应等级时为 undefined） */
+export function gradeForStars(stars: number, preset: FormatPreset): string | undefined {
+  return preset.difficulty.levels.find((l) => l.stars === stars)?.grade
 }
 
 /** 知识梳理强调格式的文字格式（确保类型完整） */

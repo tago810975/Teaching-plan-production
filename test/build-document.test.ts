@@ -76,9 +76,9 @@ describe('题号', () => {
     expect(labels).toEqual(['1.', '2.', '1.'])
   })
 
-  it('难度标记写在题干开头', () => {
+  it('难度标记写在题干开头：等级与对应的星级', () => {
     const ir = buildDocument(projectWith(createQuestion({ difficulty: 'B', stem: [para('题干')] })), 'student')
-    expect(ir.paragraphs[0]?.runs[0]).toEqual({ kind: 'text', text: '【B】' })
+    expect(ir.paragraphs[0]?.runs[0]).toEqual({ kind: 'text', text: '【B】★★' })
   })
 })
 
