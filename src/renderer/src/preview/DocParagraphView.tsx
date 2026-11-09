@@ -360,7 +360,11 @@ function TableView({ table, assetUrls, onEditMath }: { table: DocTable; assetUrl
                   style={c.shading !== undefined ? { background: `#${c.shading}` } : undefined}
                 >
                   {c.paragraphs.map((cp, k) => (
-                    <div key={k} className="doc-table-para" style={cp.align !== undefined ? { textAlign: cp.align } : undefined}>
+                    <div
+                      key={k}
+                      className={cp.font !== undefined ? `doc-table-para font-${cp.font}` : 'doc-table-para'}
+                      style={cp.align !== undefined ? { textAlign: cp.align } : undefined}
+                    >
                       {cp.runs.length > 0 ? renderRuns(cp.runs, assetUrls, onEditMath) : '\u00a0'}
                     </div>
                   ))}

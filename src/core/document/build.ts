@@ -634,7 +634,8 @@ function toDocTable(t: TableInline, base?: RefBase): DocTable {
         // 单元格中的文字也记下来源（可在预览中选中改格式、点击编辑公式）
         paragraphs: (c.content.length > 0 ? c.content : [{ inlines: [] }]).map((p, k) => ({
           runs: toRuns(p, base === undefined || c.content.length === 0 ? undefined : { blockId: base.blockId, path: [...base.path, 'rows', ri, 'cells', ci, 'content', k] }),
-          ...(p.format?.align !== undefined ? { align: p.format.align } : {})
+          ...(p.format?.align !== undefined ? { align: p.format.align } : {}),
+          ...(p.format?.font !== undefined ? { font: p.format.font } : {})
         })),
         ...(c.colSpan !== undefined && c.colSpan > 1 ? { colSpan: c.colSpan } : {}),
         ...(c.rowSpan !== undefined && c.rowSpan > 1 ? { rowSpan: c.rowSpan } : {}),

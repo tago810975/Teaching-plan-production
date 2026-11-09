@@ -226,3 +226,22 @@ describe('在预览中选中文字改格式', async () => {
     expect(twice).toEqual(p)
   })
 })
+
+describe('导入表格时整理单元格中的字体', () => {
+  it('与正文相同的字体不记录：示例表格的单元格中不再满是“字体”标记', async () => {
+    const r = await importDocx(new Uint8Array(readFileSync('reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx')), { presetId: 'physics-handbook-v1' })
+    const tables: TableInline[] = []
+    const walk = (v: unknown): void => {
+      if (Array.isArray(v)) v.forEach(walk)
+      else if (v !== null && typeof v === 'object') {
+        if ((v as Inline).type === 'table') tables.push(v as TableInline)
+        Object.values(v).forEach(walk)
+      }
+    }
+    walk(r.blocks)
+    const text = toEditable(tables[1]!.rows[1]!.cells[0]!.content).text
+    expect(text).toBe('产生条件')
+    const all = JSON.stringify(tables)
+    expect(all).not.toContain('"font":"song"')
+  })
+})

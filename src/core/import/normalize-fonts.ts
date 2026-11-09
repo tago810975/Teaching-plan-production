@@ -56,6 +56,15 @@ function text(t: RichText, fallback: FontFamily): RichText {
 }
 
 export function paragraph(p: RichParagraph, styleFont: FontFamily): RichParagraph {
+  // 表格单元格中的文字同样整理（单元格用正文样式）
+  if (p.inlines.some((i) => i.type === 'table')) {
+    p = {
+      ...p,
+      inlines: p.inlines.map((i): Inline =>
+        i.type !== 'table' ? i : { ...i, rows: i.rows.map((r) => ({ cells: r.cells.map((c) => ({ ...c, content: c.content.map((cp) => paragraph(cp, STYLE_SPECS.body.fontRole)) })) })) }
+      )
+    }
+  }
   const texts = p.inlines.filter((i): i is TextInline => i.type === 'text' && CJK.test(i.text))
   const fonts = new Set(texts.map((i) => i.marks?.font))
   // 1. 整段同一字体：提升为段落字体

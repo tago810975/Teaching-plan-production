@@ -185,6 +185,9 @@ function EditorBody({
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      // 有对话框开着时（表格编辑器、公式编辑……）由对话框自己处理撤销；
+      // 焦点可能不在对话框里（如点过的按钮变为不可用后），所以按“是否有对话框”判断
+      if (document.querySelector('dialog[open]') !== null) return
       const k = e.key.toLowerCase()
       const kind = k === 'z' ? (e.shiftKey ? 'redo' : 'undo') : k === 'y' && !e.shiftKey ? 'redo' : null
       if (kind === null) return

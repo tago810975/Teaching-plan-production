@@ -184,7 +184,7 @@ class ExportContext {
     const border = (name: string): string => `<w:${name} w:val="single" w:sz="4" w:space="0" w:color="auto"/>`
     const bodyStyle = this.styleIds.get(STYLE_SPECS.body.wordStyleName)
     const cellPara = (cp: DocCellParagraph | undefined): string =>
-      `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, undefined)).join('')}</w:p>`
+      `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, cp?.font)).join('')}</w:p>`
     let xml =
       `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:jc w:val="center"/>` +
       `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('')}</w:tblBorders>` +

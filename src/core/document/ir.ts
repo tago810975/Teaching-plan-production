@@ -80,6 +80,8 @@ export interface FigureRef {
 export interface DocCellParagraph {
   runs: DocRun[]
   align?: 'center' | 'right'
+  /** 整段字体大类（不设则随正文） */
+  font?: FontFamily
 }
 
 export interface DocTableCell {

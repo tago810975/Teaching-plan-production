@@ -1941,3 +1941,15 @@ body.is-dragging-outline * {
   margin: 0 3px;
   background: var(--rule);
 }
+.table-editor-grid td.is-selected {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.table-editor-grid td.is-selected textarea {
+  background: #e3ecf8;
+}
+.table-editor .format-toolbar {
+  margin: 0 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+}

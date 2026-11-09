@@ -1,12 +1,30 @@
 /**
- * 表格编辑器：每个单元格一个输入框（与其他输入框一样可写 $公式$，⟦⟧ 标记为导入的公式、图片或格式文字）。
- * 光标所在的单元格可在上方 / 下方插入行、左侧 / 右侧插入列、删除所在行 / 列。
- * 有合并单元格的表格只能修改内容（增删行列会破坏合并关系）。
+ * 表格编辑器：每个单元格一个输入框（可写 $公式$；⟦⟧ 为公式、图片或带格式文字）。
+ *
+ * - 格式：加粗、倾斜、下划线、重点、颜色（工具条或 Ctrl+B / I / U），表格中的重点在学生版中同样挖空；
+ * - 结构：上下插入行、左右插入列、删除所在行列；按住 Shift 点另一个单元格选中矩形范围后合并，
+ *   光标在合并单元格中时可拆分（有合并单元格时先拆分才能增删行列）；
+ * - 撤销：编辑器内 Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），同一单元格中连续输入合为一步。
+ *   点“确定”后整个修改在教学案中也是一步，可以再撤销。
  */
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { fromEditable, toEditable } from '@core/model/markup'
-import { deleteColumn, deleteRow, hasMerges, insertColumn, insertRow, layoutTable, normalizeTable } from '@core/model/table'
+import {
+  deleteColumn,
+  deleteRow,
+  expandRect,
+  hasMerges,
+  insertColumn,
+  insertRow,
+  layoutTable,
+  mergeCells,
+  normalizeTable,
+  splitCell,
+  type CellRect
+} from '@core/model/table'
 import type { Inline, TableInline } from '@core/model/types'
+import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
+import { PresetContext } from './preset-context'
 
 interface Props {
   table: TableInline
@@ -15,11 +33,18 @@ interface Props {
   onCancel: () => void
 }
 
-/** 编辑中的单元格：可编辑文字与其中的标记对象 */
+/** 编辑中的单元格：可编辑文字与其中的标记对象（改格式时换成新的对象表，不在原表上修改） */
 interface CellDraft {
   text: string
   objects: Map<number, Inline>
 }
+
+interface EditState {
+  shape: TableInline
+  cells: CellDraft[][]
+}
+
+const MERGE_MS = 1000
 
 const toDraft = (t: TableInline): CellDraft[][] =>
   t.rows.map((r) =>
@@ -29,31 +54,102 @@ const toDraft = (t: TableInline): CellDraft[][] =>
     })
   )
 
+/** 把输入的内容写回表格 */
+const toTable = (s: EditState): TableInline => ({
+  ...s.shape,
+  rows: s.shape.rows.map((r, i) => ({
+    cells: r.cells.map((c, j) => ({ ...c, content: fromEditable(s.cells[i]?.[j]?.text ?? '', s.cells[i]?.[j]?.objects ?? new Map()) }))
+  }))
+})
+
 export function TableEditor({ table, title, onSave, onCancel }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const [shape, setShape] = useState<TableInline>(() => normalizeTable(table))
-  const [cells, setCells] = useState<CellDraft[][]>(() => toDraft(normalizeTable(table)))
+  const preset = useContext(PresetContext)
+  const format = useFormatTargets()
+  const [state, setState] = useState<EditState>(() => {
+    const shape = normalizeTable(table)
+    return { shape, cells: toDraft(shape) }
+  })
+  const history = useRef<{ past: EditState[]; future: EditState[]; key: string | null; at: number }>({ past: [], future: [], key: null, at: 0 })
+  const [, setTick] = useState(0)
   const [focus, setFocus] = useState<{ row: number; index: number }>({ row: 0, index: 0 })
-  const merged = hasMerges(shape)
+  /** Shift+点击选中的矩形范围（格子坐标） */
+  const [sel, setSel] = useState<CellRect | null>(null)
+  const cellRefs = useRef(new Map<string, HTMLTextAreaElement>())
 
   useEffect(() => {
     dialogRef.current?.showModal()
   }, [])
 
-  /** 把当前输入的内容写回表格 */
-  const current = (): TableInline => ({
-    ...shape,
-    rows: shape.rows.map((r, i) => ({ cells: r.cells.map((c, j) => ({ ...c, content: fromEditable(cells[i]?.[j]?.text ?? '', cells[i]?.[j]?.objects ?? new Map()) })) }))
-  })
-  /** 改结构：先写回内容，再按新结构重建草稿 */
-  const reshape = (fn: (t: TableInline) => TableInline, next?: { row: number; index: number }): void => {
-    const t = fn(current())
-    setShape(t)
-    setCells(toDraft(t))
-    if (next !== undefined) setFocus(next)
+  /** 记下一步修改；key 相同且间隔很短的连续修改（同一单元格中打字）合为一步 */
+  const commit = (next: EditState, key: string | null = null): void => {
+    const h = history.current
+    const now = Date.now()
+    if (!(key !== null && key === h.key && now - h.at < MERGE_MS)) h.past.push(state)
+    h.future = []
+    h.key = key
+    h.at = now
+    setState(next)
+    setTick((t) => t + 1)
   }
-  const grid = layoutTable(shape.rows)
-  const col = grid.placed[focus.row]?.[focus.index]?.col ?? 0
+  const travel = (kind: 'undo' | 'redo'): void => {
+    const h = history.current
+    const from = kind === 'undo' ? h.past : h.future
+    const target = from.pop()
+    if (target === undefined) return
+    ;(kind === 'undo' ? h.future : h.past).push(state)
+    h.key = null
+    setState(target)
+    setSel(null)
+    // 单元格可能变多变少：光标落在仍存在的单元格上
+    const rows = target.shape.rows
+    setFocus((f) => (rows[f.row]?.cells[f.index] !== undefined ? f : { row: 0, index: 0 }))
+    pendingFocus.current = true
+    setTick((t) => t + 1)
+  }
+  /** 改结构：先写回内容，再按新结构重建 */
+  const reshape = (fn: (t: TableInline) => TableInline, next?: { row: number; index: number }): void => {
+    const shape = fn(toTable(state))
+    commit({ shape, cells: toDraft(shape) })
+    setSel(null)
+    if (next !== undefined) setFocus(next)
+    pendingFocus.current = true
+  }
+
+  const grid = layoutTable(state.shape.rows)
+  const focused = grid.placed[focus.row]?.[focus.index]
+  const col = focused?.col ?? 0
+  const merged = hasMerges(state.shape)
+  const rect = sel !== null ? expandRect(grid, sel) : null
+  const rectCells = rect === null ? 0 : new Set(grid.owner.slice(rect.r0, rect.r1 + 1).flatMap((row) => row.slice(rect.c0, rect.c1 + 1))).size
+  const inRect = (p: { row: number; col: number; rowSpan: number; colSpan: number }): boolean =>
+    rect !== null && p.row <= rect.r1 && p.row + p.rowSpan - 1 >= rect.r0 && p.col <= rect.c1 && p.col + p.colSpan - 1 >= rect.c0
+
+  // 撤销 / 重做快捷键：在窗口上监听（焦点不一定在对话框中的输入框里）
+  const travelRef = useRef(travel)
+  travelRef.current = travel
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const k = e.key.toLowerCase()
+      const kind = k === 'z' ? (e.shiftKey ? 'redo' : 'undo') : k === 'y' && !e.shiftKey ? 'redo' : null
+      if (kind === null) return
+      e.preventDefault()
+      e.stopPropagation()
+      travelRef.current(kind)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // 改结构、撤销后把光标放回对应的单元格
+  const pendingFocus = useRef(false)
+  useEffect(() => {
+    if (!pendingFocus.current) return
+    pendingFocus.current = false
+    const el = cellRefs.current.get(`${focus.row}:${focus.index}`) ?? cellRefs.current.get('0:0')
+    el?.focus()
+  })
 
   return (
     <dialog
@@ -66,7 +162,13 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
       }}
     >
       <h2 id="table-editor-title">{title}</h2>
-      <div className="table-editor-tools" role="toolbar" aria-label="行与列">
+      <div className="table-editor-tools" role="toolbar" aria-label="撤销与表格结构">
+        <button type="button" className="icon-button" onClick={() => travel('undo')} disabled={history.current.past.length === 0} title="撤销（Ctrl+Z）" aria-label="撤销">
+          ↶
+        </button>
+        <button type="button" className="icon-button" onClick={() => travel('redo')} disabled={history.current.future.length === 0} title="重做（Ctrl+Y）" aria-label="重做">
+          ↷
+        </button>
         <span className="table-editor-size">
           {grid.rows} 行 × {grid.cols} 列
         </span>
@@ -88,44 +190,130 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
         <button type="button" disabled={merged || grid.cols <= 1} onClick={() => reshape((t) => deleteColumn(t, col), { row: focus.row, index: Math.max(0, focus.index - 1) })}>
           删除所在列
         </button>
+        <button
+          type="button"
+          disabled={rect === null || rectCells < 2}
+          title="按住 Shift 点另一个单元格，选中要合并的范围"
+          onClick={() => {
+            if (rect === null) return
+            const next = mergeCells(toTable(state), rect)
+            const g = layoutTable(next.rows)
+            const p = g.owner[rect.r0]?.[rect.c0]
+            reshape(() => next, p !== undefined ? { row: p.row, index: g.placed[p.row]!.indexOf(p) } : undefined)
+          }}
+        >
+          合并单元格
+        </button>
+        <button
+          type="button"
+          disabled={focused === undefined || (focused.colSpan === 1 && focused.rowSpan === 1)}
+          onClick={() => focused !== undefined && reshape((t) => splitCell(t, focused.row, focused.col))}
+        >
+          拆分单元格
+        </button>
       </div>
-      {merged && <p className="field-hint">这个表格有合并单元格，只能修改内容。</p>}
-      <div className="table-editor-grid">
-        <table>
-          <tbody>
-            {grid.placed.map((row, r) => (
-              <tr key={r}>
-                {row.map((p, j) => (
-                  <td key={j} {...(p.colSpan > 1 ? { colSpan: p.colSpan } : {})} {...(p.rowSpan > 1 ? { rowSpan: p.rowSpan } : {})}>
-                    <textarea
-                      rows={2}
-                      spellCheck={false}
-                      aria-label={`第 ${r + 1} 行第 ${p.col + 1} 列`}
-                      className={focus.row === r && focus.index === j ? 'is-focused' : undefined}
-                      value={cells[r]?.[j]?.text ?? ''}
-                      autoFocus={r === focus.row && j === focus.index}
-                      onFocus={() => setFocus({ row: r, index: j })}
-                      onChange={(e) => {
-                        const text = e.target.value
-                        setCells((all) => all.map((line, i) => (i !== r ? line : line.map((c, k) => (k !== j ? c : { ...c, text })))))
+      <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={preset.keyPoint} />
+      <p className="field-hint">
+        按住 Shift 点另一个单元格可选中一片范围（用于合并）。{merged ? '有合并单元格时，先拆分才能增删行列。' : ''}
+      </p>
+      <FormatTargetProvider value={format.provider}>
+        <div className="table-editor-grid">
+          <table>
+            <tbody>
+              {grid.placed.map((row, r) => (
+                <tr key={r}>
+                  {row.map((p, j) => (
+                    <td
+                      key={j}
+                      {...(p.colSpan > 1 ? { colSpan: p.colSpan } : {})}
+                      {...(p.rowSpan > 1 ? { rowSpan: p.rowSpan } : {})}
+                      className={inRect(p) ? 'is-selected' : undefined}
+                      onMouseDownCapture={(e) => {
+                        if (!e.shiftKey || focused === undefined) return
+                        // Shift+点击：从当前单元格到这里选中一片范围
+                        e.preventDefault()
+                        setSel({ r0: focused.row, c0: focused.col, r1: p.row + p.rowSpan - 1, c1: p.col + p.colSpan - 1 })
                       }}
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    >
+                      <CellInput
+                        cell={state.cells[r]?.[j] ?? { text: '', objects: new Map() }}
+                        label={`第 ${r + 1} 行第 ${p.col + 1} 列`}
+                        focused={focus.row === r && focus.index === j}
+                        autoFocus={r === focus.row && j === focus.index}
+                        inputRef={(el) => {
+                          if (el !== null) cellRefs.current.set(`${r}:${j}`, el)
+                          else cellRefs.current.delete(`${r}:${j}`)
+                        }}
+                        onFocus={() => {
+                          setFocus({ row: r, index: j })
+                          setSel(null)
+                        }}
+                        onChange={(cell, typing) => {
+                          const cells = state.cells.map((line, i) => (i !== r ? line : line.map((c, k) => (k !== j ? c : cell))))
+                          commit({ ...state, cells }, typing ? `cell:${r}:${j}` : null)
+                        }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </FormatTargetProvider>
       <p className="field-hint">单元格中换行即分段；公式写作 $LaTeX$。</p>
       <div className="dialog-actions">
         <button type="button" onClick={onCancel}>
           取消
         </button>
-        <button type="button" className="primary" onClick={() => onSave(current())}>
+        <button type="button" className="primary" onClick={() => onSave(toTable(state))}>
           确定
         </button>
       </div>
     </dialog>
+  )
+}
+
+/** 单元格输入框：接入格式工具（改格式时在新的对象表上修改，便于撤销） */
+function CellInput(props: {
+  cell: CellDraft
+  label: string
+  focused: boolean
+  autoFocus: boolean
+  inputRef: (el: HTMLTextAreaElement | null) => void
+  onFocus: () => void
+  onChange: (cell: CellDraft, typing: boolean) => void
+}) {
+  const { cell, label, focused, autoFocus, inputRef, onFocus, onChange } = props
+  const ref = useRef<HTMLTextAreaElement | null>(null)
+  const working = useRef<Map<number, Inline>>(cell.objects)
+  const formattable = useFormattable(
+    ref,
+    () => {
+      working.current = new Map(cell.objects)
+      return { text: cell.text, objects: working.current }
+    },
+    (text) => onChange({ text, objects: working.current }, false)
+  )
+  return (
+    <textarea
+      ref={(el) => {
+        ref.current = el
+        inputRef(el)
+      }}
+      rows={2}
+      spellCheck={false}
+      aria-label={label}
+      className={focused ? 'is-focused' : undefined}
+      value={cell.text}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange({ text: e.target.value, objects: cell.objects }, true)}
+      onFocus={() => {
+        onFocus()
+        formattable.onFocus()
+      }}
+      onBlur={formattable.onBlur}
+      onKeyDown={formattable.onKeyDown}
+    />
   )
 }

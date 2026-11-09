@@ -12,6 +12,7 @@ import { FigureList } from './FigureList'
 import { OptionImageControls } from './OptionImageControls'
 import { FontSelect } from './FontSelect'
 import { TableEditor } from './TableEditor'
+import { PresetContext } from './preset-context'
 import { createTable } from '@core/model/table'
 import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { OptionStopsEditor } from './OptionStopsEditor'
@@ -104,6 +105,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
       <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={block.type === 'knowledge' ? preset.keyPoint : undefined} />
       {/* key 保证切换选中项时各输入框重新初始化 */}
       <FormatTargetProvider value={format.provider}>
+      <PresetContext.Provider value={preset}>
       <div key={`${block.id}:${revision}`} className="inspector-body">
         {block.type === 'question' ? (
           <QuestionForm
@@ -175,6 +177,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
           </Field>
         )}
       </div>
+      </PresetContext.Provider>
       </FormatTargetProvider>
     </aside>
   )
