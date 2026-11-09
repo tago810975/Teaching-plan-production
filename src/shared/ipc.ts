@@ -25,6 +25,13 @@ export const IPC = {
   createFromDocx: 'project:create-from-docx',
   getDefaultPreset: 'settings:get-default-preset',
   getOptionStopSchemes: 'settings:get-option-stop-schemes',
+  getLocalPlaces: 'files:local-places',
+  listFolder: 'files:list-folder',
+  listSubfolders: 'files:list-subfolders',
+  renameFile: 'files:rename',
+  trashFile: 'files:trash',
+  readProject: 'project:read',
+  createFromDocxAt: 'project:create-from-docx-at',
   setOptionStopSchemes: 'settings:set-option-stop-schemes',
   setDefaultPreset: 'settings:set-default-preset',
   exportCheck: 'export:check',
@@ -100,6 +107,33 @@ export interface ProjectListItem {
   error?: string
 }
 
+/** 首页左侧栏“本地”中的位置 */
+export interface LocalPlace {
+  label: string
+  path: string
+  kind: 'desktop' | 'documents' | 'downloads' | 'drive'
+}
+
+/** 文件夹中的一项：子文件夹、教学案或 Word 文档 */
+export interface FolderEntry {
+  name: string
+  path: string
+  kind: 'folder' | 'project' | 'docx'
+  modifiedAt?: string
+  sizeBytes?: number
+  /** 教学案的名称、题目数等 */
+  summary?: ProjectSummary
+  /** 教学案无法读取时的原因 */
+  error?: string
+}
+
+export interface FolderListing {
+  dir: string
+  /** 上一级文件夹；已是磁盘根目录时为 null */
+  parent: string | null
+  entries: FolderEntry[]
+}
+
 export interface LibraryListing {
   libraryDir: string
   items: ProjectListItem[]
@@ -137,6 +171,18 @@ export interface RendererApi {
   /** 设置：导入（从 Word 新建）时默认使用的格式预设 */
   getDefaultPreset(): Promise<string>
   setDefaultPreset(presetId: string): Promise<void>
+  /** 首页：本地位置（桌面、文档、下载与各磁盘） */
+  getLocalPlaces(): Promise<LocalPlace[]>
+  listFolder(dir: string): Promise<Result<FolderListing>>
+  listSubfolders(dir: string): Promise<Array<{ name: string; path: string }>>
+  /** 重命名（不含扩展名）；教学案同时改文件中的名称。返回新路径 */
+  renameFile(filePath: string, newStem: string): Promise<Result<string>>
+  /** 删除：移到回收站 */
+  trashFile(filePath: string): Promise<Result<null>>
+  /** 只读取教学案（如在首页导出），不打开、不记入最近打开 */
+  readProject(filePath: string): Promise<Result<ProjectBundle>>
+  /** 以指定的 Word 文档新建教学案 */
+  createFromDocxAt(filePath: string, templateId: string, presetId: string): Promise<Result<{ opened: OpenedProject; report: ImportReport }>>
   /** 设置：用户保存的选项间距方案（所有教学案通用） */
   getOptionStopSchemes(): Promise<OptionStopScheme[]>
   setOptionStopSchemes(schemes: OptionStopScheme[]): Promise<OptionStopScheme[]>

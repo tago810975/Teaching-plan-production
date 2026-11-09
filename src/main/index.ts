@@ -10,7 +10,9 @@ import { ProjectFileError } from '@core/project-file/codec'
 import { DocxReadError } from '@core/import/docx-reader'
 import { DocxExportError } from '@core/export/docx-writer'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
-import { IPC, type MenuCommand, type OpenedProject, type Result, type SaveRequest } from '@shared/ipc'
+import { IPC, type FolderListing, type LocalPlace, type MenuCommand, type OpenedProject, type Result, type SaveRequest } from '@shared/ipc'
+import type { ProjectBundle } from '@core/model/types'
+import { listDrives, listFolder, listSubfolders, renameEntry } from './files'
 import { buildAppMenu } from './menu'
 import { readTemplateDefaults } from './template-io'
 import { importDocxFiles } from './import-io'
@@ -32,6 +34,7 @@ import {
   getLibraryDir,
   listProjects,
   removeRecent,
+  renameRecent,
   setDefaultPresetId,
   setOptionStopSchemes,
   setLibraryDir
@@ -266,6 +269,71 @@ function registerIpc(): void {
       return { ok: true, value: { opened, report: imported.report } }
     } catch (err) {
       return { ok: false, error: describeError(err) }
+    }
+  })
+
+  // 以首页中选中的 Word 文档新建（不弹出选择文件的对话框）
+  ipcMain.handle(IPC.createFromDocxAt, async (_event, filePath: string, templateId: string, presetId: string) => {
+    try {
+      const imported = await importDocxFiles([filePath], presetId)
+      const title = imported.firstTitle ?? basename(filePath).replace(/\.docx$/i, '')
+      const opened = await createProject(title, null, templateId, imported, presetId)
+      return { ok: true, value: { opened, report: imported.report } }
+    } catch (err) {
+      return { ok: false, error: describeError(err) }
+    }
+  })
+
+  // ---------- 首页：本地文件 ----------
+  ipcMain.handle(IPC.getLocalPlaces, async (): Promise<LocalPlace[]> => {
+    const places: LocalPlace[] = []
+    for (const [label, name, kind] of [
+      ['桌面', 'desktop', 'desktop'],
+      ['文档', 'documents', 'documents'],
+      ['下载', 'downloads', 'downloads']
+    ] as const) {
+      try {
+        places.push({ label, path: app.getPath(name), kind })
+      } catch {
+        // 该位置不存在时跳过
+      }
+    }
+    for (const d of await listDrives()) {
+      places.push({ label: process.platform === 'win32' ? `本地磁盘 (${d.slice(0, 2)})` : '本机', path: d, kind: 'drive' })
+    }
+    return places
+  })
+  ipcMain.handle(IPC.listFolder, async (_event, dir: string): Promise<Result<FolderListing>> => {
+    try {
+      return { ok: true, value: await listFolder(dir) }
+    } catch (err) {
+      return { ok: false, error: `无法打开文件夹：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.listSubfolders, (_event, dir: string) => listSubfolders(dir))
+  ipcMain.handle(IPC.renameFile, async (_event, filePath: string, newStem: string): Promise<Result<string>> => {
+    try {
+      const target = await renameEntry(filePath, newStem, app.getVersion())
+      await renameRecent(filePath, target)
+      return { ok: true, value: target }
+    } catch (err) {
+      return { ok: false, error: `重命名失败：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.trashFile, async (_event, filePath: string): Promise<Result<null>> => {
+    try {
+      await shell.trashItem(filePath)
+      await removeRecent(filePath)
+      return { ok: true, value: null }
+    } catch (err) {
+      return { ok: false, error: `删除失败：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.readProject, async (_event, filePath: string): Promise<Result<ProjectBundle>> => {
+    try {
+      return { ok: true, value: await readProjectFile(filePath) }
+    } catch (err) {
+      return { ok: false, error: `无法读取教学案：${describeError(err)}` }
     }
   })
 

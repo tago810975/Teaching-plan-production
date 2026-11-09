@@ -31,9 +31,11 @@ export function App() {
     dispatch({ type: 'load', bundle, filePath: null })
   }, [])
 
-  const [fromDocxOpen, setFromDocxOpen] = useState(false)
-  const createFromDocx = useCallback(async (presetId: string) => {
-    const result = await window.api.createFromDocx(getPreset(presetId).templateId, presetId)
+  // 从 Word 新建：null 为关闭；filePath 为首页中选中的文档（否则弹出选择文件的对话框）
+  const [fromDocx, setFromDocx] = useState<{ filePath?: string } | null>(null)
+  const createFromDocx = useCallback(async (presetId: string, filePath?: string) => {
+    const templateId = getPreset(presetId).templateId
+    const result = filePath !== undefined ? await window.api.createFromDocxAt(filePath, templateId, presetId) : await window.api.createFromDocx(templateId, presetId)
     if (!result.ok) setDemoError(result.error)
     else if (result.value !== null) {
       const { opened, report } = result.value
@@ -58,7 +60,7 @@ export function App() {
             onOpenOther={() => void files.openProject()}
             onNew={files.newProject}
             onOpenDemo={() => void openDemo()}
-            onCreateFromDocx={() => setFromDocxOpen(true)}
+            onCreateFromDocx={(filePath) => setFromDocx(filePath !== undefined ? { filePath } : {})}
           />
         </>
       ) : (
@@ -84,12 +86,13 @@ export function App() {
           }}
         />
       )}
-      {fromDocxOpen && (
+      {fromDocx !== null && (
         <CreateFromDocxDialog
-          onCancel={() => setFromDocxOpen(false)}
+          {...(fromDocx.filePath !== undefined ? { filePath: fromDocx.filePath } : {})}
+          onCancel={() => setFromDocx(null)}
           onChoose={async (presetId) => {
-            await createFromDocx(presetId)
-            setFromDocxOpen(false)
+            await createFromDocx(presetId, fromDocx.filePath)
+            setFromDocx(null)
           }}
         />
       )}

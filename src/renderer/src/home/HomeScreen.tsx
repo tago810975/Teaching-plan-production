@@ -1,10 +1,14 @@
 /**
- * 首页：管理全部教学案。列出教学案库中的工程和最近打开过的工程，
- * 可以新建、打开、搜索，或在文件夹中找到对应文件。
+ * 首页（参照 WPS）：左侧栏是新建 / 打开、最近、教学案库和本地文件夹；右侧列出文件。
+ * 右键文件可以打开、导出 Word、重命名、删除（移到回收站）等。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { LibraryListing, ProjectListItem } from '@shared/ipc'
+import type { FolderListing, LibraryListing, ProjectListItem } from '@shared/ipc'
+import type { ProjectBundle } from '@core/model/types'
 import { PRESETS } from '@core/presets'
+import { ExportDialog, ExportDoneNotice } from '../export/ExportDialog'
+import { FileTable, stem, type FileActions, type FileItem } from './FileTable'
+import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
 import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
@@ -12,21 +16,32 @@ interface Props {
   onOpenOther: () => void
   onNew: () => void
   onOpenDemo: () => void
-  onCreateFromDocx: () => void
+  /** 从 Word 文档新建；给出 filePath 时直接用这个文档 */
+  onCreateFromDocx: (filePath?: string) => void
 }
 
 export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFromDocx }: Props) {
+  const [view, setView] = useState<HomeView>({ kind: 'recent' })
   const [listing, setListing] = useState<LibraryListing | null>(null)
+  const [folder, setFolder] = useState<FolderListing | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [exporting, setExporting] = useState<{ bundle: ProjectBundle; path: string } | null>(null)
+  const [exported, setExported] = useState<string[] | null>(null)
 
   const refresh = useCallback(async () => {
     const result = await window.api.listProjects()
-    if (result.ok) {
-      setListing(result.value)
-      setError(null)
-    } else setError(result.error)
-  }, [])
+    if (result.ok) setListing(result.value)
+    else setError(result.error)
+    if (view.kind === 'folder') {
+      const r = await window.api.listFolder(view.path)
+      if (r.ok) setFolder(r.value)
+      else {
+        setFolder(null)
+        setError(r.error)
+      }
+    }
+  }, [view])
 
   useEffect(() => {
     void refresh()
@@ -36,172 +51,222 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
     return () => window.removeEventListener('focus', onFocus)
   }, [refresh])
 
-  const items = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return (listing?.items ?? [])
-      .filter((item) => q === '' || displayName(item).toLowerCase().includes(q))
-      .sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
-  }, [listing, query])
-
-  const changeLibrary = async (): Promise<void> => {
-    const result = await window.api.chooseLibraryDir()
-    if (!result.ok) setError(result.error)
-    else if (result.value !== null) void refresh()
+  const go = (v: HomeView): void => {
+    setQuery('')
+    if (v.kind === 'folder') setFolder(null)
+    setView(v)
   }
+
+  const items: FileItem[] = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const all =
+      view.kind === 'recent'
+        ? (listing?.items ?? []).slice().sort((a, b) => sortKey(b).localeCompare(sortKey(a))).map((i) => fromListItem(i, listing!.libraryDir))
+        : (folder?.entries ?? []).map(
+            (e): FileItem => ({
+              path: e.path,
+              kind: e.kind,
+              name: e.kind === 'project' ? (e.summary?.title ?? stem(e.name)) : e.name,
+              fileName: e.name,
+              status: e.error !== undefined ? 'error' : 'ok',
+              ...(e.error !== undefined ? { error: e.error } : {}),
+              ...(e.summary !== undefined ? { questionCount: e.summary.questionCount } : {}),
+              ...(e.modifiedAt !== undefined ? { modifiedAt: e.modifiedAt } : {})
+            })
+          )
+    return all.filter((i) => q === '' || i.name.toLowerCase().includes(q) || i.fileName.toLowerCase().includes(q))
+  }, [view, listing, folder, query])
+
+  const actions: FileActions = {
+    open: (item) => {
+      if (item.kind === 'folder') go({ kind: 'folder', path: item.path })
+      else if (item.kind === 'docx') onCreateFromDocx(item.path)
+      else onOpen(item.path)
+    },
+    exportWord: async (item) => {
+      const r = await window.api.readProject(item.path)
+      if (r.ok) setExporting({ bundle: r.value, path: item.path })
+      else setError(r.error)
+    },
+    createFromDocx: (item) => onCreateFromDocx(item.path),
+    rename: async (item, newStem) => {
+      const r = await window.api.renameFile(item.path, newStem)
+      if (!r.ok) {
+        setError(r.error)
+        return r.error
+      }
+      await refresh()
+      return null
+    },
+    remove: async (item) => {
+      const what = item.kind === 'project' ? '教学案' : 'Word 文档'
+      if (!window.confirm(`把${what}“${item.name}”移到回收站？\n\n${item.path}\n\n需要时可以从回收站还原。`)) return
+      const r = await window.api.trashFile(item.path)
+      if (!r.ok) setError(r.error)
+      await refresh()
+    },
+    forget: async (item) => {
+      await window.api.removeRecent(item.path)
+      await refresh()
+    }
+  }
+
+  const title = view.kind === 'recent' ? '最近' : (view.title ?? lastSegment(view.path))
+  const libraryDir = listing?.libraryDir ?? null
+  const inLibrary = view.kind === 'folder' && libraryDir !== null && samePath(view.path, libraryDir)
 
   return (
     <div className="home">
-      <header className="home-head">
-        <h1 className="home-title">教学案制作</h1>
-        <div className="home-actions">
-          <button type="button" className="primary" onClick={onNew}>
-            新建教学案
-          </button>
-          <button type="button" onClick={onCreateFromDocx} title="识别 Word 文档中的题目，生成一份新的教学案">
-            从 Word 文档新建…
-          </button>
-          <button type="button" onClick={onOpenOther}>
-            打开其他位置的教学案…
-          </button>
-          <button type="button" className="link" onClick={onOpenDemo}>
-            打开示例
-          </button>
-        </div>
-      </header>
+      <HomeSidebar
+        view={view}
+        libraryDir={libraryDir}
+        onView={go}
+        onNew={onNew}
+        onCreateFromDocx={() => onCreateFromDocx()}
+        onOpenOther={onOpenOther}
+      />
 
-      {error !== null && (
-        <div className="banner" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)}>
-            知道了
-          </button>
-        </div>
-      )}
+      <main className="home-main">
+        {error !== null && (
+          <div className="banner" role="alert">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)}>
+              知道了
+            </button>
+          </div>
+        )}
 
-      <section className="home-list" aria-labelledby="home-list-title">
         <div className="home-list-bar">
-          <h2 id="home-list-title">我的教学案</h2>
+          <h1 className="home-view-title">{title}</h1>
+          <button type="button" className="icon-button" title="刷新" aria-label="刷新" onClick={() => void refresh()}>
+            ⟳
+          </button>
           <input
             type="search"
             className="home-search"
             placeholder="按名称查找"
-            aria-label="按名称查找教学案"
+            aria-label="按名称查找"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          {listing !== null && (
+        </div>
+
+        {view.kind === 'folder' && folder !== null && <Breadcrumb dir={folder.dir} parent={folder.parent} onGo={(path) => go({ kind: 'folder', path })} />}
+
+        {view.kind === 'recent' ? (
+          listing === null ? (
+            <p className="home-empty">正在读取教学案…</p>
+          ) : (
+            <FileTable
+              items={items}
+              actions={actions}
+              showLocation
+              emptyText={query !== '' ? `没有名称包含“${query}”的教学案。` : '还没有教学案。点左上角“新建教学案”开始制作第一份。'}
+            />
+          )
+        ) : folder === null ? (
+          <p className="home-empty">正在读取文件夹…</p>
+        ) : (
+          <FileTable
+            items={items}
+            actions={actions}
+            showLocation={false}
+            emptyText={query !== '' ? `没有名称包含“${query}”的文件。` : '这个文件夹中没有教学案或 Word 文档。'}
+          />
+        )}
+
+        <footer className="home-foot">
+          {libraryDir !== null && (
             <p className="home-library">
-              教学案库：<span className="home-library-path">{listing.libraryDir}</span>
-              <button type="button" className="link" onClick={() => window.api.revealInFolder(listing.libraryDir)}>
-                打开文件夹
-              </button>
-              <button type="button" className="link" onClick={() => void changeLibrary()}>
+              教学案库：<span className="home-library-path">{libraryDir}</span>
+              {!inLibrary && (
+                <button type="button" className="link" onClick={() => go({ kind: 'folder', path: libraryDir, title: '教学案库' })}>
+                  查看
+                </button>
+              )}
+              <button type="button" className="link" onClick={() => void changeLibrary(setError, refresh)}>
                 更改…
               </button>
             </p>
           )}
           <DefaultPresetSetting />
-        </div>
+          <button type="button" className="link" onClick={onOpenDemo}>
+            打开示例
+          </button>
+        </footer>
+      </main>
 
-        {listing === null ? (
-          <p className="home-empty">正在读取教学案…</p>
-        ) : listing.items.length === 0 ? (
-          <p className="home-empty">库里还没有教学案。点“新建教学案”开始制作第一份。</p>
-        ) : items.length === 0 ? (
-          <p className="home-empty">没有名称包含“{query}”的教学案。</p>
-        ) : (
-          <table className="home-table">
-            <thead>
-              <tr>
-                <th scope="col">名称</th>
-                <th scope="col" className="num">
-                  题目
-                </th>
-                <th scope="col">修改时间</th>
-                <th scope="col">位置</th>
-                <th scope="col">
-                  <span className="visually-hidden">操作</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <Row
-                  key={item.filePath}
-                  item={item}
-                  libraryDir={listing.libraryDir}
-                  onOpen={onOpen}
-                  onRemoved={() => void refresh()}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      {exported !== null && <ExportDoneNotice files={exported} onDismiss={() => setExported(null)} />}
+      {exporting !== null && (
+        <ExportDialog
+          bundle={exporting.bundle}
+          projectPath={exporting.path}
+          onCancel={() => setExporting(null)}
+          onDone={(files) => {
+            setExporting(null)
+            setExported(files)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function Row(props: {
-  item: ProjectListItem
-  libraryDir: string
-  onOpen: (filePath: string) => void
-  onRemoved: () => void
-}) {
-  const { item, libraryDir, onOpen, onRemoved } = props
-  const usable = item.status === 'ok'
-  const open = (): void => {
-    if (usable) onOpen(item.filePath)
-  }
-
+function Breadcrumb({ dir, parent, onGo }: { dir: string; parent: string | null; onGo: (path: string) => void }) {
+  // 逐级拆开路径：C:\Users\张老师\文档 → C:\ › Users › 张老师 › 文档
+  const sep = dir.includes('\\') ? '\\' : '/'
+  const parts = dir.split(/[\\/]+/).filter(Boolean)
+  const crumbs: Array<{ label: string; path: string }> = []
+  let acc = dir.startsWith('/') ? '/' : ''
+  parts.forEach((p, i) => {
+    acc = i === 0 ? (dir.startsWith('/') ? `/${p}` : `${p}${sep}`) : `${acc.replace(/[\\/]$/, '')}${sep}${p}`
+    crumbs.push({ label: p, path: acc })
+  })
+  if (dir.startsWith('/')) crumbs.unshift({ label: '/', path: '/' })
   return (
-    <tr
-      className={usable ? 'home-row' : 'home-row is-unavailable'}
-      onDoubleClick={open}
-      title={usable ? '双击打开' : undefined}
-    >
-      <td>
-        <button type="button" className="home-row-name" disabled={!usable} onClick={open}>
-          {displayName(item)}
-        </button>
-        {item.summary !== undefined && fileStem(item.filePath) !== item.summary.title && (
-          <span className="home-row-file">文件：{fileStem(item.filePath)}.tplan</span>
-        )}
-        {item.status === 'missing' && <span className="home-row-status">文件已被移动或删除</span>}
-        {item.status === 'error' && <span className="home-row-status">无法读取：{item.error}</span>}
-      </td>
-      <td className="num">{item.summary?.questionCount ?? ''}</td>
-      <td className="nowrap">{item.modifiedAt === undefined ? '' : formatTime(item.modifiedAt)}</td>
-      <td className="home-row-path" title={item.filePath}>
-        {item.inLibrary ? relativeToLibrary(item.filePath, libraryDir) : item.filePath}
-      </td>
-      <td className="home-row-actions">
-        {item.status !== 'missing' && (
-          <button type="button" className="link" onClick={() => window.api.revealInFolder(item.filePath)}>
-            在文件夹中显示
-          </button>
-        )}
-        {!item.inLibrary && (
-          <button
-            type="button"
-            className="link"
-            onClick={() => void window.api.removeRecent(item.filePath).then(onRemoved)}
-          >
-            从列表中移除
-          </button>
-        )}
-      </td>
-    </tr>
+    <nav className="breadcrumb" aria-label="文件夹位置">
+      <button type="button" className="icon-button" disabled={parent === null} onClick={() => parent !== null && onGo(parent)} title="上一级" aria-label="上一级">
+        ↑
+      </button>
+      {crumbs.map((c, i) => (
+        <span key={c.path} className="breadcrumb-item">
+          {i > 0 && <span className="breadcrumb-sep">›</span>}
+          {i === crumbs.length - 1 ? (
+            <span aria-current="page">{c.label}</span>
+          ) : (
+            <button type="button" className="link" onClick={() => onGo(c.path)}>
+              {c.label}
+            </button>
+          )}
+        </span>
+      ))}
+      <button type="button" className="link breadcrumb-reveal" onClick={() => window.api.revealInFolder(dir)}>
+        在资源管理器中打开
+      </button>
+    </nav>
   )
 }
 
-function displayName(item: ProjectListItem): string {
-  return item.summary?.title ?? fileStem(item.filePath)
+async function changeLibrary(setError: (e: string) => void, refresh: () => Promise<void>): Promise<void> {
+  const result = await window.api.chooseLibraryDir()
+  if (!result.ok) setError(result.error)
+  else if (result.value !== null) await refresh()
 }
 
-function fileStem(filePath: string): string {
-  const name = filePath.split(/[\\/]/).pop() ?? filePath
-  return name.replace(/\.tplan$/i, '')
+function fromListItem(item: ProjectListItem, libraryDir: string): FileItem {
+  const fileName = item.filePath.split(/[\\/]/).pop() ?? item.filePath
+  return {
+    path: item.filePath,
+    kind: 'project',
+    name: item.summary?.title ?? stem(fileName),
+    fileName,
+    status: item.status,
+    ...(item.error !== undefined ? { error: item.error } : {}),
+    ...(item.summary !== undefined ? { questionCount: item.summary.questionCount } : {}),
+    ...(item.modifiedAt !== undefined ? { modifiedAt: item.modifiedAt } : {}),
+    location: item.inLibrary ? relativeToLibrary(item.filePath, libraryDir) : parentDir(item.filePath),
+    recentOnly: !item.inLibrary
+  }
 }
 
 /** 按“最近修改或最近打开”中较晚的时间排序 */
@@ -218,17 +283,12 @@ function relativeToLibrary(filePath: string, libraryDir: string): string {
   return parts.length === 0 ? '教学案库' : `教学案库 › ${parts.join(' › ')}`
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const t = d.getTime()
-  if (t >= startOfToday) return `今天 ${hm}`
-  if (t >= startOfToday - 86400000) return `昨天 ${hm}`
-  const date = `${d.getMonth() + 1}月${d.getDate()}日`
-  return d.getFullYear() === now.getFullYear() ? date : `${d.getFullYear()}年${date}`
+function parentDir(p: string): string {
+  return p.replace(/[\\/][^\\/]*$/, '')
+}
+
+function lastSegment(p: string): string {
+  return p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p
 }
 
 /** 设置：导入（从 Word 新建）时默认使用的格式预设；新建教学案时也以它为初始选择 */

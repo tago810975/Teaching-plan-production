@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from 'react'
 import { PresetSelect, useDefaultPreset } from './PresetSelect'
 
 interface Props {
+  /** 首页中选中的 Word 文档；不设时点按钮后选择文件 */
+  filePath?: string
   onChoose: (presetId: string) => Promise<void>
   onCancel: () => void
 }
 
-export function CreateFromDocxDialog({ onChoose, onCancel }: Props) {
+export function CreateFromDocxDialog({ filePath, onChoose, onCancel }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [presetId, setPresetId] = useDefaultPreset()
   const [busy, setBusy] = useState(false)
@@ -29,6 +31,11 @@ export function CreateFromDocxDialog({ onChoose, onCancel }: Props) {
       }}
     >
       <h2 id="from-docx-title">从 Word 文档新建</h2>
+      {filePath !== undefined && (
+        <p className="from-docx-file" title={filePath}>
+          文档：{filePath.split(/[\\/]/).pop()}
+        </p>
+      )}
       <div className="field">
         <label className="field-label" htmlFor="from-docx-preset">
           格式预设
@@ -53,7 +60,7 @@ export function CreateFromDocxDialog({ onChoose, onCancel }: Props) {
             }
           }}
         >
-          {busy ? '正在导入…' : '选择 Word 文档…'}
+          {busy ? '正在导入…' : filePath !== undefined ? '导入' : '选择 Word 文档…'}
         </button>
       </div>
     </dialog>

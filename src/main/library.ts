@@ -109,6 +109,13 @@ export async function removeRecent(filePath: string): Promise<void> {
   await writeFile(recentPath(), JSON.stringify(list.filter((e) => normalize(e.filePath) !== key), null, 2))
 }
 
+/** 文件改名后，最近打开中的记录跟着改 */
+export async function renameRecent(from: string, to: string): Promise<void> {
+  const list = await readJsonFile<RecentEntry[]>(recentPath(), [])
+  const key = normalize(from)
+  await writeFile(recentPath(), JSON.stringify(list.map((e) => (normalize(e.filePath) === key ? { ...e, filePath: to } : e)), null, 2))
+}
+
 // ---------- 列表 ----------
 
 export async function listProjects(): Promise<LibraryListing> {
