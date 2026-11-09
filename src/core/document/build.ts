@@ -6,6 +6,7 @@
  */
 import type {
   OptionStops,
+  WorksheetBlock,
   ChoiceOption,
   CompositeBlock,
   KnowledgeBlock,
@@ -23,6 +24,7 @@ import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun, FloatingImage } from './ir'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
+import { getPreset, presetStyles, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
 const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: '(学案)' }
@@ -30,6 +32,7 @@ const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: 
 export function buildDocument(project: Project, variant: Variant): DocIR {
   const out: DocParagraph[] = []
   let questionNo = 0
+  const preset = getPreset(project.presetId)
 
   for (const block of project.blocks) {
     switch (block.type) {
@@ -43,6 +46,10 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         break
       case 'section':
         out.push(textPara(block.id, 'section', block.text))
+        break
+      case 'worksheet':
+        questionNo = 0
+        out.push(...buildWorksheet(block, preset))
         break
       case 'topic':
         out.push(textPara(block.id, 'topic', block.text))
@@ -88,8 +95,43 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
     page: A4_PAGE,
     header: { ...header, right: header.right === '' ? '' : header.right + VARIANT_SUFFIX[variant] },
     bodyTopTwip: bodyTopTwip(header, A4_PAGE),
-    paragraphs: out
+    paragraphs: out,
+    styles: presetStyles(preset)
   }
+}
+
+// ---------------- 作业单 ----------------
+
+/**
+ * 作业单：与示例文档一致——（分页）大标题、空行、“姓名：____ 教室：____ 正确率：____”、空行。
+ * 姓名栏各项之间用制表位对齐，填写处是带下划线的空白；之后的题目从 1 重新编号。
+ */
+function buildWorksheet(w: WorksheetBlock, preset: FormatPreset): DocParagraph[] {
+  const cfg = preset.worksheet
+  const line = (key: string): DocParagraph => ({ key: `${w.id}:${key}`, sourceBlockId: w.id, style: 'body', runs: [], spacerTwip: BODY_LINE_HEIGHT_TWIP, keepNext: true })
+  const runs: DocRun[] = []
+  w.fields.forEach((f, i) => {
+    if (i > 0) runs.push({ kind: 'tab' })
+    runs.push({ kind: 'text', text: `${f}：` }, { kind: 'blank', widthChars: cfg.blankChars })
+  })
+  const tabs = cfg.tabStopsTwip.slice(0, Math.max(0, w.fields.length - 1))
+  return [
+    {
+      ...textPara(w.id, 'title', w.title),
+      restartNumbering: true,
+      ...(cfg.pageBreakBefore ? { pageBreakBefore: true } : {})
+    },
+    line('gap1'),
+    {
+      key: `${w.id}:fields`,
+      sourceBlockId: w.id,
+      style: 'body',
+      keepNext: true,
+      ...(tabs.length > 0 ? { tabStopsTwip: tabs } : {}),
+      runs
+    },
+    line('gap2')
+  ]
 }
 
 // ---------------- 题目 ----------------
@@ -114,9 +156,10 @@ function buildQuestion(
   const stem: RichText = q.stem.length > 0 ? q.stem : [{ inlines: [] }]
   stem.forEach((p, i) => {
     const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined)
-    if (i === 0 && q.difficulty !== undefined && q.difficulty !== '') {
-      runs.unshift({ kind: 'text', text: `【${q.difficulty}】` })
-    }
+    // 难度：等级写作【B】，星级写作★★★，两者都有时为【B】★★★
+    const grade = q.difficulty !== undefined && q.difficulty !== '' ? `【${q.difficulty}】` : ''
+    const prefix = grade + starText(q.stars)
+    if (i === 0 && prefix !== '') runs.unshift({ kind: 'text', text: prefix })
     push({
       key: key(`stem${i}`),
       anchorIndex: i,

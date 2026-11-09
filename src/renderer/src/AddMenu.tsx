@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createComposite, createKnowledge, createQuestion, newId } from '@core/model/factory'
 import type { Block } from '@core/model/types'
+import type { FormatPreset } from '@core/presets'
 
 type Kind = 'choice' | 'multi' | 'fill' | 'solve' | 'composite' | 'knowledge' | 'topic' | 'section' | 'paragraph' | 'title'
 
@@ -20,6 +21,12 @@ const ITEMS: ReadonlyArray<readonly [Kind, string] | 'divider'> = [
   ['paragraph', '正文段落'],
   ['title', '大标题（如“作业单”）']
 ]
+
+/** 预制模块：作业单（分页、大标题、姓名栏，题号重新编排） */
+export function createWorksheet(preset: FormatPreset, projectTitle: string): Block {
+  const name = projectTitle.trim().replace(/专题$/, '')
+  return { id: newId(), type: 'worksheet', title: preset.worksheet.titlePrefix + (name || ''), fields: [...preset.worksheet.fields] }
+}
 
 export function createBlock(kind: Kind): Block {
   const id = newId()
@@ -66,7 +73,7 @@ export function createBlock(kind: Kind): Block {
   }
 }
 
-export function AddMenu({ onAdd }: { onAdd: (block: Block) => void }) {
+export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block) => void; preset: FormatPreset; projectTitle: string }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -110,6 +117,33 @@ export function AddMenu({ onAdd }: { onAdd: (block: Block) => void }) {
               </button>
             )
           )}
+          <div className="menu-divider" role="separator" />
+          <div className="menu-heading" role="presentation">
+            {preset.name} 预制模块
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              onAdd(createWorksheet(preset, projectTitle))
+            }}
+          >
+            作业单（分页、大标题、{preset.worksheet.fields.join('/')}栏，题号重新编排）
+          </button>
+          {preset.sectionNames.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false)
+                onAdd({ id: newId(), type: 'section', text: name })
+              }}
+            >
+              栏目标题：{name}
+            </button>
+          ))}
         </div>
       )}
     </div>

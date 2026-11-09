@@ -62,6 +62,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
               >
                 {block.type === 'question' && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
                 <span className="outline-text">{describe(block)}</span>
+                {block.type === 'question' && <Difficulty grade={block.question.difficulty} stars={block.question.stars} />}
               </button>
             </li>,
             // 综合题的小题：缩进列在综合题之下，随综合题一起拖动
@@ -78,6 +79,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch }: 
                     >
                       <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>
                       <span className="outline-text">{describe(item)}</span>
+                      <Difficulty grade={item.question.difficulty} stars={item.question.stars} />
                     </button>
                   </li>
                 ))
@@ -136,6 +138,18 @@ function summary(text: string): string {
     .slice(0, 40)
 }
 
+/** 大纲中的难度：等级与星级，便于浏览 */
+function Difficulty({ grade, stars }: { grade: string | undefined; stars: number | undefined }) {
+  if ((grade === undefined || grade === '') && stars === undefined) return null
+  const label = [grade !== undefined && grade !== '' ? `难度 ${grade}` : '', stars !== undefined ? `${stars} 星` : ''].filter(Boolean).join('，')
+  return (
+    <span className="outline-difficulty" title={label} aria-label={label}>
+      {grade !== undefined && grade !== '' && <span className="outline-grade">{grade}</span>}
+      {stars !== undefined && <span className="outline-stars">{'★'.repeat(stars)}</span>}
+    </span>
+  )
+}
+
 function describe(block: Block): string {
   switch (block.type) {
     case 'title':
@@ -150,5 +164,7 @@ function describe(block: Block): string {
       return block.title.trim() || summary(plainText(block.content)) || '（知识点）'
     case 'composite':
       return `综合题　${block.title.trim() || summary(plainText(block.background)) || ''}`.trim()
+    case 'worksheet':
+      return block.title.trim() || '作业单'
   }
 }

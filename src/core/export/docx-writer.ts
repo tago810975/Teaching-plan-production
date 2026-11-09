@@ -13,6 +13,7 @@ import type { DocIR, DocParagraph, DocRun, FloatingImage } from '../document/ir'
 import { A4_PAGE, contentWidthTwip } from '../document/units'
 import { STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
+import { applyHeadingStyles } from './heading-styles'
 import { latexToOmml } from '../math/mathml-to-omml'
 import type { Asset, FontFamily, HeaderImage, TextMarks } from '../model/types'
 import { extForMime } from '../project-file/format'
@@ -39,6 +40,8 @@ export class DocxExportError extends Error {
 
 export async function writeDocx({ ir, assets, title, template }: ExportInput): Promise<Uint8Array> {
   const zip = await JSZip.loadAsync(template)
+  // 标题格式来自格式预设：写进模板的同名样式
+  if (ir.styles !== undefined) zip.file('word/styles.xml', applyHeadingStyles(await readText(zip, 'word/styles.xml'), ir.styles))
   const ctx = new ExportContext(zip, assets)
   await ctx.loadTemplate()
 

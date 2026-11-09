@@ -12,6 +12,9 @@ import { FigureList } from './FigureList'
 import { OptionImageControls } from './OptionImageControls'
 import { FontSelect } from './FontSelect'
 import { OptionStopsEditor } from './OptionStopsEditor'
+import { DifficultyField } from './DifficultyField'
+import { getPreset, type FormatPreset } from '@core/presets'
+import { formatToken } from '@core/model/markup'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
 import { copyStops, DEFAULT_OPTION_STOPS, LEGACY_OPTION_STOPS } from '@core/model/factory'
@@ -19,6 +22,7 @@ import { optionImageSignature } from '@core/model/option-images'
 import type {
   Block,
   FontFamily,
+  Inline,
   BlockLayout,
   CompositeBlock,
   KeepTogether,
@@ -48,9 +52,11 @@ interface Props {
   linkOptionImages?: boolean
   /** 工程的版式设置（选项列位置等的默认值） */
   projectLayout?: ProjectLayout
+  /** 工程的格式预设（难度等级、知识梳理的强调格式等） */
+  preset?: FormatPreset
 }
 
-export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout, preset = getPreset(undefined) }: Props) {
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -100,6 +106,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             dispatch={dispatch}
             linkOptionImages={linkOptionImages}
             projectStops={projectLayout?.optionStops ?? DEFAULT_OPTION_STOPS}
+            preset={preset}
           />
         ) : block.type === 'knowledge' ? (
           <KnowledgeForm
@@ -107,6 +114,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             update={update as (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void}
             assetUrls={assetUrls}
             dispatch={dispatch}
+            emphasis={preset.knowledgeEmphasis}
           />
         ) : block.type === 'composite' ? (
           <CompositeForm
@@ -134,6 +142,27 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
               onChange={(content) => update((b) => ({ ...b, content }) as Block)}
             />
           </Field>
+        ) : block.type === 'worksheet' ? (
+          <>
+            <Field label="标题" hint="如“作业单-动态圆”；作业单从新的一页开始，其后的题目从 1 重新编号">
+              <TextInput fieldId="text" value={block.title} onChange={(title) => update((b) => ({ ...b, title }) as Block)} />
+            </Field>
+            <Field label="姓名栏" hint="各项用顿号分隔，每项后面留一段下划线供学生填写">
+              <TextInput
+                value={block.fields.join('、')}
+                onChange={(v) =>
+                  update((b) => ({ ...b, fields: v.split(/[、,，;；\s]+/).map((s) => s.trim()).filter(Boolean) }) as Block)
+                }
+              />
+            </Field>
+            <button
+              type="button"
+              className="link"
+              onClick={() => update((b) => ({ ...b, fields: [...preset.worksheet.fields] }) as Block)}
+            >
+              恢复为“{preset.worksheet.fields.join('、')}”
+            </button>
+          </>
         ) : (
           <Field label="文字">
             <TextInput fieldId="text" value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
@@ -151,7 +180,8 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
   paragraph: '正文段落',
   question: '题目',
   knowledge: '知识点',
-  composite: '综合题'
+  composite: '综合题',
+  worksheet: '作业单'
 }
 
 // ---------------- 版式设置 ----------------
@@ -301,7 +331,7 @@ function CompositeForm({
         >
           <RichTextField fieldId="answer" value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
         </Field>
-        <Field label="详解" aside={fontSelect('详解', block.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
+        <Field label="解析" aside={fontSelect('解析', block.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
           <RichTextField fieldId="analysis" value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
@@ -316,8 +346,10 @@ function KnowledgeForm({
   block,
   update,
   assetUrls,
-  dispatch
+  dispatch,
+  emphasis
 }: {
+  emphasis: FormatPreset['knowledgeEmphasis']
   block: KnowledgeBlock
   update: (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void
   assetUrls: ReadonlyMap<string, string>
@@ -335,7 +367,7 @@ function KnowledgeForm({
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
         aside={fontSelect('内容', block.content, STYLE_SPECS.body.fontRole, (content) => set({ content }), dispatch)}
       >
-        <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
+        <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} emphasis={emphasis} />
       </Field>
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
@@ -480,7 +512,8 @@ function QuestionForm({
   assetUrls,
   dispatch,
   linkOptionImages,
-  projectStops
+  projectStops,
+  preset
 }: {
   block: QuestionBlock
   update: (fn: (b: QuestionBlock) => QuestionBlock) => void
@@ -488,6 +521,7 @@ function QuestionForm({
   dispatch: Dispatch<EditorAction>
   linkOptionImages: boolean
   projectStops: OptionStops
+  preset: FormatPreset
 }) {
   const q = block.question
   // 选项图片的尺寸变化时，选项输入框需要重新读取内容（它只在挂载时读取一次行内图片）
@@ -498,9 +532,13 @@ function QuestionForm({
 
   return (
     <>
-      <Field label="难度" hint="显示为题干开头的【B】，留空则不显示">
-        <TextInput value={q.difficulty ?? ''} width="4em" onChange={(v) => set({ difficulty: v || undefined })} />
-      </Field>
+      <DifficultyField
+        grade={q.difficulty}
+        stars={q.stars}
+        grades={preset.difficulty.grades}
+        maxStars={Math.min(5, preset.difficulty.maxStars)}
+        onChange={(difficulty, stars) => set({ difficulty, stars })}
+      />
       <Field
         label="题干"
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
@@ -667,7 +705,7 @@ function QuestionForm({
         <Field label="难点">
           <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
         </Field>
-        <Field label="详解" aside={fontSelect('详解', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
+        <Field label="解析" aside={fontSelect('解析', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
           <RichTextField fieldId="analysis" value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
@@ -754,11 +792,14 @@ function RichTextField({
   value,
   rows,
   onChange,
-  fieldId
+  fieldId,
+  emphasis
 }: {
   value: RichText
   rows: number
   onChange: (v: RichText) => void
+  /** 强调格式按钮（如知识梳理中的红色加粗下划线）：给选中的文字加上该格式 */
+  emphasis?: FormatPreset['knowledgeEmphasis']
   /** 对应预览段落的字段名，用于“点击预览定位到编辑框” */
   fieldId?: string
 }) {
@@ -787,7 +828,38 @@ function RichTextField({
         title={EDIT_HINT}
         onChange={(e) => update(e.target.value)}
       />
-      <InsertFormulaButton target={ref} text={draft} onInsert={update} />
+      <div className="text-field-tools">
+        {emphasis?.map((e) => (
+          <button
+            key={e.label}
+            type="button"
+            className="emphasis-button"
+            title={`给选中的文字设为${e.label}`}
+            style={{ color: e.marks.color !== undefined ? `#${e.marks.color}` : undefined, fontWeight: e.marks.bold === true ? 700 : undefined, textDecoration: e.marks.underline === true ? 'underline' : undefined }}
+            onMouseDown={(ev) => ev.preventDefault() /* 保持输入框中的选区 */}
+            onClick={() => {
+              const el = ref.current
+              if (el === null) return
+              const { selectionStart: a, selectionEnd: b } = el
+              const sel = draft.slice(a, b)
+              // 只处理普通文字：不跨段、不含已有标记或公式
+              if (sel === '' || /[⟦⟧\n$]/.test(sel)) return
+              const n = Math.max(0, ...initial.objects.keys()) + 1
+              const marks = { ...e.marks }
+              ;(initial.objects as Map<number, Inline>).set(n, { type: 'text', text: sel, marks })
+              const token = formatToken(n, marks, sel)
+              update(draft.slice(0, a) + token + draft.slice(b))
+              requestAnimationFrame(() => {
+                el.focus()
+                el.setSelectionRange(a, a + token.length)
+              })
+            }}
+          >
+            {e.label}
+          </button>
+        ))}
+        <InsertFormulaButton target={ref} text={draft} onInsert={update} />
+      </div>
     </div>
   )
 }

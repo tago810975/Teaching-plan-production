@@ -7,7 +7,7 @@
 import JSZip from 'jszip'
 import { projectSchema } from '../model/schema'
 import { countQuestions } from '../model/stats'
-import { copyStops, LEGACY_OPTION_STOPS } from '../model/factory'
+import { copyStops, DEFAULT_PRESET_ID, LEGACY_OPTION_STOPS } from '../model/factory'
 import type { Asset, Project, ProjectBundle } from '../model/types'
 import {
   CURRENT_FORMAT_VERSION,
@@ -181,7 +181,16 @@ function migrate(raw: unknown, fromVersion: number): unknown {
   if (fromVersion < 2) data = migrateV1toV2(data)
   if (fromVersion < 3) data = migrateV2toV3(data)
   if (fromVersion < 6) data = migrateV5toV6(data)
+  if (fromVersion < 7) data = migrateV6toV7(data)
   return data
+}
+
+/** 版本 6 → 7：补上格式预设（此前只有物理教案 V1.0 一种格式） */
+function migrateV6toV7(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const project = raw as Record<string, unknown>
+  project.presetId ??= DEFAULT_PRESET_ID
+  return project
 }
 
 /** 版本 5 → 6：补上选项列位置，取模板原有的制表位，保持旧工程的排版效果不变（新建工程用略宽的默认值） */

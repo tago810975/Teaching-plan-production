@@ -16,6 +16,9 @@ import type {
   RichText
 } from './types'
 
+/** 默认格式预设：物理教案 V1.0（与 core/presets 中的 id 一致） */
+export const DEFAULT_PRESET_ID = 'physics-v1'
+
 export const DEFAULT_TEMPLATE_ID = 'physics-default'
 
 export function newId(): string {
@@ -64,6 +67,7 @@ export function createEmptyProject(now: Date = new Date()): Project {
       optionStops: copyStops(DEFAULT_OPTION_STOPS)
     },
     templateId: DEFAULT_TEMPLATE_ID,
+    presetId: DEFAULT_PRESET_ID,
     blocks: []
   }
 }

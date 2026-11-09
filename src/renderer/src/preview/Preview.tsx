@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { DocIR, OptionImageRef } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
+import { StylesContext } from './styles-context'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
 import { DocParagraphView, type MathRun, type OptionImageHandlers, type ParagraphFocus } from './DocParagraphView'
 import type { FigureChangeHandler } from './FigureImage'
@@ -162,6 +163,7 @@ export function Preview({
   const heights = layout?.heights ?? []
 
   return (
+    <StylesContext.Provider value={ir.styles ?? STYLE_SPECS}>
     <div className="preview" ref={scrollRef}>
       <div className="preview-measure" aria-hidden="true">
         <div ref={measureRef} style={{ width: bodyStyle.width }}>
@@ -222,6 +224,7 @@ export function Preview({
         ))}
       </div>
     </div>
+    </StylesContext.Provider>
   )
 }
 

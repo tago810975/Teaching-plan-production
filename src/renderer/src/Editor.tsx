@@ -4,6 +4,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
 import type { OptionImageRef } from '@core/document/ir'
+import { getPreset } from '@core/presets'
 import { resizeOptionImage, scaleOptionImages } from '@core/model/option-images'
 import type { Variant } from '@core/model/types'
 import { AddMenu } from './AddMenu'
@@ -105,6 +106,7 @@ function EditorBody({
     [openFormula, dispatch]
   )
   const { project, assets } = state.bundle
+  const preset = getPreset(project.presetId)
 
   // 预览使用延迟值：快速输入时优先保证输入框流畅，预览稍后跟上
   const deferredProject = useDeferredValue(project)
@@ -206,7 +208,7 @@ function EditorBody({
         </div>
 
         <div className="toolbar-actions">
-          <AddMenu onAdd={addBlock} />
+          <AddMenu onAdd={addBlock} preset={preset} projectTitle={project.meta.title} />
           <button type="button" onClick={() => void importWord()} title="识别 Word 文档中的题目，插入到当前选中内容之后">
             导入 Word 题目…
           </button>
@@ -264,6 +266,7 @@ function EditorBody({
           block={selectedBlock}
           linkOptionImages={state.linkOptionImages}
           projectLayout={project.layout}
+          preset={preset}
           header={headerSelected ? project.header : null}
           layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}

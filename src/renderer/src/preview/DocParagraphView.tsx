@@ -1,9 +1,10 @@
 /**
  * 单个段落的预览渲染。只依据 DocIR 与 STYLE_SPECS，不包含任何排版规则。
  */
-import { memo, type CSSProperties, type ReactNode } from 'react'
+import { useContext, memo, type CSSProperties, type ReactNode } from 'react'
 import type { DocParagraph, DocRun, OptionImageRef } from '@core/document/ir'
-import { previewCss, STYLE_SPECS } from '@core/document/styles'
+import { previewCss } from '@core/document/styles'
+import { StylesContext } from './styles-context'
 import { emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
 import { FigureImage, type FigureChangeHandler } from './FigureImage'
@@ -85,7 +86,7 @@ export const DocParagraphView = memo(function DocParagraphView({
   onFigureChange,
   optionImages
 }: Props) {
-  const spec = STYLE_SPECS[p.style]
+  const spec = useContext(StylesContext)[p.style]
   const css = previewCss(spec)
   // Word 中相邻段落的段后、段前间距是相加的，CSS 的 margin 会合并，所以改用 padding
   const style: CSSProperties = {

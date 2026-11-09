@@ -1258,3 +1258,78 @@ body.is-dragging-outline * {
   border-color: var(--red-pen);
   outline-color: var(--red-pen);
 }
+
+/* 文本框下方的工具：强调格式按钮与“插入公式” */
+.text-field-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.emphasis-button {
+  font-size: 12px;
+  padding: 1px 8px;
+}
+
+/* 难度：等级与星级 */
+.difficulty-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.stars {
+  display: inline-flex;
+}
+.stars .star {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--rule);
+  cursor: pointer;
+}
+.stars .star.is-on {
+  color: #d99a00;
+}
+.stars .star:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* 大纲中的难度 */
+.outline-difficulty {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  font-size: 11px;
+}
+.outline-grade {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #e6ebe9;
+  color: var(--ink);
+  font-weight: 600;
+}
+.outline-stars {
+  color: #d99a00;
+  letter-spacing: -1px;
+}
+.outline-item.is-selected .outline-grade {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* 添加菜单：预制模块分组 */
+.menu-heading {
+  padding: 4px 10px 2px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.menu-popup {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}

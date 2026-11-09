@@ -82,6 +82,7 @@ const question = z.object({
   id: z.string(),
   kind: z.enum(['single-choice', 'multi-choice', 'fill-blank', 'solve']),
   difficulty: z.string().optional(),
+  stars: z.number().int().min(1).max(5).optional(),
   stem: richText,
   figures: z.array(figure),
   options: z.array(z.object({ label: z.string(), content: richParagraph })),
@@ -114,6 +115,7 @@ const block = z.discriminatedUnion('type', [
     restartNumbering: z.boolean().optional()
   }),
   z.object({ id: z.string(), type: z.literal('section'), text: z.string() }),
+  z.object({ id: z.string(), type: z.literal('worksheet'), title: z.string(), fields: z.array(z.string()) }),
   z.object({ id: z.string(), type: z.literal('topic'), text: z.string() }),
   z.object({
     id: z.string(),
@@ -169,6 +171,7 @@ export const projectSchema = z.object({
     optionStops
   }),
   templateId: z.string(),
+  presetId: z.string(),
   blocks: z.array(block)
 })
 

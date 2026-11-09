@@ -1,0 +1,29 @@
+{
+  "id": "physics-v1",
+  "name": "物理教案 V1.0",
+  "subject": "物理",
+  "description": "墨帝教育物理教学案：大标题、知识梳理 / 例题精讲 / 课堂练习 / 课后练习等二级标题、题型分类三级标题，以及作业单模块。",
+  "templateId": "physics-default",
+  "headings": {
+    "title": { "font": "song", "sizeHalfPt": 36, "bold": true, "align": "center", "spaceBeforeTwip": 160, "spaceAfterTwip": 160 },
+    "section": { "font": "song", "sizeHalfPt": 28, "bold": true, "align": "left", "spaceBeforeTwip": 160, "spaceAfterTwip": 160 },
+    "topic": { "font": "song", "sizeHalfPt": 21, "bold": true, "align": "left", "spaceBeforeTwip": 120, "spaceAfterTwip": 120 }
+  },
+  "sectionNames": ["知识梳理", "例题精讲", "课堂练习", "课后练习", "课堂总结"],
+  "worksheet": {
+    "titlePrefix": "作业单-",
+    "fields": ["姓名", "教室", "正确率"],
+    "tabStopsTwip": [3980, 7980],
+    "blankChars": 8,
+    "pageBreakBefore": true
+  },
+  "knowledgeEmphasis": [
+    { "label": "红色加粗下划线", "marks": { "bold": true, "underline": true, "color": "C00000" } },
+    { "label": "黑色加粗下划线", "marks": { "bold": true, "underline": true } }
+  ],
+  "import": {
+    "renameLabels": { "【详解】": "【解析】" },
+    "analysisColor": "black"
+  },
+  "difficulty": { "grades": ["A", "B", "C"], "maxStars": 5 }
+}

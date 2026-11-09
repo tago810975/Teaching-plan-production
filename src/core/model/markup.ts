@@ -62,6 +62,11 @@ function paragraphText(p: RichParagraph, objects: Map<number, Inline>): string {
   return out
 }
 
+/** 带格式文字的标记，如 ⟦加粗3:文字⟧（用于在输入框中给选中的文字加上格式） */
+export function formatToken(n: number, marks: TextMarks, text: string): string {
+  return `⟦${markName(marks)}${n}:${text}⟧`
+}
+
 function markName(m: TextMarks): string {
   const keys = Object.keys(m).filter((k) => m[k as keyof TextMarks] !== undefined)
   if (keys.length !== 1) return '格式'

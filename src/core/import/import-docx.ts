@@ -7,6 +7,8 @@ import type { Asset, Block } from '../model/types'
 import { collectAssetRefs } from '../project-file/codec'
 import { readDocx } from './docx-reader'
 import { normalizeFonts } from './normalize-fonts'
+import { applyPresetRules } from './preset-rules'
+import { getPreset } from '../presets'
 import { recognize } from './recognize'
 
 export interface DocxImportResult {
@@ -19,12 +21,17 @@ export interface DocxImportResult {
   warnings: string[]
 }
 
-export async function importDocx(bytes: Uint8Array): Promise<DocxImportResult> {
+export interface DocxImportOptions {
+  /** 格式预设，决定作业单、解析等的整理规则；默认物理教案 V1.0 */
+  presetId?: string
+}
+
+export async function importDocx(bytes: Uint8Array, options: DocxImportOptions = {}): Promise<DocxImportResult> {
   const read = await readDocx(bytes)
   const recognized = recognize(read.paragraphs)
   const { questionCount, firstTitle } = recognized
-  // 去掉与样式相同的字体，整段同一字体时提升为段落字体
-  const blocks = normalizeFonts(recognized.blocks)
+  // 去掉与样式相同的字体，整段同一字体时提升为段落字体；再按预设整理作业单、难度星级与解析
+  const blocks = applyPresetRules(normalizeFonts(recognized.blocks), getPreset(options.presetId))
 
   // 只保留被引用的图片（水印、页眉图片等不会进入正文）
   const refs = collectAssetRefs({ ...createEmptyProject(), blocks })

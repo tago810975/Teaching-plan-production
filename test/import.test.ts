@@ -21,10 +21,14 @@ describe('导入样例教案（教师版）', async () => {
     expect(result.questionCount).toBe(20)
     expect(result.firstTitle).toBe('动态圆专题')
     const titles = result.blocks.filter((b) => b.type === 'title')
-    expect(titles.map((t) => (t.type === 'title' ? [t.text, t.restartNumbering ?? false] : []))).toEqual([
-      ['动态圆专题', false],
-      ['作业单-动态圆', true]
-    ])
+    expect(titles.map((t) => (t.type === 'title' ? [t.text, t.restartNumbering ?? false] : []))).toEqual([['动态圆专题', false]])
+  })
+
+  it('作业单：大标题与姓名栏合成作业单模块，其后 5 道题', () => {
+    const i = result.blocks.findIndex((b) => b.type === 'worksheet')
+    expect(result.blocks[i]).toMatchObject({ type: 'worksheet', title: '作业单-动态圆', fields: ['姓名', '教室', '正确率'] })
+    expect(result.blocks.slice(i + 1).filter((b) => b.type === 'question')).toHaveLength(5)
+    expect(result.blocks.slice(i + 1).some((b) => b.type === 'paragraph')).toBe(false)
   })
 
   it('栏目、知识点与题型分组', () => {
@@ -64,7 +68,9 @@ describe('导入样例教案（教师版）', async () => {
     expect(q.options.map((o) => o.label)).toEqual(['A', 'B', 'C', 'D'])
     expect(plainText(q.answer)).toBe('BC')
     expect(q.knowledgePoints).toEqual(['放缩圆'])
-    expect(plainText(q.analysis)).toContain('【详解】')
+    // 物理教案 V1.0：【详解】统一改为【解析】
+    expect(plainText(q.analysis)).toContain('【解析】')
+    expect(plainText(q.analysis)).not.toContain('【详解】')
     expect(q.figures).toHaveLength(1)
     // 选项中的公式保留为原始 OMML
     expect(q.options[1]!.content.inlines.some((i) => i.type === 'math' && i.omml !== undefined)).toBe(true)

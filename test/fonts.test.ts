@@ -3,6 +3,7 @@ import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { fontFamilyOf } from '@core/document/fonts'
 import { STYLE_SPECS } from '@core/document/styles'
+import type { Block } from '@core/model/types'
 
 /** 读取模板 styles.xml：样式名 → 东亚字体（沿 basedOn 向上查找） */
 async function templateFonts(): Promise<Map<string, string | undefined>> {
@@ -84,8 +85,47 @@ describe('导入时识别字体、加粗与颜色', async () => {
     return out
   }
 
-  it('红色文字保留颜色（此前导入时丢失）', () => {
-    expect(texts((m) => m.color === 'FF0000').length).toBeGreaterThan(0)
+  it('解析统一为黑色（物理教案 V1.0），知识梳理中的红字保留', () => {
+    const colored = (field: 'analysis' | 'knowledge'): number =>
+      r.blocks
+        .flatMap((b) =>
+          field === 'knowledge'
+            ? b.type === 'knowledge'
+              ? b.content
+              : []
+            : b.type === 'question'
+              ? b.question.analysis
+              : b.type === 'composite'
+                ? [...b.analysis, ...b.items.flatMap((it) => it.question.analysis)]
+                : []
+        )
+        .flatMap((p) => p.inlines)
+        .filter((i) => i.type === 'text' && i.marks?.color !== undefined).length
+    expect(colored('analysis')).toBe(0)
+    expect(colored('knowledge')).toBeGreaterThan(0)
+  })
+
+  it('知识梳理中的红色加粗下划线保留', async () => {
+    const r2 = await importDocx(new Uint8Array(readFileSync('reference/samples/2026秋季高二物理敏思_动态圆专题/教案_T_动态圆专题.docx')))
+    const marks = r2.blocks.flatMap((b) =>
+      b.type === 'knowledge' ? b.content.flatMap((p) => p.inlines.flatMap((i) => (i.type === 'text' && i.marks !== undefined ? [i.marks] : []))) : []
+    )
+    expect(marks.some((m) => m.color === 'C00000')).toBe(true)
+    expect(marks.some((m) => m.bold === true)).toBe(true)
+  })
+
+  it('选择保留颜色的预设时，解析中的红字保留', async () => {
+    const { applyPresetRules } = await import('@core/import/preset-rules')
+    const { getPreset } = await import('@core/presets')
+    const { createQuestion } = await import('@core/model/factory')
+    const red = { inlines: [{ type: 'text' as const, text: '【详解】红', marks: { color: 'FF0000', bold: true } }] }
+    const block = (): Block => ({ id: 'q', type: 'question', question: createQuestion({ analysis: [red] }) })
+    const keep = { ...getPreset('physics-v1'), import: { renameLabels: {}, analysisColor: 'keep' as const } }
+    const analysisOf = (b: Block | undefined): unknown => (b?.type === 'question' ? b.question.analysis : undefined)
+    expect(analysisOf(applyPresetRules([block()], keep)[0])).toEqual([red])
+    expect(analysisOf(applyPresetRules([block()], getPreset('physics-v1'))[0])).toEqual([
+      { inlines: [{ type: 'text', text: '【解析】红', marks: { bold: true } }] }
+    ])
   })
 
   it('加粗保留', () => {

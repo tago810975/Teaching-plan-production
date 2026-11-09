@@ -9,7 +9,7 @@
  * 这是保证“预览所见即导出所得”的核心约束：任何排版规则只能写在 build.ts 里。
  */
 import type { FontFamily, MathInline, PageHeader, TextMarks, Variant } from '../model/types'
-import type { StyleKey } from './styles'
+import type { ParagraphStyleSpec, StyleKey } from './styles'
 import type { PageSetup } from './units'
 
 /**
@@ -128,4 +128,6 @@ export interface DocIR {
   /** 正文起点（twip），由页眉高度决定 */
   bodyTopTwip: number
   paragraphs: DocParagraph[]
+  /** 本工程的段落样式表（标题格式来自格式预设）；不设时为 STYLE_SPECS */
+  styles?: Readonly<Record<StyleKey, ParagraphStyleSpec>>
 }

@@ -173,6 +173,8 @@ export interface Question {
   kind: QuestionKind
   /** 难度标记，如 "B"、"C"；样例中写作题干前缀【B】 */
   difficulty?: string
+  /** 星级难度，1～5 颗星（星越多越难）；与等级 difficulty 可同时使用 */
+  stars?: number
   /** 题干，第一段紧跟题号 */
   stem: RichText
   figures: QuestionFigure[]
@@ -265,7 +267,28 @@ export interface CompositeBlock {
   layout: BlockLayout
 }
 
-export type Block = TitleBlock | SectionBlock | TopicBlock | ParagraphBlock | QuestionBlock | KnowledgeBlock | CompositeBlock
+/**
+ * 作业单：预制模块。导出为“分页 → 大标题 → 空行 → 姓名栏 → 空行”，其后的题目重新从 1 编号。
+ * 格式（姓名栏的制表位、下划线长度）由格式预设决定。
+ */
+export interface WorksheetBlock {
+  id: string
+  type: 'worksheet'
+  /** 大标题，如“作业单-动态圆” */
+  title: string
+  /** 姓名栏中的各项，如 ["姓名", "教室", "正确率"]，每项后面是供填写的下划线 */
+  fields: string[]
+}
+
+export type Block =
+  | TitleBlock
+  | SectionBlock
+  | TopicBlock
+  | ParagraphBlock
+  | QuestionBlock
+  | KnowledgeBlock
+  | CompositeBlock
+  | WorksheetBlock
 
 // ---------- 工程 ----------
 
@@ -319,6 +342,8 @@ export interface Project {
   layout: ProjectLayout
   /** 使用的 Word 模板标识，对应 resources/templates 下的目录名 */
   templateId: string
+  /** 格式预设（标题格式、作业单模块、导入规则等），见 core/presets */
+  presetId: string
   blocks: Block[]
 }
 
