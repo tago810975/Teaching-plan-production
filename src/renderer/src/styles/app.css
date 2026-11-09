@@ -1873,3 +1873,16 @@ body.is-dragging-outline * {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
+
+/* 格式工具栏在窄面板中：按钮文字不折行，放不下时整体换行，提示另起一行 */
+.format-toolbar {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.format-toolbar .format-button {
+  white-space: nowrap;
+}
+.format-toolbar-hint {
+  flex: 1 1 100%;
+  margin-left: 0;
+}
