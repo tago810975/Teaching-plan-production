@@ -17,6 +17,7 @@ import type { Asset, Block } from '@core/model/types'
 import type { LibraryListing, OpenedProject, ProjectListItem } from '@shared/ipc'
 import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project-io'
 import { readTemplateDefaults } from './template-io'
+import { getPreset } from '@core/presets'
 
 const MAX_RECENT = 30
 /** 扫描库目录时的最大子目录深度（库目录本身为 0） */
@@ -24,6 +25,8 @@ const MAX_SCAN_DEPTH = 2
 
 interface Settings {
   libraryDir?: string
+  /** 导入（从 Word 新建）时默认使用的格式预设 */
+  defaultPresetId?: string
 }
 
 interface RecentEntry {
@@ -54,6 +57,19 @@ export async function getLibraryDir(): Promise<string> {
 export async function setLibraryDir(dir: string): Promise<void> {
   const settings = await readJsonFile<Settings>(settingsPath(), {})
   await writeFile(settingsPath(), JSON.stringify({ ...settings, libraryDir: dir }, null, 2))
+}
+
+// ---------- 默认格式预设 ----------
+
+export async function getDefaultPresetId(): Promise<string> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  // 设置中的预设已不存在（例如被移除）时回到默认预设
+  return getPreset(settings.defaultPresetId).id
+}
+
+export async function setDefaultPresetId(presetId: string): Promise<void> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, defaultPresetId: getPreset(presetId).id }, null, 2))
 }
 
 // ---------- 最近打开 ----------
@@ -138,7 +154,8 @@ export async function createProject(
   title: string,
   dir: string | null,
   templateId: string,
-  content?: { blocks: Block[]; assets: Record<string, Asset> }
+  content?: { blocks: Block[]; assets: Record<string, Asset> },
+  presetId?: string
 ): Promise<OpenedProject> {
   const targetDir = dir ?? (await getLibraryDir())
   await mkdir(targetDir, { recursive: true })
@@ -148,6 +165,7 @@ export async function createProject(
   const bundle = withTemplateDefaults(createEmptyBundle(), defaults)
   bundle.project.meta.title = title.trim() === '' ? '未命名教学案' : title.trim()
   bundle.project.templateId = templateId
+  bundle.project.presetId = getPreset(presetId).id
   if (content !== undefined) {
     bundle.project.blocks = content.blocks
     bundle.assets = { ...bundle.assets, ...content.assets }

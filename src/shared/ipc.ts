@@ -22,6 +22,8 @@ export const IPC = {
   revealInFolder: 'shell:reveal',
   importDocx: 'import:docx',
   createFromDocx: 'project:create-from-docx',
+  getDefaultPreset: 'settings:get-default-preset',
+  setDefaultPreset: 'settings:set-default-preset',
   exportCheck: 'export:check',
   exportWord: 'export:word',
   defaultExportDir: 'export:default-dir',
@@ -123,12 +125,15 @@ export interface RendererApi {
   /** 选择一个文件夹（新建教学案时更改保存位置）；用户取消时返回 null */
   chooseFolder(defaultPath: string): Promise<string | null>
   /** 新建教学案并立即保存为文件；dir 为 null 时保存到教学案库 */
-  createProject(request: { title: string; dir: string | null; templateId: string }): Promise<Result<OpenedProject>>
+  createProject(request: { title: string; dir: string | null; templateId: string; presetId: string }): Promise<Result<OpenedProject>>
   removeRecent(filePath: string): Promise<void>
   /** 选择一个或多个 Word 文档并识别其中的题目；用户取消时返回 null */
-  importDocx(): Promise<Result<ImportedContent | null>>
+  importDocx(presetId: string): Promise<Result<ImportedContent | null>>
   /** 选择一个 Word 文档，以其内容新建教学案；用户取消时返回 null */
-  createFromDocx(templateId: string): Promise<Result<{ opened: OpenedProject; report: ImportReport } | null>>
+  createFromDocx(templateId: string, presetId: string): Promise<Result<{ opened: OpenedProject; report: ImportReport } | null>>
+  /** 设置：导入（从 Word 新建）时默认使用的格式预设 */
+  getDefaultPreset(): Promise<string>
+  setDefaultPreset(presetId: string): Promise<void>
   /** 导出的默认位置：工程文件所在文件夹，未保存时为教学案库 */
   defaultExportDir(projectPath: string | null): Promise<string>
   /** 目标位置已存在的同名文件 */

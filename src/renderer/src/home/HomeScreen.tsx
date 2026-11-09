@@ -4,6 +4,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LibraryListing, ProjectListItem } from '@shared/ipc'
+import { PRESETS } from '@core/presets'
+import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
   onOpen: (filePath: string) => void
@@ -98,6 +100,7 @@ export function HomeScreen({ onOpen, onOpenOther, onNew, onOpenDemo, onCreateFro
               </button>
             </p>
           )}
+          <DefaultPresetSetting />
         </div>
 
         {listing === null ? (
@@ -226,4 +229,28 @@ function formatTime(iso: string): string {
   if (t >= startOfToday - 86400000) return `昨天 ${hm}`
   const date = `${d.getMonth() + 1}月${d.getDate()}日`
   return d.getFullYear() === now.getFullYear() ? date : `${d.getFullYear()}年${date}`
+}
+
+/** 设置：导入（从 Word 新建）时默认使用的格式预设；新建教学案时也以它为初始选择 */
+function DefaultPresetSetting() {
+  const [presetId, setPresetId] = useDefaultPreset()
+  return (
+    <p className="home-library">
+      <label htmlFor="default-preset">导入时默认格式预设：</label>
+      <select
+        id="default-preset"
+        value={presetId}
+        onChange={(e) => {
+          setPresetId(e.target.value)
+          void window.api.setDefaultPreset(e.target.value)
+        }}
+      >
+        {PRESETS.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    </p>
+  )
 }

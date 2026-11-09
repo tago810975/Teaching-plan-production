@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch } from 'react'
 import type { MenuCommand } from '@shared/ipc'
 import type { EditorAction, EditorState } from './store'
+import { getPreset } from '@core/presets'
 
 const DISCARD_PROMPT = '当前教学案有未保存的修改，确定要放弃这些修改吗？'
 
@@ -11,7 +12,7 @@ export interface ProjectFileActions {
   /** 新建：弹出新建对话框 */
   newProject(): void
   /** 新建对话框中点击“创建” */
-  createProject(title: string, dir: string | null): Promise<void>
+  createProject(title: string, dir: string | null, presetId: string): Promise<void>
   openAt(filePath: string): Promise<void>
   /** 关闭当前教学案，回到首页 */
   closeProject(): void
@@ -55,8 +56,9 @@ export function useProjectFile(
   }, [])
 
   const createProject = useCallback(
-    async (title: string, dir: string | null) => {
-      const result = await window.api.createProject({ title, dir, templateId: options.templateId })
+    async (title: string, dir: string | null, presetId: string) => {
+      // 预设决定所用的 Word 模板
+      const result = await window.api.createProject({ title, dir, templateId: getPreset(presetId).templateId, presetId })
       if (result.ok) dispatch({ type: 'load', bundle: result.value.bundle, filePath: result.value.filePath })
       else setError(result.error)
     },

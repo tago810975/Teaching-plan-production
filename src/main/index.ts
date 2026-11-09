@@ -24,7 +24,16 @@ import {
   sanitizeFileName,
   writeProjectFile
 } from './project-io'
-import { addRecent, createProject, getLibraryDir, listProjects, removeRecent, setLibraryDir } from './library'
+import {
+  addRecent,
+  createProject,
+  getDefaultPresetId,
+  getLibraryDir,
+  listProjects,
+  removeRecent,
+  setDefaultPresetId,
+  setLibraryDir
+} from './library'
 
 const APP_DISPLAY_NAME = '教学案制作'
 const PROJECT_FILTER = { name: '教学案工程', extensions: [PROJECT_FILE_EXTENSION] }
@@ -196,24 +205,27 @@ function registerIpc(): void {
 
   ipcMain.handle(
     IPC.createProject,
-    async (_event, req: { title: string; dir: string | null; templateId: string }) => {
+    async (_event, req: { title: string; dir: string | null; templateId: string; presetId: string }) => {
       try {
-        return { ok: true, value: await createProject(req.title, req.dir, req.templateId) }
+        return { ok: true, value: await createProject(req.title, req.dir, req.templateId, undefined, req.presetId) }
       } catch (err) {
         return { ok: false, error: `新建教学案失败：${describeError(err)}` }
       }
     }
   )
 
+  ipcMain.handle(IPC.getDefaultPreset, () => getDefaultPresetId())
+  ipcMain.handle(IPC.setDefaultPreset, (_event, presetId: string) => setDefaultPresetId(presetId))
+
   ipcMain.handle(IPC.removeRecent, (_event, filePath: string) => removeRecent(filePath))
 
   ipcMain.on(IPC.revealInFolder, (_event, filePath: string) => shell.showItemInFolder(filePath))
 
-  ipcMain.handle(IPC.importDocx, async (event) => {
+  ipcMain.handle(IPC.importDocx, async (event, presetId: string) => {
     const paths = await pickDocx(event.sender, true)
     if (paths.length === 0) return { ok: true, value: null }
     try {
-      return { ok: true, value: await importDocxFiles(paths) }
+      return { ok: true, value: await importDocxFiles(paths, presetId) }
     } catch (err) {
       return { ok: false, error: describeError(err) }
     }
@@ -240,13 +252,13 @@ function registerIpc(): void {
     return error === '' ? null : error
   })
 
-  ipcMain.handle(IPC.createFromDocx, async (event, templateId: string) => {
+  ipcMain.handle(IPC.createFromDocx, async (event, templateId: string, presetId: string) => {
     const paths = await pickDocx(event.sender, false)
     if (paths.length === 0) return { ok: true, value: null }
     try {
-      const imported = await importDocxFiles(paths)
+      const imported = await importDocxFiles(paths, presetId)
       const title = imported.firstTitle ?? basename(paths[0]!).replace(/\.docx$/i, '')
-      const opened = await createProject(title, null, templateId, imported)
+      const opened = await createProject(title, null, templateId, imported, presetId)
       return { ok: true, value: { opened, report: imported.report } }
     } catch (err) {
       return { ok: false, error: describeError(err) }

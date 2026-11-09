@@ -8,7 +8,7 @@ import { importDocx } from '@core/import/import-docx'
 import type { Asset, Block } from '@core/model/types'
 import type { ImportedContent } from '@shared/ipc'
 
-export async function importDocxFiles(paths: string[]): Promise<ImportedContent & { firstTitle?: string }> {
+export async function importDocxFiles(paths: string[], presetId?: string): Promise<ImportedContent & { firstTitle?: string }> {
   const blocks: Block[] = []
   const assets: Record<string, Asset> = {}
   const warnings: string[] = []
@@ -20,7 +20,7 @@ export async function importDocxFiles(paths: string[]): Promise<ImportedContent 
     let result
     try {
       const bytes = await readFile(path)
-      result = await importDocx(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength))
+      result = await importDocx(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength), presetId !== undefined ? { presetId } : {})
     } catch (err) {
       if (err instanceof DocxReadError) throw new DocxReadError(`“${name}”：${err.message}`)
       if ((err as NodeJS.ErrnoException).code === 'EBUSY' || (err as NodeJS.ErrnoException).code === 'EPERM') {

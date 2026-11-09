@@ -2,9 +2,10 @@
  * 新建教学案对话框：输入名称，默认保存到教学案库，也可以改到其他文件夹。
  */
 import { useEffect, useRef, useState } from 'react'
+import { PresetSelect, useDefaultPreset } from './PresetSelect'
 
 interface Props {
-  onCreate: (title: string, dir: string | null) => Promise<void>
+  onCreate: (title: string, dir: string | null, presetId: string) => Promise<void>
   onCancel: () => void
 }
 
@@ -14,6 +15,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
   const [dir, setDir] = useState<string | null>(null)
   const [libraryDir, setLibraryDir] = useState('')
   const [busy, setBusy] = useState(false)
+  const [presetId, setPresetId] = useDefaultPreset()
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -26,7 +28,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
     if (title.trim() === '' || busy) return
     setBusy(true)
     try {
-      await onCreate(title.trim(), dir)
+      await onCreate(title.trim(), dir, presetId)
     } finally {
       setBusy(false)
     }
@@ -64,6 +66,12 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
           }}
         />
         <p className="field-hint">同时作为文件名，以后在编辑界面顶部可以修改名称</p>
+      </div>
+      <div className="field">
+        <label className="field-label" htmlFor="new-project-preset">
+          格式预设
+        </label>
+        <PresetSelect id="new-project-preset" value={presetId} onChange={setPresetId} />
       </div>
       <div className="field">
         <span className="field-label">保存位置</span>

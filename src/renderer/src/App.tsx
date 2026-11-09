@@ -8,6 +8,8 @@ import { NewProjectDialog } from './home/NewProjectDialog'
 import type { ImportReport } from '@shared/ipc'
 import { editorReducer, initEditorState } from './state/store'
 import { useProjectFile } from './state/useProjectFile'
+import { getPreset } from '@core/presets'
+import { CreateFromDocxDialog } from './home/CreateFromDocxDialog'
 
 export function App() {
   const [state, dispatch] = useReducer(editorReducer, createEmptyBundle(), initEditorState)
@@ -29,8 +31,9 @@ export function App() {
     dispatch({ type: 'load', bundle, filePath: null })
   }, [])
 
-  const createFromDocx = useCallback(async () => {
-    const result = await window.api.createFromDocx(DEFAULT_TEMPLATE_ID)
+  const [fromDocxOpen, setFromDocxOpen] = useState(false)
+  const createFromDocx = useCallback(async (presetId: string) => {
+    const result = await window.api.createFromDocx(getPreset(presetId).templateId, presetId)
     if (!result.ok) setDemoError(result.error)
     else if (result.value !== null) {
       const { opened, report } = result.value
@@ -55,7 +58,7 @@ export function App() {
             onOpenOther={() => void files.openProject()}
             onNew={files.newProject}
             onOpenDemo={() => void openDemo()}
-            onCreateFromDocx={() => void createFromDocx()}
+            onCreateFromDocx={() => setFromDocxOpen(true)}
           />
         </>
       ) : (
@@ -75,9 +78,18 @@ export function App() {
       {newDialogOpen && (
         <NewProjectDialog
           onCancel={() => setNewDialogOpen(false)}
-          onCreate={async (title, dir) => {
-            await files.createProject(title, dir)
+          onCreate={async (title, dir, presetId) => {
+            await files.createProject(title, dir, presetId)
             setNewDialogOpen(false)
+          }}
+        />
+      )}
+      {fromDocxOpen && (
+        <CreateFromDocxDialog
+          onCancel={() => setFromDocxOpen(false)}
+          onChoose={async (presetId) => {
+            await createFromDocx(presetId)
+            setFromDocxOpen(false)
           }}
         />
       )}

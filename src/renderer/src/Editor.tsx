@@ -164,7 +164,8 @@ function EditorBody({
   const insertAfter = selectedBlock?.id ?? null
   const addBlock = (block: Block): void => dispatch({ type: 'insert-blocks', blocks: [block], afterBlockId: insertAfter })
   const importWord = async (): Promise<void> => {
-    const result = await window.api.importDocx()
+    // 按本工程的格式预设整理导入的内容
+    const result = await window.api.importDocx(project.presetId)
     if (!result.ok) onError(result.error)
     else if (result.value !== null) {
       const { blocks, assets, report } = result.value
