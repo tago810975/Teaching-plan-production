@@ -76,7 +76,7 @@ export function App() {
   const openPaths = ws.tabs.flatMap((t) => (t.state.filePath !== null ? [t.state.filePath] : []))
 
   return (
-    <div className="workspace">
+    <div className="app-shell">
       <TabBar
         tabs={ws.tabs}
         active={ws.active}
@@ -85,7 +85,7 @@ export function App() {
         onMove={(id, toIndex) => dispatch({ type: 'move-tab', id, toIndex })}
         onNew={files.newProject}
       />
-      <div className="workspace-body">
+      <div className="app-shell-body">
         {tab === null ? (
           <>
             {error !== null && <ErrorBanner message={error} onDismiss={dismissError} />}
