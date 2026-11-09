@@ -1574,6 +1574,8 @@ body.is-dragging-outline * {
 .math-underline {
   /* 与导出的“下横线”一致：整个公式下方一条平直的线（分式在分母下方） */
   display: inline-block;
+  /* 行内块会继承段落的首行缩进，公式前会多出两个字的空白 */
+  text-indent: 0;
   border-bottom: 1px solid currentColor;
   padding-bottom: 1px;
   line-height: 1;

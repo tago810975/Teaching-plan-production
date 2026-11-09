@@ -2,7 +2,7 @@
  * 表格的网格计算：合并单元格按 HTML 的方式记录（起始单元格写 colSpan / rowSpan，被覆盖的位置不出现），
  * 导入、预览、导出、编辑都要知道每个单元格实际占哪些格子。
  */
-import type { TableCell, TableInline } from './types'
+import type { RichParagraph, TableCell, TableInline } from './types'
 
 /** 只需要合并信息的单元格（工程数据中的单元格、排版数据中的单元格都可以） */
 export interface SpanCell {
@@ -103,4 +103,90 @@ export function columnWidths(t: TableInline, totalTwip: number): number[] {
     return sum > totalTwip ? t.colWidthsTwip.map((w) => Math.floor((w * totalTwip) / sum)) : t.colWidthsTwip.slice()
   }
   return Array.from({ length: cols }, () => Math.floor(totalTwip / cols))
+}
+
+/** 表格中的矩形范围（格子坐标，含两端） */
+export interface CellRect {
+  r0: number
+  c0: number
+  r1: number
+  c1: number
+}
+
+/** 把范围扩大到完整包住碰到的合并单元格 */
+export function expandRect<C extends SpanCell>(grid: TableGrid<C>, rect: CellRect): CellRect {
+  let { r0, c0, r1, c1 } = { r0: Math.min(rect.r0, rect.r1), c0: Math.min(rect.c0, rect.c1), r1: Math.max(rect.r0, rect.r1), c1: Math.max(rect.c0, rect.c1) }
+  for (let changed = true; changed; ) {
+    changed = false
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const p = grid.owner[r]?.[c]
+        if (p === undefined) continue
+        const pr1 = p.row + p.rowSpan - 1
+        const pc1 = p.col + p.colSpan - 1
+        if (p.row < r0 || p.col < c0 || pr1 > r1 || pc1 > c1) {
+          r0 = Math.min(r0, p.row)
+          c0 = Math.min(c0, p.col)
+          r1 = Math.max(r1, pr1)
+          c1 = Math.max(c1, pc1)
+          changed = true
+        }
+      }
+    }
+  }
+  return { r0, c0, r1, c1 }
+}
+
+/**
+ * 合并单元格：范围先扩大到完整包住碰到的合并单元格；保留左上角的单元格（底纹等），
+ * 其余单元格的内容依次接在后面（空的略去）。范围内只有一个单元格时原样返回。
+ */
+export function mergeCells(t: TableInline, rect: CellRect): TableInline {
+  const grid = layoutTable(t.rows)
+  const { r0, c0, r1, c1 } = expandRect(grid, rect)
+  const owners: PlacedCell[] = []
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+    const p = grid.owner[r]?.[c]
+    if (p !== undefined && !owners.includes(p)) owners.push(p)
+  }
+  if (owners.length <= 1 && r0 === r1 && c0 === c1) return t
+  const first = grid.owner[r0]?.[c0] ?? owners[0]
+  if (first === undefined) return t
+  const isEmpty = (p: RichParagraph): boolean => p.inlines.every((i) => i.type === 'text' && i.text.trim() === '')
+  const content = owners.flatMap((o) => o.cell.content).filter((p) => !isEmpty(p))
+  const rows = r1 - r0 + 1
+  const cols = c1 - c0 + 1
+  const merged: TableCell = {
+    ...first.cell,
+    content: content.length > 0 ? content : [{ inlines: [] }],
+    ...(cols > 1 ? { colSpan: cols } : {}),
+    ...(rows > 1 ? { rowSpan: rows } : {})
+  }
+  if (cols === 1) delete merged.colSpan
+  if (rows === 1) delete merged.rowSpan
+  const removed = new Set(owners.filter((o) => o !== first).map((o) => o.cell))
+  return {
+    ...t,
+    rows: t.rows.map((r) => ({ cells: r.cells.filter((c) => !removed.has(c)).map((c) => (c === first.cell ? merged : c)) }))
+  }
+}
+
+/** 拆分单元格：(row, col) 所在的合并单元格还原为 1×1，被它覆盖的位置补上空单元格 */
+export function splitCell(t: TableInline, row: number, col: number): TableInline {
+  const grid = layoutTable(t.rows)
+  const p = grid.owner[row]?.[col]
+  if (p === undefined || (p.colSpan === 1 && p.rowSpan === 1)) return t
+  const { colSpan: _c, rowSpan: _r, ...single } = p.cell
+  const rows = t.rows.map((r) => ({ cells: r.cells.slice() }))
+  for (let r = p.row; r < p.row + p.rowSpan; r++) {
+    // 插在这一行中位于合并单元格左边的单元格之后
+    const before = grid.placed[r]!.filter((x) => x.col < p.col).length
+    const added = Array.from({ length: r === p.row ? p.colSpan - 1 : p.colSpan }, () => ({ content: [{ inlines: [] }] }) as TableCell)
+    if (r === p.row) {
+      rows[r]!.cells.splice(before, 1, single, ...added)
+    } else {
+      rows[r]!.cells.splice(before, 0, ...added)
+    }
+  }
+  return { ...t, rows }
 }

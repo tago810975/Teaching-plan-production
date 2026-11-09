@@ -143,3 +143,83 @@ describe('表格的排版与导出', () => {
     expect(tables[2]!.rows[1]!.cells.slice(1).every((c) => c.content[0]!.inlines.some((i) => i.type === 'image'))).toBe(true)
   })
 })
+
+describe('合并与拆分单元格', async () => {
+  const { mergeCells, splitCell, expandRect } = await import('@core/model/table')
+  const filled = (rows: number, cols: number): TableInline => ({
+    type: 'table',
+    rows: Array.from({ length: rows }, (_, r) => ({ cells: Array.from({ length: cols }, (_, c) => cell(`${r}${c}`)) }))
+  })
+  const text = (t: TableInline): string[][] => t.rows.map((r) => r.cells.map((c) => c.content.map((p) => p.inlines.map((i) => (i.type === 'text' ? i.text : '')).join('')).join('/') + (c.colSpan ? `c${c.colSpan}` : '') + (c.rowSpan ? `r${c.rowSpan}` : '')))
+
+  it('合并 2×2：保留左上角，其余内容接在后面', () => {
+    const m = mergeCells(filled(3, 3), { r0: 0, c0: 0, r1: 1, c1: 1 })
+    expect(text(m)).toEqual([['00/01/10/11c2r2', '02'], ['12'], ['20', '21', '22']])
+    expect(layoutTable(m.rows).cols).toBe(3)
+  })
+
+  it('范围碰到合并单元格时扩大到完整包住它', () => {
+    const m = mergeCells(filled(3, 3), { r0: 0, c0: 0, r1: 1, c1: 1 })
+    const g = layoutTable(m.rows)
+    expect(expandRect(g, { r0: 1, c0: 1, r1: 1, c1: 2 })).toEqual({ r0: 0, c0: 0, r1: 1, c1: 2 })
+  })
+
+  it('拆分：还原为 1×1，被覆盖的位置补空单元格，网格不变', () => {
+    const m = mergeCells(filled(3, 3), { r0: 1, c0: 1, r1: 2, c1: 2 })
+    expect(text(m)).toEqual([['00', '01', '02'], ['10', '11/12/21/22c2r2'], ['20']])
+    const s = splitCell(m, 2, 2)
+    expect(text(s)).toEqual([['00', '01', '02'], ['10', '11/12/21/22', ''], ['20', '', '']])
+    expect(layoutTable(s.rows)).toMatchObject({ rows: 3, cols: 3 })
+    expect(hasMerges(s)).toBe(false)
+  })
+
+  it('横向合并后拆分；不是合并单元格时拆分不改动', () => {
+    const t = filled(2, 3)
+    const m = mergeCells(t, { r0: 0, c0: 1, r1: 0, c1: 2 })
+    expect(text(m)[0]).toEqual(['00', '01/02c2'])
+    expect(text(splitCell(m, 0, 2))[0]).toEqual(['00', '01/02', ''])
+    expect(splitCell(t, 0, 0)).toBe(t)
+  })
+
+  it('合并后导出再导入，合并关系不变', async () => {
+    const m = mergeCells(filled(3, 3), { r0: 0, c0: 1, r1: 2, c1: 1 })
+    const bytes = await writeDocx({ ir: buildDocument(projectWith([{ inlines: [m] }]), 'teacher'), assets: {}, title: 't', template: TEMPLATE })
+    const r = await importDocx(bytes, { presetId: 'physics-handbook-v1' })
+    const k = r.blocks.find((b) => b.type === 'knowledge')
+    const t = k?.type === 'knowledge' ? (k.content.flatMap((p) => p.inlines).find((i) => i.type === 'table') as TableInline) : undefined
+    expect(text(t!)).toEqual(text(m))
+  })
+})
+
+describe('在预览中选中文字改格式', async () => {
+  const { formatParagraphRange } = await import('@core/model/markup')
+  const p = { inlines: [{ type: 'text' as const, text: '折射率较小的介质' }, { type: 'math' as const, latex: 'n' }, { type: 'text' as const, text: '称为光疏介质' }] }
+
+  it('选中一段文字的一部分：拆开后只改选中的部分', () => {
+    const out = formatParagraphRange(p, { inline: 0, offset: 3 }, { inline: 0, offset: 4 }, { combo: { bold: true, underline: true, color: 'C00000' } })!
+    expect(out.inlines.slice(0, 3)).toEqual([
+      { type: 'text', text: '折射率' },
+      { type: 'text', text: '较', marks: { bold: true, underline: true, color: 'C00000' } },
+      { type: 'text', text: '小的介质' }
+    ])
+  })
+
+  it('跨过公式：文字与公式都改；倾斜不作用于公式', () => {
+    const out = formatParagraphRange(p, { inline: 0, offset: 6 }, { inline: 2, offset: 2 }, { mark: 'bold' })!
+    expect(out.inlines).toEqual([
+      { type: 'text', text: '折射率较小的' },
+      { type: 'text', text: '介质', marks: { bold: true } },
+      { type: 'math', latex: 'n', bold: true },
+      { type: 'text', text: '称为', marks: { bold: true } },
+      { type: 'text', text: '光疏介质' }
+    ])
+    const it2 = formatParagraphRange(p, { inline: 1, offset: 0 }, { inline: 1, offset: 1 }, { mark: 'italic' })
+    expect(it2).toBeNull()
+  })
+
+  it('再选中同一处再点一次取消，相邻文字合并回去；反向选择也可以', () => {
+    const once = formatParagraphRange(p, { inline: 0, offset: 3 }, { inline: 0, offset: 5 }, { mark: 'underline' })!
+    const twice = formatParagraphRange(once, { inline: 1, offset: 2 }, { inline: 1, offset: 0 }, { mark: 'underline' })!
+    expect(twice).toEqual(p)
+  })
+})

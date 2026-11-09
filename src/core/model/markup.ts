@@ -363,3 +363,84 @@ function compactor(objects: Map<number, Inline>, whole: string): ((s: string) =>
   }
   return fn
 }
+
+// ---------------- 按范围改格式（预览中选中文字后使用） ----------------
+
+/** 段落中的位置：第几个行内元素、其中第几个字（公式看作长度 1） */
+export interface InlinePos {
+  inline: number
+  offset: number
+}
+
+/**
+ * 给段落中 [start, end) 范围内的文字与公式改格式（规则同 applyFormat：加粗等都有时取消，否则加上；
+ * 颜色一律设定；倾斜不作用于公式）。文字在范围边界处拆开，改完后合并相邻且格式相同的文字。
+ * 范围内没有可改的内容时返回 null。
+ */
+export function formatParagraphRange(p: RichParagraph, start: InlinePos, end: InlinePos, op: FormatOp): RichParagraph | null {
+  if (end.inline < start.inline || (end.inline === start.inline && end.offset < start.offset)) [start, end] = [end, start]
+  const isMark = 'mark' in op
+  const combo = 'combo' in op ? { ...op.combo, ...(op.combo.color !== undefined ? { color: op.combo.color.toUpperCase() } : {}) } : null
+  const mathOk = !isMark || op.mark !== 'italic'
+  const has = (o: Record<string, unknown>): boolean =>
+    isMark ? o[op.mark] === true : combo !== null ? Object.entries(combo).every(([k, v]) => (typeof v === 'string' ? String(o[k] ?? '').toUpperCase() === v : o[k] === v)) : false
+
+  // 拆分：标出范围内的部分
+  const pieces: Array<{ inline: Inline; selected: boolean }> = []
+  p.inlines.forEach((inline, i) => {
+    if (i < start.inline || i > end.inline) {
+      pieces.push({ inline, selected: false })
+      return
+    }
+    if (inline.type === 'text') {
+      const a = i === start.inline ? Math.min(start.offset, inline.text.length) : 0
+      const b = i === end.inline ? Math.min(end.offset, inline.text.length) : inline.text.length
+      if (a > 0) pieces.push({ inline: { ...inline, text: inline.text.slice(0, a) }, selected: false })
+      if (b > a) pieces.push({ inline: { ...inline, text: inline.text.slice(a, b) }, selected: true })
+      if (b < inline.text.length) pieces.push({ inline: { ...inline, text: inline.text.slice(b) }, selected: false })
+      return
+    }
+    // 公式：范围在它之后开始或在它之前结束时不算
+    const inside = !(i === end.inline && end.offset === 0) && !(i === start.inline && start.offset >= 1)
+    pieces.push({ inline, selected: inside && inline.type === 'math' })
+  })
+
+  const targets = pieces.filter((x) => x.selected && (x.inline.type === 'text' ? x.inline.text.trim() !== '' : mathOk))
+  if (targets.length === 0) return null
+  const markOf = (i: Inline): Record<string, unknown> => (i.type === 'text' ? ((i.marks ?? {}) as Record<string, unknown>) : (i as unknown as Record<string, unknown>))
+  const on = isMark || combo !== null ? !targets.every((x) => has(markOf(x.inline))) : true
+  const change = (o: Record<string, unknown>): Record<string, unknown> => {
+    const copy = { ...o }
+    if (isMark) {
+      if (on) copy[op.mark] = true
+      else delete copy[op.mark]
+    } else if (combo !== null) {
+      for (const [k, v] of Object.entries(combo)) {
+        if (on) copy[k] = v
+        else if (typeof v === 'string' ? String(copy[k] ?? '').toUpperCase() === v : copy[k] === v) delete copy[k]
+      }
+    } else if ('color' in op && op.color !== undefined) copy.color = op.color.toUpperCase()
+    else delete copy.color
+    return copy
+  }
+
+  const out: Inline[] = []
+  for (const { inline, selected } of pieces) {
+    let next = inline
+    if (selected && targets.some((t) => t.inline === inline)) {
+      if (inline.type === 'text') {
+        const marks = change((inline.marks ?? {}) as Record<string, unknown>) as TextMarks
+        next = Object.keys(marks).length > 0 ? { type: 'text', text: inline.text, marks } : { type: 'text', text: inline.text }
+      } else if (inline.type === 'math') {
+        next = change(inline as unknown as Record<string, unknown>) as unknown as Inline
+      }
+    }
+    // 合并相邻且格式相同的文字
+    const last = out[out.length - 1]
+    const key = (m: TextMarks | undefined): string => JSON.stringify(Object.entries(m ?? {}).sort())
+    if (next.type === 'text' && last?.type === 'text' && key(last.marks) === key(next.marks)) {
+      out[out.length - 1] = { ...last, text: last.text + next.text }
+    } else out.push(next)
+  }
+  return { ...p, inlines: out }
+}
