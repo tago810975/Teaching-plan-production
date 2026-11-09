@@ -52,7 +52,8 @@ export function FileTable({ items, actions, showLocation, emptyText }: Props) {
     const remove: MenuItem = { label: '删除（移到回收站）', danger: true, onSelect: () => actions.remove(item) }
     const forget: MenuItem[] = item.recentOnly === true ? [{ label: '从最近列表中移除', onSelect: () => actions.forget(item) }] : []
     if (item.kind === 'folder') return [{ label: '打开', onSelect: () => actions.open(item) }, reveal]
-    if (item.status === 'missing') return forget.length > 0 ? forget : [{ label: '文件已不存在', disabled: true, onSelect: () => {} }]
+    // 文件已在别处被删除或移动：只能从列表中移除（不论原来是否在教学案库中）
+    if (item.status === 'missing') return [{ label: '从列表中移除', onSelect: () => actions.forget(item) }]
     if (item.kind === 'docx') {
       return [{ label: '用这个 Word 文档新建教学案…', onSelect: () => actions.createFromDocx(item) }, 'separator', rename, reveal, 'separator', remove]
     }
@@ -84,9 +85,11 @@ export function FileTable({ items, actions, showLocation, emptyText }: Props) {
     } else if (e.key === 'F2' && item.kind !== 'folder' && item.status !== 'missing') {
       e.preventDefault()
       setRenaming(item.path)
-    } else if (e.key === 'Delete' && item.kind !== 'folder' && item.status !== 'missing') {
+    } else if (e.key === 'Delete' && item.kind !== 'folder') {
       e.preventDefault()
-      actions.remove(item)
+      // 已不存在的文件：Delete 从列表中移除
+      if (item.status === 'missing') actions.forget(item)
+      else actions.remove(item)
     } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
       e.preventDefault()
       const r = e.currentTarget.getBoundingClientRect()

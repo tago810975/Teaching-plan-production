@@ -83,6 +83,12 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
     return all.filter((i) => q === '' || i.name.toLowerCase().includes(q) || i.fileName.toLowerCase().includes(q))
   }, [view, listing, folder, query])
 
+  // 在本软件之外删除或移动了的文件
+  const missing = (listing?.items ?? []).filter((i) => i.status === 'missing')
+  const forgetAll = async (): Promise<void> => {
+    for (const i of missing) await window.api.removeRecent(i.filePath)
+    await refresh()
+  }
   const isOpen = (item: FileItem): boolean => openPaths.some((p) => samePath(p, item.path))
   const actions: FileActions = {
     open: (item) => {
@@ -164,6 +170,11 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
           <button type="button" className="icon-button" title="刷新" aria-label="刷新" onClick={() => void refresh()}>
             ⟳
           </button>
+          {view.kind === 'recent' && missing.length > 0 && (
+            <button type="button" className="link" onClick={() => void forgetAll()} title="在本软件之外删除或移动过的文件">
+              清除失效项（{missing.length}）
+            </button>
+          )}
           <input
             type="search"
             className="home-search"
