@@ -71,7 +71,34 @@ export interface BlankInline {
   widthChars: number
 }
 
-export type Inline = TextInline | MathInline | ImageInline | BlankInline
+/**
+ * 表格单元格：内容为富文本（可有公式、图片、格式）。合并单元格按 HTML 的方式记录：
+ * 起始单元格写 colSpan / rowSpan，被它覆盖的位置不出现在 cells 中。
+ */
+export interface TableCell {
+  content: RichText
+  colSpan?: number
+  rowSpan?: number
+  /** 底纹颜色，十六进制，不含 # */
+  shading?: string
+}
+
+export interface TableRow {
+  cells: TableCell[]
+}
+
+/**
+ * 表格。独占一段（所在段落中只有它），可出现在任何富文本中（知识点、题干、解析……）。
+ * 输入框中显示为 ⟦表格N⟧，内容在表格编辑器中修改。
+ */
+export interface TableInline {
+  type: 'table'
+  rows: TableRow[]
+  /** 各列宽度（twip）；不设时平分栏宽 */
+  colWidthsTwip?: number[]
+}
+
+export type Inline = TextInline | MathInline | ImageInline | BlankInline | TableInline
 
 /** 段落格式（从 Word 导入时保留，正文类段落使用） */
 export interface ParagraphFormat {

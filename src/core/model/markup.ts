@@ -19,7 +19,7 @@ export interface Editable {
   objects: ReadonlyMap<number, Inline>
 }
 
-const TOKEN = /⟦(公式|图|填空)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|颜色|字体|重点|格式)(\d+):([^⟧]*)⟧/g
+const TOKEN = /⟦(公式|图|填空|表格)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|颜色|字体|重点|格式)(\d+):([^⟧]*)⟧/g
 
 export function toEditable(rich: RichText): Editable {
   const objects = new Map<number, Inline>()
@@ -58,6 +58,9 @@ function paragraphText(p: RichParagraph, objects: Map<number, Inline>): string {
         break
       case 'blank':
         out += `⟦填空${add(inline)}⟧`
+        break
+      case 'table':
+        out += `⟦表格${add(inline)}⟧`
         break
     }
   }

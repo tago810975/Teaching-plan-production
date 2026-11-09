@@ -4,7 +4,8 @@
  */
 import { fontFamilyOf } from '../document/fonts'
 import JSZip from 'jszip'
-import type { Asset, Inline, ParagraphFormat, TextMarks } from '../model/types'
+import type { Asset, Inline, ParagraphFormat, RichText, TableCell, TableInline, TableRow, TextMarks } from '../model/types'
+import { layoutTable } from '../model/table'
 import { createAsset } from '../project-file/codec'
 import { mimeForExt } from '../project-file/format'
 import { attr, child, children, descendants, NS, parseXml, serializeXml, type Element } from '../xml/dom'
@@ -135,7 +136,7 @@ class Reader {
     if (c.oleObjects > 0) out.push(`${c.oleObjects} 个嵌入对象（无法识别的公式等）已按图片导入，无法在软件中修改。`)
     if (c.eqFailed > 0) out.push(`${c.eqFailed} 个 EQ 域公式无法识别，已保留其中的文字，请检查。`)
     if (c.textBoxes > 0) out.push(`${c.textBoxes} 个文本框中的文字已拆成普通段落，请检查位置是否合适。`)
-    if (c.tables > 0) out.push(`${c.tables} 个表格已按段落导入，表格格式没有保留。`)
+    if (c.tables > 0) out.push(`导入了 ${c.tables} 个表格，请核对合并单元格与列宽。`)
     if (c.missingImages > 0) out.push(`${c.missingImages} 张图片在文档中找不到对应文件，已跳过。`)
     return out
   }
@@ -147,12 +148,82 @@ class Reader {
       if (el.localName === 'p') await this.readParagraph(el)
       else if (el.localName === 'tbl') {
         this.counts.tables += 1
-        for (const tc of descendants(el, W, 'tc')) await this.readContainer(tc)
+        // 表格独占一段
+        this.paragraphs.push({ numbered: false, inlines: [await this.readTable(el)], floating: [] })
       } else if (el.localName === 'sdt') {
         const content = child(el, W, 'sdtContent')
         if (content !== undefined) await this.readContainer(content)
       }
     }
+  }
+
+  /**
+   * 读取表格：横向合并（gridSpan）记为 colSpan；纵向合并（vMerge）的续行单元格不单独记录，
+   * 而是加到上方起始单元格的 rowSpan 上。单元格内容按段落读取（公式、图片、格式都保留，表格可嵌套）。
+   */
+  private async readTable(tbl: Element): Promise<TableInline> {
+    const grid = child(tbl, W, 'tblGrid')
+    const colWidthsTwip = grid !== undefined ? children(grid, W, 'gridCol').map((g) => Number(attr(g, W, 'w') ?? 0)) : []
+    const rows: TableRow[] = []
+    // 每一列上正在向下合并的单元格
+    const merging = new Map<number, TableCell>()
+    for (const tr of children(tbl, W, 'tr')) {
+      const cells: TableCell[] = []
+      const trPr = child(tr, W, 'trPr')
+      let col = trPr !== undefined ? Number(attr(child(trPr, W, 'gridBefore'), W, 'val') ?? 0) : 0
+      for (const tc of children(tr, W, 'tc')) {
+        const tcPr = child(tc, W, 'tcPr')
+        const span = Math.max(1, Number((tcPr !== undefined ? attr(child(tcPr, W, 'gridSpan'), W, 'val') : undefined) ?? 1))
+        const vMerge = tcPr !== undefined ? child(tcPr, W, 'vMerge') : undefined
+        const vMergeVal = vMerge !== undefined ? (attr(vMerge, W, 'val') ?? 'continue') : undefined
+        if (vMergeVal === 'continue') {
+          const top = merging.get(col)
+          if (top !== undefined) {
+            top.rowSpan = (top.rowSpan ?? 1) + 1
+            col += span
+            continue
+          }
+        }
+        const fill = tcPr !== undefined ? attr(child(tcPr, W, 'shd'), W, 'fill') : undefined
+        const cell: TableCell = {
+          content: await this.readCell(tc),
+          ...(span > 1 ? { colSpan: span } : {}),
+          ...(fill !== undefined && /^[0-9A-Fa-f]{6}$/.test(fill) && fill.toUpperCase() !== 'FFFFFF' ? { shading: fill.toUpperCase() } : {})
+        }
+        if (vMergeVal === 'restart') merging.set(col, cell)
+        else merging.delete(col)
+        cells.push(cell)
+        col += span
+      }
+      rows.push({ cells })
+    }
+    const cols = layoutTable(rows).cols
+    const widthsOk = colWidthsTwip.length === cols && colWidthsTwip.every((w) => w > 0)
+    return { type: 'table', rows, ...(widthsOk ? { colWidthsTwip } : {}) }
+  }
+
+  /** 单元格中的段落 → 富文本（只保留对齐；浮动图片改为行内图片） */
+  private async readCell(tc: Element): Promise<RichText> {
+    const saved = this.paragraphs
+    this.paragraphs = []
+    await this.readContainer(tc)
+    const read = this.paragraphs
+    this.paragraphs = saved
+    const out: RichText = []
+    for (const p of read) {
+      const inlines: Inline[] = [...p.inlines, ...p.floating.map((f): Inline => ({ type: 'image', assetId: f.assetId, widthEmu: f.widthEmu, heightEmu: f.heightEmu }))]
+      // 去掉首尾空白
+      const first = inlines[0]
+      if (first?.type === 'text') inlines[0] = { ...first, text: first.text.replace(/^[\s\u3000]+/, '') }
+      const last = inlines[inlines.length - 1]
+      if (last?.type === 'text') inlines[inlines.length - 1] = { ...last, text: last.text.replace(/[\s\u3000]+$/, '') }
+      const kept = inlines.filter((i) => i.type !== 'text' || i.text !== '')
+      const align = p.format?.align
+      out.push({ inlines: kept, ...(align !== undefined ? { format: { align } } : {}) })
+    }
+    // 去掉末尾的空段落，至少留一段
+    while (out.length > 1 && out[out.length - 1]!.inlines.length === 0) out.pop()
+    return out.length > 0 ? out : [{ inlines: [] }]
   }
 
   private async readParagraph(p: Element): Promise<void> {

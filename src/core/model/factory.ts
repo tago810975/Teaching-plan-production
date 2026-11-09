@@ -170,6 +170,8 @@ export function plainText(rich: RichText | RichParagraph): string {
               return '[图]'
             case 'blank':
               return '____'
+            case 'table':
+              return '[表格]'
           }
         })
         .join('')

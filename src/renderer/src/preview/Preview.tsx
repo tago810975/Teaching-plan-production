@@ -91,7 +91,9 @@ export function Preview({
       const next = els[i + 1]?.offsetTop ?? bottom
       const spaceAfter = el === undefined ? 0 : parseFloat(getComputedStyle(el).paddingBottom) || 0
       // 作答留白与带浮动图片的段落不拆分；其余未设“段中不分页”的段落可按行拆分
-      const splittable = el !== undefined && p.keepLines !== true && p.spacerTwip === undefined && (p.floatingImages ?? []).length === 0
+      // 含表格的段落整块排在一页（不按文字行拆开）
+      const splittable =
+        el !== undefined && p.keepLines !== true && p.spacerTwip === undefined && (p.floatingImages ?? []).length === 0 && !p.runs.some((r) => r.kind === 'table')
       return {
         height: next - top,
         spaceAfter,

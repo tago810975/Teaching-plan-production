@@ -7,6 +7,7 @@
 import type {
   OptionStops,
   DifficultyDisplay,
+  TableInline,
   WorksheetBlock,
   ChoiceOption,
   CompositeBlock,
@@ -22,7 +23,8 @@ import type {
   Variant
 } from '../model/types'
 import { bodyTopTwip } from './header'
-import type { DocIR, DocParagraph, DocRun, FloatingImage } from './ir'
+import type { DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from './ir'
+import { columnWidths } from '../model/table'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
 import { difficultyOf, getPreset, presetStyles, starText, type FormatPreset } from '../presets'
@@ -119,22 +121,37 @@ export function blankKeyPoints(p: DocParagraph, d: FormatPreset['dictation']): D
     if (r.kind === 'math') return (!d.bold || r.bold === true) && colors.has((r.color ?? '').toUpperCase())
     return false
   }
-  if (!p.runs.some(isKey)) return p
-  const runs: DocRun[] = []
-  let width = 0
-  const flush = (): void => {
-    if (width > 0) runs.push({ kind: 'blank', widthChars: Math.max(d.minChars, Math.ceil(width) + 1) })
-    width = 0
-  }
-  for (const r of p.runs) {
-    if (isKey(r)) width += r.kind === 'text' ? textWidthChars(r.text) : 5
-    else {
-      flush()
-      runs.push(r)
+  // 表格单元格中的重点同样挖空
+  const blankRuns = (input: DocRun[]): DocRun[] => {
+    const runs: DocRun[] = []
+    let width = 0
+    const flush = (): void => {
+      if (width > 0) runs.push({ kind: 'blank', widthChars: Math.max(d.minChars, Math.ceil(width) + 1) })
+      width = 0
     }
+    for (const r of input) {
+      if (isKey(r)) width += r.kind === 'text' ? textWidthChars(r.text) : 5
+      else {
+        flush()
+        runs.push(
+          r.kind === 'table'
+            ? {
+                ...r,
+                table: {
+                  ...r.table,
+                  rows: r.table.rows.map((row) => ({ cells: row.cells.map((c) => ({ ...c, paragraphs: c.paragraphs.map((cp) => ({ ...cp, runs: blankRuns(cp.runs) })) })) }))
+                }
+              }
+            : r
+        )
+      }
+    }
+    flush()
+    return runs
   }
-  flush()
-  return { ...p, runs }
+  const hasKey = (runs: DocRun[]): boolean => runs.some((r) => isKey(r) || (r.kind === 'table' && r.table.rows.some((row) => row.cells.some((c) => c.paragraphs.some((cp) => hasKey(cp.runs))))))
+  if (!hasKey(p.runs)) return p
+  return { ...p, runs: blankRuns(p.runs) }
 }
 
 /** 文字宽度（以字为单位）：汉字与全角符号 1，其余 0.5 */
@@ -563,6 +580,9 @@ function estimateInlineTwip(i: Inline): number {
       return emuToTwip(i.widthEmu)
     case 'blank':
       return i.widthChars * CHAR_TWIP
+    case 'table':
+      // 表格占满一行：含表格的选项只能每行一项
+      return contentWidthTwip(A4_PAGE)
   }
 }
 
@@ -594,8 +614,28 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
         return { kind: 'image', assetId: i.assetId, widthEmu: i.widthEmu, heightEmu: i.heightEmu }
       case 'blank':
         return { kind: 'blank', widthChars: i.widthChars }
+      case 'table':
+        return { kind: 'table', table: toDocTable(i) }
     }
   })
+}
+
+/** 表格 → DocTable：列宽不超过栏宽，单元格内容转为 DocRun */
+function toDocTable(t: TableInline): DocTable {
+  return {
+    colWidthsTwip: columnWidths(t, contentWidthTwip(A4_PAGE)),
+    rows: t.rows.map((r) => ({
+      cells: r.cells.map((c) => ({
+        paragraphs: (c.content.length > 0 ? c.content : [{ inlines: [] }]).map((p) => ({
+          runs: toRuns(p),
+          ...(p.format?.align !== undefined ? { align: p.format.align } : {})
+        })),
+        ...(c.colSpan !== undefined && c.colSpan > 1 ? { colSpan: c.colSpan } : {}),
+        ...(c.rowSpan !== undefined && c.rowSpan > 1 ? { rowSpan: c.rowSpan } : {}),
+        ...(c.shading !== undefined ? { shading: c.shading } : {})
+      }))
+    }))
+  }
 }
 
 /** 标题类段落（大标题、栏目标题、题型分组）一律与下段同页，避免标题孤零零留在页底 */

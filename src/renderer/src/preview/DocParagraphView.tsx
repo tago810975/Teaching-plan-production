@@ -2,7 +2,7 @@
  * 单个段落的预览渲染。只依据 DocIR 与 STYLE_SPECS，不包含任何排版规则。
  */
 import { useContext, memo, type CSSProperties, type ReactNode } from 'react'
-import type { DocParagraph, DocRun, OptionImageRef } from '@core/document/ir'
+import type { DocParagraph, DocRun, DocTable, OptionImageRef } from '@core/document/ir'
 import { previewCss } from '@core/document/styles'
 import { StylesContext } from './styles-context'
 import { emuToPt, twipToPt } from '@core/document/units'
@@ -310,6 +310,44 @@ function renderRuns(
         return <span key={i} className="run-blank" style={{ width: `${run.widthChars}em` }} />
       case 'tab':
         return <span key={i} className="run-tab" />
+      case 'table':
+        return <TableView key={i} table={run.table} assetUrls={assetUrls} onEditMath={onEditMath} />
     }
   })
+}
+
+/** 表格：与导出一致——细实线边框、固定列宽、居中；单元格内容垂直居中，不首行缩进 */
+function TableView({ table, assetUrls, onEditMath }: { table: DocTable; assetUrls: ReadonlyMap<string, string>; onEditMath: ((run: MathRun) => void) | undefined }) {
+  const total = table.colWidthsTwip.reduce((a, b) => a + b, 0)
+  return (
+    <span className="doc-table-wrap">
+      <table className="doc-table" style={{ width: `${twipToPt(total)}pt` }}>
+        <colgroup>
+          {table.colWidthsTwip.map((w, i) => (
+            <col key={i} style={{ width: `${twipToPt(w)}pt` }} />
+          ))}
+        </colgroup>
+        <tbody>
+          {table.rows.map((row, r) => (
+            <tr key={r}>
+              {row.cells.map((c, j) => (
+                <td
+                  key={j}
+                  {...(c.colSpan !== undefined ? { colSpan: c.colSpan } : {})}
+                  {...(c.rowSpan !== undefined ? { rowSpan: c.rowSpan } : {})}
+                  style={c.shading !== undefined ? { background: `#${c.shading}` } : undefined}
+                >
+                  {c.paragraphs.map((cp, k) => (
+                    <div key={k} className="doc-table-para" style={cp.align !== undefined ? { textAlign: cp.align } : undefined}>
+                      {cp.runs.length > 0 ? renderRuns(cp.runs, assetUrls, onEditMath) : '\u00a0'}
+                    </div>
+                  ))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </span>
+  )
 }

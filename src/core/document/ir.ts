@@ -26,6 +26,8 @@ export type DocRun =
   | ({ kind: 'math'; ref?: InlineRef } & Omit<MathInline, 'type'>)
   | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef; optionRef?: OptionImageRef }
   | { kind: 'blank'; widthChars: number }
+  /** 表格：独占一段；预览中画成表格，导出为 <w:tbl> */
+  | { kind: 'table'; table: DocTable }
   /** 制表符，用于选项分列 */
   | { kind: 'tab' }
 
@@ -62,6 +64,25 @@ export interface OptionImageRef {
 export interface FigureRef {
   blockId: string
   figureIndex: number
+}
+
+/** 表格单元格中的一段：文字等内容与对齐 */
+export interface DocCellParagraph {
+  runs: DocRun[]
+  align?: 'center' | 'right'
+}
+
+export interface DocTableCell {
+  paragraphs: DocCellParagraph[]
+  colSpan?: number
+  rowSpan?: number
+  shading?: string
+}
+
+export interface DocTable {
+  rows: Array<{ cells: DocTableCell[] }>
+  /** 各列宽度（twip），总和不超过栏宽 */
+  colWidthsTwip: number[]
 }
 
 export interface DocParagraph {

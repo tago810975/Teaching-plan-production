@@ -11,6 +11,8 @@ import { createKnowledge, createQuestion, newId, plainText } from '@core/model/f
 import { FigureList } from './FigureList'
 import { OptionImageControls } from './OptionImageControls'
 import { FontSelect } from './FontSelect'
+import { TableEditor } from './TableEditor'
+import { createTable } from '@core/model/table'
 import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
@@ -23,6 +25,7 @@ import type {
   Block,
   FontFamily,
   Inline,
+  TableInline,
   BlockLayout,
   CompositeBlock,
   KeepTogether,
@@ -823,6 +826,27 @@ function RichTextField({
   }
   // 加粗、倾斜、下划线：属性面板顶部的格式工具与 Ctrl+B / I / U
   const formattable = useFormattable(ref, () => ({ text: draft, objects: initial.objects as Map<number, Inline> }), update)
+  // 表格：⟦表格N⟧ 标记对应的表格在编辑器中修改；n 为 null 表示插入新表格
+  const [tableEdit, setTableEdit] = useState<{ n: number | null; table: TableInline } | null>(null)
+  const tableTokens = [...draft.matchAll(/⟦表格(\d+)⟧/g)].map((m) => Number(m[1]))
+  const objects = initial.objects as Map<number, Inline>
+  const saveTable = (table: TableInline): void => {
+    if (tableEdit?.n != null) {
+      objects.set(tableEdit.n, table)
+      update(draft)
+    } else {
+      // 新表格独占一行，插在光标处
+      const n = Math.max(0, ...objects.keys()) + 1
+      objects.set(n, table)
+      const pos = ref.current?.selectionStart ?? draft.length
+      const before = draft.slice(0, pos)
+      const after = draft.slice(pos)
+      const lead = before === '' || before.endsWith('\n') ? '' : '\n'
+      const trail = after === '' || after.startsWith('\n') ? '' : '\n'
+      update(`${before}${lead}⟦表格${n}⟧${trail}${after}`)
+    }
+    setTableEdit(null)
+  }
   return (
     <div className="text-field">
       <textarea
@@ -834,7 +858,26 @@ function RichTextField({
         onChange={(e) => update(e.target.value)}
         {...formattable}
       />
+      {tableEdit !== null && (
+        <TableEditor
+          table={tableEdit.table}
+          title={tableEdit.n === null ? '插入表格' : '编辑表格'}
+          onSave={saveTable}
+          onCancel={() => setTableEdit(null)}
+        />
+      )}
       <div className="text-field-tools">
+        {tableTokens.map((n, k) => {
+          const t = objects.get(n)
+          return t?.type === 'table' ? (
+            <button key={`${n}-${k}`} type="button" className="table-edit-button" onClick={() => setTableEdit({ n, table: t })} title="删除表格：在输入框中删掉 ⟦表格⟧ 标记">
+              编辑表格{tableTokens.length > 1 ? k + 1 : ''}
+            </button>
+          ) : null
+        })}
+        <button type="button" className="table-edit-button" onClick={() => setTableEdit({ n: null, table: createTable(3, 3) })}>
+          插入表格
+        </button>
         <InsertFormulaButton target={ref} text={draft} onInsert={update} />
       </div>
     </div>

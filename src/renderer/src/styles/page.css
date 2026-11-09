@@ -278,3 +278,32 @@
   background-color: rgba(47, 111, 181, 0.12);
   outline: 0.75pt solid rgba(47, 111, 181, 0.45);
 }
+
+/* 表格：与导出一致 */
+.doc-table-wrap {
+  display: block;
+  text-indent: 0;
+  margin: 2pt 0;
+}
+.doc-table {
+  margin: 0 auto;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-indent: 0;
+}
+.doc-table td {
+  border: 0.5pt solid #000;
+  padding: 0 4pt;
+  vertical-align: middle;
+  text-indent: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.doc-table-para {
+  text-indent: 0;
+}
+.doc-table .run-image {
+  /* 图片比单元格宽时按比例缩小 */
+  max-width: 100% !important;
+  height: auto !important;
+}

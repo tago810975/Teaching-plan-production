@@ -9,7 +9,8 @@
  * - 大标题处重新开始题号（如“作业单”）。
  */
 import JSZip from 'jszip'
-import type { DocIR, DocParagraph, DocRun, FloatingImage } from '../document/ir'
+import type { DocCellParagraph, DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from '../document/ir'
+import { layoutTable } from '../model/table'
 import { A4_PAGE, contentWidthTwip } from '../document/units'
 import { STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
@@ -47,7 +48,9 @@ export async function writeDocx({ ir, assets, title, template }: ExportInput): P
   await ctx.loadTemplate()
 
   // ---- 正文 ----
-  const body = ir.paragraphs.map((p) => ctx.paragraph(p)).join('')
+  let body = ir.paragraphs.map((p) => ctx.paragraph(p)).join('')
+  // 正文不能以表格结尾（Word 要求最后是段落）
+  if (body.endsWith('</w:tbl>')) body += '<w:p/>'
   const docPath = 'word/document.xml'
   const doc = await readText(zip, docPath)
   if (!doc.includes('{{body}}')) throw new DocxExportError('模板中缺少正文占位符 {{body}}。')
@@ -118,6 +121,14 @@ class ExportContext {
   // ---------------- 段落 ----------------
 
   paragraph(p: DocParagraph): string {
+    // 表格不能放在段落里：先写其余内容（如题号）组成的段落，再写表格
+    if (p.runs.some((r) => r.kind === 'table')) {
+      const rest = p.runs.filter((r) => r.kind !== 'table')
+      const hasOther = rest.some((r) => !(r.kind === 'text' && r.text.trim() === ''))
+      let out = hasOther || p.label !== undefined ? this.paragraph({ ...p, runs: rest }) : ''
+      for (const r of p.runs) if (r.kind === 'table') out += this.table(r.table)
+      return out
+    }
     const spec = STYLE_SPECS[p.style]
     if (p.restartNumbering === true && this.numbering !== null) {
       this.currentNumId = this.newRestartNum()
@@ -161,6 +172,53 @@ class ExportContext {
     return ''
   }
 
+  /**
+   * 表格：细实线边框、固定列宽、居中；合并单元格写成 gridSpan / vMerge（被上方单元格覆盖的位置写续行单元格）。
+   * 单元格中的段落用正文样式，但不缩进、段前段后为 0。
+   */
+  private table(t: DocTable): string {
+    const grid = layoutTable(t.rows)
+    const widths = t.colWidthsTwip.length === grid.cols ? t.colWidthsTwip : Array.from({ length: grid.cols }, () => Math.floor(contentWidthTwip(A4_PAGE) / Math.max(1, grid.cols)))
+    const total = widths.reduce((a, b) => a + b, 0)
+    const span = (c: number, n: number): number => widths.slice(c, c + n).reduce((a, b) => a + b, 0)
+    const border = (name: string): string => `<w:${name} w:val="single" w:sz="4" w:space="0" w:color="auto"/>`
+    const bodyStyle = this.styleIds.get(STYLE_SPECS.body.wordStyleName)
+    const cellPara = (cp: DocCellParagraph | undefined): string =>
+      `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, undefined)).join('')}</w:p>`
+    let xml =
+      `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:jc w:val="center"/>` +
+      `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('')}</w:tblBorders>` +
+      `<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>` +
+      `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`
+    for (let r = 0; r < grid.rows; r++) {
+      xml += '<w:tr>'
+      for (let c = 0; c < grid.cols; ) {
+        const owner = grid.owner[r]![c]
+        if (owner === undefined) {
+          // 行中缺的格子补空单元格
+          xml += `<w:tc><w:tcPr><w:tcW w:w="${widths[c]}" w:type="dxa"/></w:tcPr>${cellPara(undefined)}</w:tc>`
+          c += 1
+          continue
+        }
+        const gridSpan = owner.colSpan > 1 ? `<w:gridSpan w:val="${owner.colSpan}"/>` : ''
+        const w = `<w:tcW w:w="${span(c, owner.colSpan)}" w:type="dxa"/>`
+        if (owner.row !== r) {
+          // 被上方单元格覆盖：续行单元格
+          xml += `<w:tc><w:tcPr>${w}${gridSpan}<w:vMerge/></w:tcPr>${cellPara(undefined)}</w:tc>`
+        } else {
+          const cell = owner.cell
+          const vMerge = owner.rowSpan > 1 ? '<w:vMerge w:val="restart"/>' : ''
+          const shd = cell.shading !== undefined ? `<w:shd w:val="clear" w:color="auto" w:fill="${cell.shading}"/>` : ''
+          const paras = cell.paragraphs.length > 0 ? cell.paragraphs.map(cellPara).join('') : cellPara(undefined)
+          xml += `<w:tc><w:tcPr>${w}${gridSpan}${vMerge}${shd}<w:vAlign w:val="center"/></w:tcPr>${paras}</w:tc>`
+        }
+        c += owner.colSpan
+      }
+      xml += '</w:tr>'
+    }
+    return xml + '</w:tbl>'
+  }
+
   private run(run: DocRun, paraFont: FontFamily | undefined): string {
     switch (run.kind) {
       case 'text':
@@ -170,6 +228,9 @@ class ExportContext {
         return '<w:r><w:tab/></w:r>'
       case 'blank':
         return `<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${'\u3000'.repeat(Math.max(1, Math.round(run.widthChars)))}</w:t></w:r>`
+      case 'table':
+        // 由 paragraph() 单独写成 <w:tbl>
+        return ''
       case 'image':
         return this.drawing(run, 'inline')
       case 'math': {

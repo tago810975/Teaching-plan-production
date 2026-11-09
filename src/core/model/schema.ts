@@ -6,7 +6,7 @@
  * `types.ts` 中的类型定义保持同步：两者不一致时会编译失败。
  */
 import { z } from 'zod'
-import type { Project } from './types'
+import type { Inline, Project, RichParagraph, TableInline } from './types'
 
 const fontFamily = z.enum(['song', 'hei', 'kai', 'fang'])
 
@@ -25,7 +25,7 @@ const textMarks = z.object({
     .optional()
 })
 
-const inline = z.discriminatedUnion('type', [
+const simpleInline = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string(), marks: textMarks.optional() }),
   z
     .object({
@@ -50,7 +50,10 @@ const inline = z.discriminatedUnion('type', [
   z.object({ type: z.literal('blank'), widthChars: z.number().positive() })
 ])
 
-const richParagraph = z.object({
+// 表格的单元格内容是富文本：行内元素、段落、表格互相引用，需显式标注类型
+const inline: z.ZodType<Inline> = z.lazy(() => z.union([simpleInline, tableInline]))
+
+const richParagraph: z.ZodType<RichParagraph> = z.object({
   inlines: z.array(inline),
   format: z
     .object({
@@ -63,6 +66,27 @@ const richParagraph = z.object({
     .optional()
 })
 const richText = z.array(richParagraph)
+
+const tableInline: z.ZodType<TableInline> = z.object({
+  type: z.literal('table'),
+  rows: z.array(
+    z.object({
+      cells: z.array(
+        z.object({
+          content: richText,
+          colSpan: z.number().int().min(1).optional(),
+          rowSpan: z.number().int().min(1).optional(),
+          shading: z
+            .string()
+            .regex(/^[0-9A-Fa-f]{6}$/)
+            .optional()
+        })
+      )
+    })
+  ),
+  colWidthsTwip: z.array(z.number().positive()).optional()
+})
+
 
 const variant = z.enum(['teacher', 'student'])
 
