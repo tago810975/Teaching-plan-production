@@ -60,6 +60,8 @@ export type EditorAction =
   | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
+  /** 让属性面板的输入框重新读取内容（如改了字体，文字自身的格式随之变化） */
+  | { type: 'refresh-inspector' }
   /** 选项图片在预览中拖动时是否全部一起缩放（界面设置，不存入工程） */
   | { type: 'set-link-option-images'; value: boolean }
   /** 修改某张题图 / 插图（在预览中缩放、拖动后） */
@@ -196,6 +198,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const next = withBlocks(state, (blocks) => mapBlockById(blocks, ref.blockId, (b) => replaceAt(b, ref.path, inline) as Block))
       return { ...next, selectedBlockId: ref.blockId, revision: state.revision + 1 }
     }
+    case 'refresh-inspector':
+      return { ...state, revision: state.revision + 1 }
     case 'set-link-option-images':
       return { ...state, linkOptionImages: action.value }
     case 'update-layout':

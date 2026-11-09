@@ -263,6 +263,7 @@ function EditorBody({
         <Inspector
           block={selectedBlock}
           linkOptionImages={state.linkOptionImages}
+          projectLayout={project.layout}
           header={headerSelected ? project.header : null}
           layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}

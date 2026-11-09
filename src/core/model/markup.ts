@@ -19,7 +19,7 @@ export interface Editable {
   objects: ReadonlyMap<number, Inline>
 }
 
-const TOKEN = /⟦(公式|图|填空)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|格式)(\d+):([^⟧]*)⟧/g
+const TOKEN = /⟦(公式|图|填空)(\d+)⟧|⟦(上标|下标|加粗|倾斜|下划线|颜色|字体|格式)(\d+):([^⟧]*)⟧/g
 
 export function toEditable(rich: RichText): Editable {
   const objects = new Map<number, Inline>()
@@ -70,6 +70,8 @@ function markName(m: TextMarks): string {
   if (m.bold === true) return '加粗'
   if (m.italic === true) return '倾斜'
   if (m.underline === true) return '下划线'
+  if (m.color !== undefined) return '颜色'
+  if (m.font !== undefined) return '字体'
   return '格式'
 }
 

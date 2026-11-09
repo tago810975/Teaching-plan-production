@@ -1219,3 +1219,42 @@ body.is-dragging-outline * {
   min-width: 4.5em;
   color: var(--ink-soft);
 }
+
+/* 字体选择（输入框标题旁、选项与小问分组内） */
+.font-select {
+  font-size: 12px;
+  padding: 1px 4px;
+  max-width: 11em;
+}
+.group-font-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+  color: var(--ink-soft);
+}
+
+/* 选项列位置 */
+.option-stops-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 6px 0;
+}
+.option-stops-caption {
+  min-width: 5em;
+  color: var(--ink-soft);
+}
+.option-stops-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.option-stops-row input {
+  width: 4.2em;
+}
+.option-stops-row input.is-invalid {
+  border-color: var(--red-pen);
+  outline-color: var(--red-pen);
+}

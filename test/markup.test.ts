@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromEditable, toEditable } from '@core/model/markup'
+import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import type { RichText } from '@core/model/types'
 
 const roundTrip = (rich: RichText): RichText => {
@@ -57,5 +57,12 @@ describe('可编辑文本', () => {
 
   it('未配对的 $ 视为文字', () => {
     expect(fromEditable('a$b', new Map())).toEqual([{ inlines: [{ type: 'text', text: 'a$b' }] }])
+  })
+
+  it('颜色、字体单独设置时标记写作“颜色”“字体”，往返不变', () => {
+    const p = { inlines: [{ type: 'text' as const, text: '红字', marks: { color: 'FF0000' } }, { type: 'text' as const, text: '和' }, { type: 'text' as const, text: '仿宋', marks: { font: 'fang' as const } }] }
+    const e = paragraphToEditable(p)
+    expect(e.text).toBe('⟦颜色1:红字⟧和⟦字体2:仿宋⟧')
+    expect(paragraphFromEditable(e.text, e.objects)).toEqual(p)
   })
 })

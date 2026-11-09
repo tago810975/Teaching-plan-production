@@ -10,14 +10,21 @@ import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } 
 import { createKnowledge, createQuestion, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
 import { OptionImageControls } from './OptionImageControls'
+import { FontSelect } from './FontSelect'
+import { OptionStopsEditor } from './OptionStopsEditor'
+import { STYLE_SPECS } from '@core/document/styles'
+import { resolveOptionColumns } from '@core/document/build'
+import { copyStops, DEFAULT_OPTION_STOPS, LEGACY_OPTION_STOPS } from '@core/model/factory'
 import { optionImageSignature } from '@core/model/option-images'
 import type {
   Block,
+  FontFamily,
   BlockLayout,
   CompositeBlock,
   KeepTogether,
   KnowledgeBlock,
   OptionColumns,
+  OptionStops,
   Question,
   QuestionBlock,
   RichParagraph,
@@ -39,9 +46,11 @@ interface Props {
   revision: number
   /** 预览中拖动选项图片时是否全部一起缩放 */
   linkOptionImages?: boolean
+  /** 工程的版式设置（选项列位置等的默认值） */
+  projectLayout?: ProjectLayout
 }
 
-export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout }: Props) {
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -72,6 +81,11 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   }
 
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
+  /** 改字体会改动文字自身的格式，输入框需要重新读取内容 */
+  const refreshAfter = (fn: () => void): void => {
+    fn()
+    dispatch({ type: 'refresh-inspector' })
+  }
 
   return (
     <aside className="panel inspector" aria-label="属性">
@@ -85,6 +99,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             assetUrls={assetUrls}
             dispatch={dispatch}
             linkOptionImages={linkOptionImages}
+            projectStops={projectLayout?.optionStops ?? DEFAULT_OPTION_STOPS}
           />
         ) : block.type === 'knowledge' ? (
           <KnowledgeForm
@@ -101,7 +116,17 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             dispatch={dispatch}
           />
         ) : block.type === 'paragraph' ? (
-          <Field label="内容">
+          <Field
+            label="内容"
+            aside={
+              <FontSelect
+                label="内容"
+                paragraphs={block.content}
+                styleFont={STYLE_SPECS.body.fontRole}
+                onChange={(content) => refreshAfter(() => update((b) => ({ ...b, content }) as Block))}
+              />
+            }
+          >
             <RichTextField
               fieldId="content"
               value={block.content}
@@ -164,8 +189,42 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
         {row('keepKnowledgeTogether', 'teacher', '教案', '整块同页')}
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
       </fieldset>
+      <fieldset className="group">
+        <legend>选项位置</legend>
+        <p className="field-hint">选择题选项排成每行 2 项、4 项时，各列从哪里开始。</p>
+        <OptionStopsEditor stops={layout.optionStops} onChange={(optionStops) => dispatch({ type: 'update-layout', layout: { ...layout, optionStops } })} />
+        <div className="group-actions">
+          <button type="button" onClick={() => dispatch({ type: 'update-layout', layout: { ...layout, optionStops: copyStops(DEFAULT_OPTION_STOPS) } })}>
+            恢复默认
+          </button>
+          <button type="button" onClick={() => dispatch({ type: 'update-layout', layout: { ...layout, optionStops: copyStops(LEGACY_OPTION_STOPS) } })}>
+            用模板原来的位置（较窄）
+          </button>
+        </div>
+      </fieldset>
       <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
     </>
+  )
+}
+
+/** 输入框标题旁的字体选择；改完后让输入框重新读取内容（字体会去掉文字自身的字体格式） */
+function fontSelect(
+  label: string,
+  paragraphs: RichParagraph[],
+  styleFont: FontFamily,
+  onChange: (paragraphs: RichParagraph[]) => void,
+  dispatch: Dispatch<EditorAction>
+): ReactNode {
+  return (
+    <FontSelect
+      label={label}
+      paragraphs={paragraphs}
+      styleFont={styleFont}
+      onChange={(next) => {
+        onChange(next)
+        dispatch({ type: 'refresh-inspector' })
+      }}
+    />
   )
 }
 
@@ -195,7 +254,11 @@ function CompositeForm({
       <Field label="标题" hint="如“材料一”；居中显示">
         <TextInput fieldId="title" value={block.title} onChange={(title) => set({ title })} />
       </Field>
-      <Field label="背景材料（可选）" hint="小题共用的情境、材料；留空则不显示">
+      <Field
+        label="背景材料（可选）"
+        hint="小题共用的情境、材料；留空则不显示"
+        aside={fontSelect('背景材料', block.background, STYLE_SPECS.compositeBackground.fontRole, (background) => set({ background }), dispatch)}
+      >
         <RichTextField fieldId="background" value={block.background} rows={6} onChange={(background) => set({ background })} />
       </Field>
       <FigureList
@@ -231,10 +294,14 @@ function CompositeForm({
       </fieldset>
       <fieldset className="group group--teacher">
         <legend>仅教师版：共用的答案与详解</legend>
-        <Field label="答案" hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写">
+        <Field
+          label="答案"
+          hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写"
+          aside={fontSelect('答案', block.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}
+        >
           <RichTextField fieldId="answer" value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
         </Field>
-        <Field label="详解">
+        <Field label="详解" aside={fontSelect('详解', block.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
           <RichTextField fieldId="analysis" value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
@@ -263,7 +330,11 @@ function KnowledgeForm({
       <Field label="标题" hint="如“一、放缩圆”；留空则只显示内容">
         <TextInput fieldId="title" value={block.title} onChange={(title) => set({ title })} />
       </Field>
-      <Field label="内容" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
+      <Field
+        label="内容"
+        hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
+        aside={fontSelect('内容', block.content, STYLE_SPECS.body.fontRole, (content) => set({ content }), dispatch)}
+      >
         <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
       </Field>
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
@@ -408,13 +479,15 @@ function QuestionForm({
   update,
   assetUrls,
   dispatch,
-  linkOptionImages
+  linkOptionImages,
+  projectStops
 }: {
   block: QuestionBlock
   update: (fn: (b: QuestionBlock) => QuestionBlock) => void
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
   linkOptionImages: boolean
+  projectStops: OptionStops
 }) {
   const q = block.question
   // 选项图片的尺寸变化时，选项输入框需要重新读取内容（它只在挂载时读取一次行内图片）
@@ -428,7 +501,11 @@ function QuestionForm({
       <Field label="难度" hint="显示为题干开头的【B】，留空则不显示">
         <TextInput value={q.difficulty ?? ''} width="4em" onChange={(v) => set({ difficulty: v || undefined })} />
       </Field>
-      <Field label="题干" hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除">
+      <Field
+        label="题干"
+        hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
+        aside={fontSelect('题干', q.stem, STYLE_SPECS.question.fontRole, (stem) => set({ stem }), dispatch)}
+      >
         <RichTextField fieldId="stem" value={q.stem} rows={5} onChange={(stem) => set({ stem })} />
       </Field>
 
@@ -445,6 +522,18 @@ function QuestionForm({
       <fieldset className="group">
         <legend>选项</legend>
         {q.options.length === 0 && <p className="field-hint">没有选项。选择题请添加选项。</p>}
+        {q.options.length > 0 && (
+          <div className="group-font-row">
+            <span>字体</span>
+            {fontSelect(
+              '选项',
+              q.options.map((o) => o.content),
+              STYLE_SPECS.option.fontRole,
+              (contents) => set({ options: q.options.map((o, i) => ({ ...o, content: contents[i]! })) }),
+              dispatch
+            )}
+          </div>
+        )}
         {q.options.map((opt, i) => (
           <div key={`${block.id}-${opt.label}-${q.options.length}-${imageSig}`} className="option-row">
             <span className="option-label">{opt.label}</span>
@@ -505,6 +594,22 @@ function QuestionForm({
 
       <fieldset className="group">
         <legend>小问</legend>
+        {q.subQuestions.length > 0 && (
+          <div className="group-font-row">
+            <span>字体</span>
+            {fontSelect(
+              '小问',
+              q.subQuestions.flatMap((sq) => sq.content),
+              STYLE_SPECS.subQuestion.fontRole,
+              (all) => {
+                // 按各小问的段数切回去
+                let k = 0
+                set({ subQuestions: q.subQuestions.map((sq) => ({ ...sq, content: sq.content.map(() => all[k++]!) })) })
+              },
+              dispatch
+            )}
+          </div>
+        )}
         {q.subQuestions.map((sq, i) => (
           <div key={sq.id} className="field">
             <div className="field-label-row">
@@ -539,7 +644,7 @@ function QuestionForm({
 
       <fieldset className="group group--teacher">
         <legend>仅教师版</legend>
-        <Field label="答案">
+        <Field label="答案" aside={fontSelect('答案', q.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}>
           <RichTextField fieldId="answer" value={q.answer} rows={2} onChange={(answer) => set({ answer })} />
         </Field>
         <Field label="知识点" hint="多个知识点用顿号或逗号分隔">
@@ -562,7 +667,7 @@ function QuestionForm({
         <Field label="难点">
           <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
         </Field>
-        <Field label="详解">
+        <Field label="详解" aside={fontSelect('详解', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
           <RichTextField fieldId="analysis" value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
       </fieldset>
@@ -582,6 +687,33 @@ function QuestionForm({
             />
           </Field>
         )}
+        {q.options.length > 0 && (
+          <Field
+            label="选项位置"
+            hint={(() => {
+              const n = resolveOptionColumns(q.options, q.layout.optionColumns, q.layout.optionStops ?? projectStops)
+              return n === 1 ? '现在每行 1 项，不用设置位置。' : `现在每行 ${n} 项。`
+            })()}
+          >
+            <label className="checkbox checkbox--inline">
+              <input
+                type="checkbox"
+                checked={q.layout.optionStops !== undefined}
+                onChange={(e) => {
+                  if (e.target.checked) setLayout({ optionStops: copyStops(projectStops) })
+                  else update((b) => {
+                    const { optionStops: _s, ...layout } = b.question.layout
+                    return { ...b, question: { ...b.question, layout } }
+                  })
+                }}
+              />
+              本题单独设置（否则用“版式设置”中的位置）
+            </label>
+            {q.layout.optionStops !== undefined && (
+              <OptionStopsEditor stops={q.layout.optionStops} onChange={(optionStops) => setLayout({ optionStops })} />
+            )}
+          </Field>
+        )}
       </LayoutFields>
     </>
   )
@@ -589,13 +721,23 @@ function QuestionForm({
 
 // ---------------- 通用输入控件 ----------------
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({ label, hint, children, aside }: { label: string; hint?: string; children: ReactNode; aside?: ReactNode }) {
   const id = useId()
+  const labelEl = (
+    <span className="field-label" id={id}>
+      {label}
+    </span>
+  )
   return (
     <div className="field" role="group" aria-labelledby={id}>
-      <span className="field-label" id={id}>
-        {label}
-      </span>
+      {aside === undefined ? (
+        labelEl
+      ) : (
+        <div className="field-label-row">
+          {labelEl}
+          {aside}
+        </div>
+      )}
       <div className="field-control">{children}</div>
       {hint !== undefined && <p className="field-hint">{hint}</p>}
     </div>
@@ -655,9 +797,14 @@ function ParagraphField({ value, onChange, fieldId }: { value: RichParagraph; on
   const [draft, setDraft] = useState(initial.text)
   const ref = useRef<HTMLInputElement>(null)
   useFieldFocus(fieldId, ref)
+  const latest = useRef(value)
+  latest.current = value
   const update = (text: string): void => {
     setDraft(text)
-    onChange(paragraphFromEditable(text, initial.objects))
+    // 文本框只编辑文字：保留段落格式（如字体）
+    const next = paragraphFromEditable(text, initial.objects)
+    const format = latest.current.format
+    onChange(format !== undefined ? { ...next, format } : next)
   }
   return (
     <div className="text-field text-field--inline">
