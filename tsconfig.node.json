@@ -13,5 +13,7 @@
     "src/core/**/*",
     "src/shared/**/*",
     "test/**/*"
-  ]
+  ],
+  // 界面层（src/renderer）的测试由 tsconfig.web.json 检查
+  "exclude": ["test/renderer/**/*"]
 }

@@ -41,7 +41,7 @@ export const IPC = {
   openFileRequest: 'app:open-file-request'
 } as const
 
-export type MenuCommand = 'new' | 'open' | 'save' | 'save-as' | 'export-word' | 'close'
+export type MenuCommand = 'new' | 'open' | 'save' | 'save-as' | 'export-word' | 'close' | 'undo' | 'redo'
 
 export interface OpenedProject {
   filePath: string

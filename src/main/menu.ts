@@ -27,8 +27,10 @@ export function buildAppMenu(send: (command: MenuCommand) => void): Menu {
   const editMenu: MenuItemConstructorOptions = {
     label: '编辑',
     submenu: [
-      { label: '撤销', role: 'undo' },
-      { label: '重做', role: 'redo' },
+      // 撤销 / 重做整个教学案的修改（不只是输入框里的文字）。快捷键只在菜单中显示、不向系统注册，
+      // 由界面统一处理 Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z（对话框中仍是输入框自己的撤销）
+      { label: '撤销', accelerator: 'CmdOrCtrl+Z', registerAccelerator: false, click: () => send('undo') },
+      { label: '重做', accelerator: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y', registerAccelerator: false, click: () => send('redo') },
       { type: 'separator' },
       { label: '剪切', role: 'cut' },
       { label: '复制', role: 'copy' },

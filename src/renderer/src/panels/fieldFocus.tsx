@@ -15,11 +15,23 @@ export const FieldFocusContext = createContext<FocusRequest | null>(null)
 export function useFieldFocus(fieldId: string | undefined, ref: RefObject<HTMLTextAreaElement | HTMLInputElement | null>): void {
   const request = useContext(FieldFocusContext)
   const handled = useRef(0)
+  // 记下输入框标识：撤销 / 重做时据此知道光标在哪个输入框
+  useEffect(() => {
+    const el = ref.current
+    if (el !== null && fieldId !== undefined) el.dataset.fieldId = fieldId
+  }, [fieldId, ref])
   useEffect(() => {
     const el = ref.current
     if (fieldId === undefined || request === null || el === null) return
     if (request.field !== fieldId || request.nonce === handled.current) return
     handled.current = request.nonce
+    if (request.caret !== undefined) {
+      // 撤销 / 重做：光标放回原处，不滚动、不高亮
+      const caret = Math.min(request.caret, el.value.length)
+      el.focus({ preventScroll: true })
+      el.setSelectionRange(caret, caret)
+      return
+    }
     const caret = caretPosition(el.value, request.paragraph, request.before, request.after)
     el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     el.focus({ preventScroll: true })

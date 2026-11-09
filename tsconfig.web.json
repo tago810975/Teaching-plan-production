@@ -10,6 +10,7 @@
     "src/renderer/src/**/*",
     "src/preload/*.d.ts",
     "src/core/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "test/renderer/**/*"
   ]
 }

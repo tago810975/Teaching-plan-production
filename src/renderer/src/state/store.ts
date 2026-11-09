@@ -1,6 +1,9 @@
 /**
- * 编辑器状态。工程数据为不可变对象，每次修改都生成新对象，
- * 便于 React 判断变化，也为后续实现撤销 / 重做打基础。
+ * 编辑器状态。工程数据为不可变对象，每次修改都生成新对象，便于 React 判断变化。
+ *
+ * 撤销 / 重做：每次修改工程前，把修改前的工程（及当时选中的内容）记入 history.past。
+ * 不可变数据让快照几乎不占额外内存（未改动的部分共用）。连续输入同一处时合并为一步
+ * （两次修改间隔不到 MERGE_MS）。撤销时选中改动所在的内容，便于看到改了哪里。
  */
 import { createEmptyBundle } from '@core/model/factory'
 import type { FigureRef, InlineRef } from '@core/document/ir'
@@ -33,7 +36,37 @@ export interface EditorState {
   focusRequest: FocusRequest | null
   /** 在预览中拖动一张选项图片时，全部选项图片一起缩放（按住 Shift 临时反过来） */
   linkOptionImages: boolean
+  history: History
+  /** 最近一次保存（或打开）时的工程，用于判断撤销后是否回到了已保存的状态 */
+  savedProject: ProjectBundle['project'] | null
 }
+
+/** 撤销 / 重做的一步：修改前的工程与资源，以及当时选中的内容 */
+export interface Snapshot {
+  bundle: ProjectBundle
+  selectedBlockId: string | null
+}
+
+export interface History {
+  past: Snapshot[]
+  future: Snapshot[]
+  /** 上一次修改的合并键（同一处的连续输入合并为一步）与时间 */
+  lastKey: string | null
+  lastAt: number
+}
+
+/** 光标所在的输入框与位置 */
+export interface CaretAt {
+  field: string
+  caret: number
+}
+
+/** 最多可撤销的步数 */
+export const HISTORY_LIMIT = 200
+/** 同一处的两次修改间隔不到这么久（毫秒）时合并为一步 */
+export const MERGE_MS = 1000
+
+const EMPTY_HISTORY: History = { past: [], future: [], lastKey: null, lastAt: 0 }
 
 export interface FocusRequest {
   blockId: string
@@ -43,6 +76,10 @@ export interface FocusRequest {
   /** 点击处前后的几个字，用于把光标放在点击位置 */
   before: string
   after: string
+  /** 直接指定光标位置（撤销 / 重做后放回原处），优先于 before / after */
+  caret?: number
+  /** 不滚动、不高亮（撤销 / 重做时） */
+  quiet?: boolean
   nonce: number
 }
 
@@ -72,6 +109,11 @@ export type EditorAction =
   | { type: 'add-asset'; asset: Asset }
   /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
   | { type: 'insert-blocks'; blocks: Block[]; assets?: Record<string, Asset>; afterBlockId: string | null }
+  /**
+   * 撤销 / 重做。focus：执行时光标所在的输入框与位置；撤销后仍选中同一内容时，光标放回原处
+   */
+  | { type: 'undo'; focus?: CaretAt }
+  | { type: 'redo'; focus?: CaretAt }
   /** 修改页眉文字或图片；image 为 null 表示移除该图片，asset 为新图片的资源 */
   | {
       type: 'update-header'
@@ -80,10 +122,86 @@ export type EditorAction =
     }
 
 export function initEditorState(bundle: ProjectBundle): EditorState {
-  return { screen: 'home', bundle, filePath: null, dirty: false, variant: 'teacher', selectedBlockId: null, revision: 0, focusRequest: null, linkOptionImages: false }
+  return {
+    screen: 'home',
+    bundle,
+    filePath: null,
+    dirty: false,
+    variant: 'teacher',
+    selectedBlockId: null,
+    revision: 0,
+    focusRequest: null,
+    linkOptionImages: false,
+    history: EMPTY_HISTORY,
+    savedProject: null
+  }
 }
 
+/** 编辑器的状态更新（用于 useReducer） */
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  return reduceAt(state, action, Date.now())
+}
+
+/** 先按动作修改，再记录撤销历史；now 为当前时间（测试中可指定） */
+export function reduceAt(state: EditorState, action: EditorAction, now: number): EditorState {
+  if (action.type === 'undo' || action.type === 'redo') return travel(state, action)
+  const next = baseReducer(state, action)
+  if (action.type === 'load' || action.type === 'close') return { ...next, history: EMPTY_HISTORY }
+  // 只有工程内容（或资源）变化才记入历史
+  if (next.bundle === state.bundle) return next
+  const key = mergeKey(action)
+  const h = state.history
+  const merge = key !== null && key === h.lastKey && now - h.lastAt < MERGE_MS && h.past.length > 0
+  const past = merge ? h.past : [...h.past, { bundle: state.bundle, selectedBlockId: state.selectedBlockId }].slice(-HISTORY_LIMIT)
+  return { ...next, history: { past, future: [], lastKey: key, lastAt: now } }
+}
+
+/** 同一处的连续修改（如在同一个输入框中打字）合并为一步；其余操作各算一步 */
+function mergeKey(action: EditorAction): string | null {
+  switch (action.type) {
+    case 'update-block':
+      return `block:${action.blockId}`
+    case 'set-title':
+      return 'title'
+    case 'update-header':
+      return action.image === undefined ? 'header' : null
+    case 'update-layout':
+      return 'layout'
+    default:
+      return null
+  }
+}
+
+function travel(state: EditorState, action: { type: 'undo' | 'redo'; focus?: CaretAt }): EditorState {
+  const h = state.history
+  const from = action.type === 'undo' ? h.past : h.future
+  const target = from[from.length - 1]
+  if (target === undefined) return state
+  const current: Snapshot = { bundle: state.bundle, selectedBlockId: state.selectedBlockId }
+  const rest = from.slice(0, -1)
+  const history: History =
+    action.type === 'undo'
+      ? { past: rest, future: [...h.future, current], lastKey: null, lastAt: 0 }
+      : { past: [...h.past, current], future: rest, lastKey: null, lastAt: 0 }
+  // 撤销：选中被撤销的修改发生时选中的内容；重做：同理
+  const selectedBlockId = target.selectedBlockId
+  const sameBlock = selectedBlockId !== null && selectedBlockId === state.selectedBlockId
+  return {
+    ...state,
+    bundle: target.bundle,
+    selectedBlockId,
+    history,
+    dirty: target.bundle.project !== state.savedProject,
+    // 属性面板的输入框重新读取内容
+    revision: state.revision + 1,
+    focusRequest:
+      sameBlock && action.focus !== undefined
+        ? { blockId: selectedBlockId, field: action.focus.field, paragraph: 0, before: '', after: '', caret: action.focus.caret, quiet: true, nonce: (state.focusRequest?.nonce ?? 0) + 1 }
+        : state.focusRequest
+  }
+}
+
+function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: 'undo' } | { type: 'redo' }>): EditorState {
   switch (action.type) {
     case 'load':
       return {
@@ -92,12 +210,13 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         bundle: action.bundle,
         filePath: action.filePath,
         dirty: false,
-        selectedBlockId: null
+        selectedBlockId: null,
+        savedProject: action.bundle.project
       }
     case 'close':
       return { ...initEditorState(createEmptyBundle()), variant: state.variant, linkOptionImages: state.linkOptionImages }
     case 'saved':
-      return { ...state, filePath: action.filePath, dirty: false }
+      return { ...state, filePath: action.filePath, dirty: false, savedProject: state.bundle.project }
     case 'set-variant':
       return { ...state, variant: action.variant }
     case 'select':

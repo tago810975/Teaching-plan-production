@@ -1466,3 +1466,15 @@ body.is-dragging-outline * {
 .format-button.format-keypoint:disabled {
   opacity: 0.45;
 }
+
+/* 撤销 / 重做 */
+.undo-redo {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 4px;
+}
+.undo-redo .icon-button {
+  width: 32px;
+  font-size: 18px;
+  line-height: 1;
+}

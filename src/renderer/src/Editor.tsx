@@ -160,6 +160,44 @@ function EditorBody({
     return () => window.removeEventListener('keydown', onKey)
   }, [dispatch])
 
+  // 撤销 / 重做：工具栏按钮、Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z、“编辑”菜单
+  const travel = useCallback(
+    (kind: 'undo' | 'redo') => {
+      const el = document.activeElement
+      // 对话框（如公式编辑）中仍用输入框自己的撤销
+      if (el instanceof HTMLElement && el.closest('dialog[open]') !== null) {
+        document.execCommand(kind)
+        return
+      }
+      // 记下光标所在的输入框，撤销后放回原处
+      const field = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el.dataset.fieldId : undefined
+      const caret = field !== undefined ? ((el as HTMLInputElement).selectionStart ?? 0) : 0
+      dispatch({ type: kind, ...(field !== undefined ? { focus: { field, caret } } : {}) })
+    },
+    [dispatch]
+  )
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const k = e.key.toLowerCase()
+      const kind = k === 'z' ? (e.shiftKey ? 'redo' : 'undo') : k === 'y' && !e.shiftKey ? 'redo' : null
+      if (kind === null) return
+      e.preventDefault()
+      travel(kind)
+    }
+    // 捕获阶段：先于输入框自己的撤销
+    window.addEventListener('keydown', onKey, true)
+    const off = window.api.onMenuCommand((command) => {
+      if (command === 'undo' || command === 'redo') travel(command)
+    })
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      off()
+    }
+  }, [travel])
+  const canUndo = state.history.past.length > 0
+  const canRedo = state.history.future.length > 0
+
   /** 插入位置：选中内容之后；未选中或选中页眉时放在末尾 */
   const insertAfter = selectedBlock?.id ?? null
   const addBlock = (block: Block): void => dispatch({ type: 'insert-blocks', blocks: [block], afterBlockId: insertAfter })
@@ -209,6 +247,14 @@ function EditorBody({
         </div>
 
         <div className="toolbar-actions">
+          <div className="undo-redo" role="group" aria-label="撤销与重做">
+            <button type="button" className="icon-button" onClick={() => travel('undo')} disabled={!canUndo} title="撤销（Ctrl+Z）" aria-label="撤销">
+              ↶
+            </button>
+            <button type="button" className="icon-button" onClick={() => travel('redo')} disabled={!canRedo} title="重做（Ctrl+Y 或 Ctrl+Shift+Z）" aria-label="重做">
+              ↷
+            </button>
+          </div>
           <AddMenu onAdd={addBlock} preset={preset} projectTitle={project.meta.title} />
           <button type="button" onClick={() => void importWord()} title="识别 Word 文档中的题目，插入到当前选中内容之后">
             导入 Word 题目…
