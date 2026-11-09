@@ -8,7 +8,15 @@
 
 // ---------- 行内内容 ----------
 
+/**
+ * 中文字体大类：宋体、黑体、楷体、仿宋。只区分大类，导出时写成对应的 Windows 字体，
+ * 导入时把“华文仿宋”“楷体_GB2312”“微软雅黑”等归入相应大类。
+ */
+export type FontFamily = 'song' | 'hei' | 'kai' | 'fang'
+
 export interface TextMarks {
+  /** 字体大类；不设时随段落（段落格式的 font，再到样式） */
+  font?: FontFamily
   bold?: boolean
   italic?: boolean
   underline?: boolean
@@ -68,6 +76,8 @@ export interface ParagraphFormat {
   spaceAfterLines?: number
   /** 从这一段开始换页 */
   pageBreakBefore?: boolean
+  /** 整段的字体大类；不设时用样式的字体 */
+  font?: FontFamily
 }
 
 /** 一个段落的行内内容 */
@@ -124,11 +134,20 @@ export interface SubQuestion {
 
 export type KeepTogether = 'auto' | 'always' | 'never'
 
+/**
+ * 选项分列时第 2 列起各列的起始位置（twip，相对左页边距；对应 Word 的制表位）：
+ * 每行 2 项时 1 个，每行 4 项时 3 个，从小到大。
+ */
+export interface OptionStops {
+  two: [number]
+  four: [number, number, number]
+}
+
 /** 选项排布：自动根据选项长度决定，或手动指定每行几项 */
 export type OptionColumns = 'auto' | 1 | 2 | 4
 
 /** 知识点等内容块的版式（与题目相同，但没有选项排列） */
-export type BlockLayout = Omit<QuestionLayout, 'optionColumns'>
+export type BlockLayout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'>
 
 export interface QuestionLayout {
   /** 学生版题后留白（作答空间），单位：行（按正文行高折算） */
@@ -136,6 +155,8 @@ export interface QuestionLayout {
   /** 教师版题后留白，单位：行 */
   teacherSpaceLines: number
   optionColumns: OptionColumns
+  /** 本题自定义的选项列位置；不设时用工程版式设置中的位置 */
+  optionStops?: OptionStops
   /**
    * 整题是否排在同一页：
    * - auto：跟随工程的版式设置（教案、学案分别设置）
@@ -288,6 +309,8 @@ export interface ProjectLayout {
   keepQuestionTogether: Record<Variant, boolean>
   /** 每个知识点默认是否整块排在同一页 */
   keepKnowledgeTogether: Record<Variant, boolean>
+  /** 选项分列的列位置（单道题可另行设置） */
+  optionStops: OptionStops
 }
 
 export interface Project {

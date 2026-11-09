@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument, resolveOptionColumns } from '@core/document/build'
 import { paginate, type MeasuredParagraph, type PageSlice } from '@core/document/paginate'
-import { createEmptyProject, createQuestion, newId, para } from '@core/model/factory'
+import { createEmptyProject, createQuestion, DEFAULT_OPTION_STOPS, LEGACY_OPTION_STOPS, newId, para } from '@core/model/factory'
 import type { Project, Question } from '@core/model/types'
 import { createDemoBundle } from '@core/sample/demo-project'
 
@@ -90,7 +90,13 @@ describe('选项分列', () => {
     expect(resolveOptionColumns(opts('2', '3', '4', '5'), 'auto')).toBe(4)
   })
   it('中等长度选项排成一行两项', () => {
-    expect(resolveOptionColumns(opts('离子运动时间相等', '运动半径不等', '时间最长', '偏转角最大'), 'auto')).toBe(2)
+    expect(resolveOptionColumns(opts('离子运动时间都相等', '运动半径不等', '时间最长', '偏转角最大'), 'auto')).toBe(2)
+  })
+
+  it('列位置决定能否排成四项：默认列宽比模板原有的略宽', () => {
+    const o = opts('离子运动时间相等', '运动半径不等', '时间最长', '偏转角最大')
+    expect(resolveOptionColumns(o, 'auto', LEGACY_OPTION_STOPS)).toBe(2)
+    expect(resolveOptionColumns(o, 'auto')).toBe(4)
   })
   it('长选项每行一项', () => {
     expect(
@@ -104,7 +110,21 @@ describe('选项分列', () => {
     const ir = buildDocument(projectWith(createQuestion({ options: opts('2', '3', '4', '5') })), 'student')
     const row = ir.paragraphs.find((p) => p.style === 'option')!
     expect(row.runs.filter((r) => r.kind === 'tab')).toHaveLength(3)
-    expect(row.tabStopsTwip).toEqual([2310, 4200, 6090])
+    expect(row.tabStopsTwip).toEqual(DEFAULT_OPTION_STOPS.four)
+  })
+
+  it('选项列位置：工程设置，单道题可另行设置', () => {
+    const custom = { two: [5000] as [number], four: [2500, 5000, 7500] as [number, number, number] }
+    const p = projectWith(createQuestion({ options: opts('2', '3', '4', '5') }))
+    p.layout.optionStops = custom
+    const row = (proj: Project) => buildDocument(proj, 'student').paragraphs.find((x) => x.style === 'option')!
+    expect(row(p).tabStopsTwip).toEqual([2500, 5000, 7500])
+    const own = { two: [4000] as [number], four: [2000, 4000, 6000] as [number, number, number] }
+    const b = p.blocks[0]!
+    if (b.type === 'question') b.question.layout.optionStops = own
+    expect(row(p).tabStopsTwip).toEqual([2000, 4000, 6000])
+    const two = projectWith(createQuestion({ options: opts('2', '3', '4', '5'), layout: { optionColumns: 2, optionStops: own } }))
+    expect(buildDocument(two, 'student').paragraphs.filter((x) => x.style === 'option').map((x) => x.tabStopsTwip)).toEqual([[4000], [4000]])
   })
 })
 

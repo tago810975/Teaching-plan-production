@@ -99,7 +99,15 @@
   font-family: 'Times New Roman', SimSun, '宋体', 'Songti SC', STSong, serif;
 }
 .font-hei {
-  font-family: 'Times New Roman', 'Microsoft YaHei', '微软雅黑', SimHei, 'PingFang SC', 'Heiti SC', sans-serif;
+  /* 与导出写入的“黑体”一致；没有黑体的系统再退到其他黑体类字体 */
+  font-family: 'Times New Roman', SimHei, '黑体', 'Heiti SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+.font-kai {
+  /* 模板“综合题背景”的楷体中，字母与数字也是楷体 */
+  font-family: KaiTi, '楷体', STKaiti, 'Kaiti SC', 'Times New Roman', serif;
+}
+.font-fang {
+  font-family: 'Times New Roman', FangSong, '仿宋', STFangsong, 'FangSong SC', serif;
 }
 
 .para {

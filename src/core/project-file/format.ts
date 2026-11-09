@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 5
+export const CURRENT_FORMAT_VERSION = 6
 
 /*
  * 版本记录：
@@ -28,6 +28,8 @@ export const CURRENT_FORMAT_VERSION = 5
  * 4 —— 图片位置新增 right-items / below-item / below-all / free；段落格式新增段后空行与段前换页
  *      （只增加取值与可选字段，旧数据无需迁移；升级版本号是为了让旧版软件拒绝打开新文件）
  * 5 —— 新增综合题块（composite）；图片可上下偏移（right / right-items 的 offsetYEmu）。无需迁移
+ * 6 —— 字体大类（文字格式 marks.font、段落格式 format.font）；project.layout 增加选项列位置 optionStops，
+ *      题目 layout 可选 optionStops。旧工程迁移时 optionStops 取模板原有制表位，排版不变
  */
 
 export interface Manifest {

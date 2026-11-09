@@ -2,6 +2,7 @@
  * 读取 .docx，把正文转换为“段落列表”：每段带有样式名、行内内容（文字、公式、图片）
  * 以及锚定在该段的浮动图片。题目识别在 recognize.ts 中进行。
  */
+import { fontFamilyOf } from '../document/fonts'
 import JSZip from 'jszip'
 import type { Asset, Inline, ParagraphFormat, TextMarks } from '../model/types'
 import { createAsset } from '../project-file/codec'
@@ -447,6 +448,12 @@ function runMarks(rPr: Element | undefined): TextMarks {
   if (on('b')) marks.bold = true
   if (on('i')) marks.italic = true
   if (on('u')) marks.underline = true
+  // 文字颜色：黑色与“自动”视为没有颜色
+  const color = attr(child(rPr, W, 'color'), W, 'val')
+  if (color !== undefined && /^[0-9A-Fa-f]{6}$/.test(color) && color !== '000000') marks.color = color.toUpperCase()
+  // 中文字体：只看东亚字体，归入宋体、黑体、楷体、仿宋四类；认不出的（如主题字体）不记录
+  const font = fontFamilyOf(attr(child(rPr, W, 'rFonts'), W, 'eastAsia'))
+  if (font !== undefined) marks.font = font
   const va = attr(child(rPr, W, 'vertAlign'), W, 'val')
   if (va === 'superscript') marks.script = 'sup'
   else if (va === 'subscript') marks.script = 'sub'
@@ -464,7 +471,7 @@ function pushText(para: ReadParagraph, text: string, marks: TextMarks): void {
 }
 
 function sameMarks(a: TextMarks, b: TextMarks): boolean {
-  return a.bold === b.bold && a.italic === b.italic && a.underline === b.underline && a.script === b.script && a.color === b.color
+  return a.bold === b.bold && a.italic === b.italic && a.underline === b.underline && a.script === b.script && a.color === b.color && a.font === b.font
 }
 
 function symbolChar(sym: Element): string {

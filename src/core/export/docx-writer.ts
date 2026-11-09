@@ -11,9 +11,10 @@
 import JSZip from 'jszip'
 import type { DocIR, DocParagraph, DocRun, FloatingImage } from '../document/ir'
 import { A4_PAGE, contentWidthTwip } from '../document/units'
-import { STYLE_SPECS, TEACHER_SHADING, type StyleKey } from '../document/styles'
+import { STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
+import { WORD_FONT_NAMES } from '../document/fonts'
 import { latexToOmml } from '../math/mathml-to-omml'
-import type { Asset, HeaderImage, TextMarks } from '../model/types'
+import type { Asset, FontFamily, HeaderImage, TextMarks } from '../model/types'
 import { extForMime } from '../project-file/format'
 import { attr, child, descendants, escapeXml, NS, parseXml, serializeXml, type Element } from '../xml/dom'
 
@@ -125,9 +126,7 @@ class ExportContext {
     const numPr = this.numPrFor(p.style)
     if (numPr !== '') pPr += numPr
     if (p.shaded === true) pPr += `<w:shd w:val="clear" w:color="auto" w:fill="${TEACHER_SHADING}"/>`
-    if (p.tabStopsTwip !== undefined) {
-      pPr += `<w:tabs>${p.tabStopsTwip.map((t) => `<w:tab w:val="left" w:pos="${t}"/>`).join('')}</w:tabs>`
-    }
+    if (p.tabStopsTwip !== undefined) pPr += tabsXml(p.style, p.tabStopsTwip)
     if (p.spacerTwip !== undefined) {
       pPr += `<w:spacing w:before="0" w:after="0" w:line="${p.spacerTwip}" w:lineRule="exact"/>`
     }
@@ -140,7 +139,7 @@ class ExportContext {
     let runs = ''
     for (const f of p.floatingImages ?? []) runs += this.drawing(f, 'anchor', f)
     if (p.label !== undefined && spec.autoNumbered !== true) runs += textRun(p.label, undefined)
-    for (const run of p.runs) runs += this.run(run)
+    for (const run of p.runs) runs += this.run(run, p.font)
     return `<w:p><w:pPr>${pPr}</w:pPr>${runs}</w:p>`
   }
 
@@ -158,10 +157,11 @@ class ExportContext {
     return ''
   }
 
-  private run(run: DocRun): string {
+  private run(run: DocRun, paraFont: FontFamily | undefined): string {
     switch (run.kind) {
       case 'text':
-        return textRun(run.text, run.marks)
+        // 文字自身的字体优先，其次是整段字体；都没有时随样式
+        return textRun(run.text, paraFont !== undefined && run.marks?.font === undefined ? { ...run.marks, font: paraFont } : run.marks)
       case 'tab':
         return '<w:r><w:tab/></w:r>'
       case 'blank':
@@ -396,10 +396,25 @@ class ExportContext {
 
 // ---------------- 工具函数 ----------------
 
+/**
+ * 段落制表位。Word 中段落的制表位叠加在样式的制表位之上，所以选项段落要先清除
+ * 模板“题目 选项”样式自带、但这次没用到的制表位，否则 Tab 会先停在旧位置。
+ */
+function tabsXml(style: StyleKey, stops: readonly number[]): string {
+  const entries = stops.map((pos) => ({ pos, val: 'left' }))
+  if (style === 'option') {
+    for (const pos of TEMPLATE_OPTION_TAB_STOPS) if (!stops.includes(pos)) entries.push({ pos, val: 'clear' })
+  }
+  entries.sort((a, b) => a.pos - b.pos)
+  return `<w:tabs>${entries.map((e) => `<w:tab w:val="${e.val}" w:pos="${e.pos}"/>`).join('')}</w:tabs>`
+}
+
 function textRun(text: string, marks: TextMarks | undefined): string {
   if (text === '') return ''
   let rPr = ''
   if (marks !== undefined) {
+    // 只设东亚字体：字母、数字仍用样式中的西文字体
+    if (marks.font !== undefined) rPr += `<w:rFonts w:eastAsia="${WORD_FONT_NAMES[marks.font]}" w:hint="eastAsia"/>`
     if (marks.bold === true) rPr += '<w:b/><w:bCs/>'
     if (marks.italic === true) rPr += '<w:i/><w:iCs/>'
     if (marks.color !== undefined) rPr += `<w:color w:val="${marks.color}"/>`

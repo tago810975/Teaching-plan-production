@@ -8,7 +8,7 @@
  * 预览（React）和 Word 导出都只消费 DocIR，不再各自解释工程数据，
  * 这是保证“预览所见即导出所得”的核心约束：任何排版规则只能写在 build.ts 里。
  */
-import type { MathInline, PageHeader, TextMarks, Variant } from '../model/types'
+import type { FontFamily, MathInline, PageHeader, TextMarks, Variant } from '../model/types'
 import type { StyleKey } from './styles'
 import type { PageSetup } from './units'
 
@@ -96,6 +96,8 @@ export interface DocParagraph {
   firstLineIndentTwip?: number
   /** 对齐方式，覆盖样式中的对齐 */
   align?: 'center' | 'right'
+  /** 整段字体大类，覆盖样式中的字体（文字自身的 marks.font 优先） */
+  font?: FontFamily
   /** 从本段之后重新开始题号（如“作业单”大标题） */
   restartNumbering?: boolean
   /** 锚定在本段的浮动图片（文字环绕） */

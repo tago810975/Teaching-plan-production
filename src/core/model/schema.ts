@@ -8,7 +8,13 @@
 import { z } from 'zod'
 import type { Project } from './types'
 
+const fontFamily = z.enum(['song', 'hei', 'kai', 'fang'])
+
+const twip = z.number().min(0).max(20000)
+const optionStops = z.object({ two: z.tuple([twip]), four: z.tuple([twip, twip, twip]) })
+
 const textMarks = z.object({
+  font: fontFamily.optional(),
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
   underline: z.boolean().optional(),
@@ -45,6 +51,7 @@ const richParagraph = z.object({
       firstLineChars: z.number().optional(),
       align: z.enum(['center', 'right']).optional(),
       spaceAfterLines: z.number().min(0).optional(),
+      font: fontFamily.optional(),
       pageBreakBefore: z.boolean().optional()
     })
     .optional()
@@ -91,6 +98,7 @@ const question = z.object({
     studentSpaceLines: z.number().min(0),
     teacherSpaceLines: z.number().min(0),
     optionColumns: z.union([z.literal('auto'), z.literal(1), z.literal(2), z.literal(4)]),
+    optionStops: optionStops.optional(),
     keepTogether: z.enum(['auto', 'always', 'never']),
     pageBreakBefore: z.boolean()
   })
@@ -157,7 +165,8 @@ export const projectSchema = z.object({
   }),
   layout: z.object({
     keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
-    keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() })
+    keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
+    optionStops
   }),
   templateId: z.string(),
   blocks: z.array(block)

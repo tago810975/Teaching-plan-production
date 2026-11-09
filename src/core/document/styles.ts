@@ -9,6 +9,7 @@
  *
  * TODO（导出阶段）：改为启动时从模板 styles.xml 解析生成，彻底消除两份数据。
  */
+import type { FontFamily } from '../model/types'
 import type { CSSLength } from './units'
 import { halfPtToPt, twipToPt } from './units'
 
@@ -30,8 +31,8 @@ export type StyleKey =
   | 'difficultPoint'
   | 'analysis'
 
-/** 中文字体类别：宋体（正文）或黑体类（标题） */
-export type FontRole = 'song' | 'hei'
+/** 中文字体大类（宋体、黑体、楷体、仿宋），须与模板 styles.xml 中各样式的东亚字体一致（有测试检查） */
+export type FontRole = FontFamily
 
 export interface ParagraphStyleSpec {
   /** 模板中的样式名称 */
@@ -83,7 +84,8 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
   title: {
     ...base,
     wordStyleName: '物理排版 大标题',
-    fontRole: 'hei',
+    // 模板中为宋体加粗（大标题用主题字体，主题的中文字体也是宋体）
+    fontRole: 'song',
     sizeHalfPt: 36,
     bold: true,
     align: 'center',
@@ -93,7 +95,8 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
   section: {
     ...base,
     wordStyleName: '物理排版 标题2 知识梳理、例题精讲、课堂总结、课后练习',
-    fontRole: 'hei',
+    // 模板中为宋体加粗（大标题用主题字体，主题的中文字体也是宋体）
+    fontRole: 'song',
     sizeHalfPt: 28,
     bold: true,
     align: 'left',
@@ -116,7 +119,7 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
     spaceBeforeTwip: 120,
     spaceAfterTwip: 120
   },
-  compositeBackground: { ...base, wordStyleName: '物理排版 综合题背景', align: 'left', lineAuto: 312 },
+  compositeBackground: { ...base, wordStyleName: '物理排版 综合题背景', fontRole: 'kai', align: 'left', lineAuto: 312 },
   body: { ...base, wordStyleName: '物理排版 正文' },
   question: {
     ...base,
@@ -162,11 +165,12 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
   analysis: { ...base, wordStyleName: '物理排版 正文' }
 }
 
-/** 选项的制表位（twip，相对页面左边距），与模板“题目 选项”样式一致 */
-export const OPTION_TAB_STOPS: Readonly<Record<2 | 4, readonly number[]>> = {
-  2: [4200],
-  4: [2310, 4200, 6090]
-}
+/**
+ * 模板“题目 选项”样式自带的制表位（twip，相对页面左边距）。实际的列位置由工程版式设置决定
+ * （OptionStops）；导出时段落上的制表位是叠加在样式制表位之上的，所以要把这些清除掉。
+ */
+export const TEMPLATE_OPTION_TAB_STOPS: readonly number[] = [2310, 4200, 6090]
+
 
 /** 教师版答案区的底纹颜色，与参考样例一致 */
 export const TEACHER_SHADING = 'F2F2F2'

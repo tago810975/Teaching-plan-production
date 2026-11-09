@@ -110,4 +110,18 @@ describe('工程文件编解码', () => {
     bundle.assets = {}
     await expect(encodeBundle(bundle, opts)).rejects.toThrow('不存在的图片资源')
   })
+
+  it('第 5 版工程：迁移后选项列位置取模板原有的制表位，排版不变', async () => {
+    const bytes = await encodeBundle(createEmptyBundle(), opts)
+    const zip = await JSZip.loadAsync(bytes)
+    const project = JSON.parse(await zip.file('project.json')!.async('string'))
+    delete project.layout.optionStops
+    zip.file('project.json', JSON.stringify(project))
+    const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'))
+    manifest.formatVersion = 5
+    zip.file('manifest.json', JSON.stringify(manifest))
+    const old = await zip.generateAsync({ type: 'uint8array' })
+    const decoded = await decodeBundle(old)
+    expect(decoded.project.layout.optionStops).toEqual({ two: [4200], four: [2310, 4200, 6090] })
+  })
 })

@@ -5,6 +5,7 @@
  * 题后留白、防跨页），预览和 Word 导出不得各自另写规则。
  */
 import type {
+  OptionStops,
   ChoiceOption,
   CompositeBlock,
   KnowledgeBlock,
@@ -20,7 +21,8 @@ import type {
 } from '../model/types'
 import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun, FloatingImage } from './ir'
-import { BODY_LINE_HEIGHT_TWIP, OPTION_TAB_STOPS, STYLE_SPECS, type StyleKey } from './styles'
+import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, type StyleKey } from './styles'
+import { DEFAULT_OPTION_STOPS } from '../model/factory'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
 const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: '(学案)' }
@@ -68,14 +70,14 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         out.push(
           ...buildComposite(block, variant, (item) => {
             questionNo += 1
-            return buildQuestion(item.id, item.question, questionNo, variant, kt)
+            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops)
           })
         )
         break
       }
       case 'question':
         questionNo += 1
-        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant]))
+        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops))
         break
     }
   }
@@ -97,7 +99,8 @@ function buildQuestion(
   q: Question,
   no: number,
   variant: Variant,
-  keepTogetherByDefault: boolean
+  keepTogetherByDefault: boolean,
+  projectStops: OptionStops = DEFAULT_OPTION_STOPS
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
@@ -120,6 +123,7 @@ function buildQuestion(
       editTarget: { field: 'stem', paragraph: i },
       style: i === 0 ? 'question' : 'questionContinued',
       ...(i === 0 ? { label: `${no}.` } : {}),
+      ...fontProp(p),
       runs
     })
   })
@@ -167,15 +171,22 @@ function buildQuestion(
   // 选项：右侧有图时自动排成每行 1 项，避免与图重叠
   if (q.options.length > 0) {
     const setting = rightItems.length > 0 && q.layout.optionColumns === 'auto' ? 1 : q.layout.optionColumns
-    const columns = resolveOptionColumns(q.options, setting)
+    const stops = q.layout.optionStops ?? projectStops
+    const columns = resolveOptionColumns(q.options, setting, stops)
     chunk(q.options, columns).forEach((row, i) => {
       const runs: DocRun[] = []
       row.forEach((opt, j) => {
         if (j > 0) runs.push({ kind: 'tab' })
         const option = q.options.indexOf(opt)
         // 选项中的图片记下位置，预览中可单独或整体缩放
+        // 一行中可能有几个选项，选项的整段字体落到各自的文字上
+        const optFont = opt.content.format?.font
         const optRuns = toRuns(opt.content, at('options', option, 'content')).map((r, inline): DocRun =>
-          r.kind === 'image' ? { ...r, optionRef: { blockId, option, inline } } : r
+          r.kind === 'image'
+            ? { ...r, optionRef: { blockId, option, inline } }
+            : r.kind === 'text' && optFont !== undefined && r.marks?.font === undefined
+              ? { ...r, marks: { ...r.marks, font: optFont } }
+              : r
         )
         runs.push({ kind: 'text', text: `${opt.label}．` }, ...optRuns)
       })
@@ -185,7 +196,7 @@ function buildQuestion(
         // 选项行：paragraph 为本行第一个选项的序号，点击时再加上所在列
         editTarget: { field: 'option', paragraph: q.options.indexOf(row[0]!) },
         runs,
-        ...(columns > 1 ? { tabStopsTwip: OPTION_TAB_STOPS[columns as 2 | 4] } : {})
+        ...(columns > 1 ? { tabStopsTwip: columns === 2 ? stops.two : stops.four } : {})
       })
       attachRightItems(paras[paras.length - 1]!)
     })
@@ -198,6 +209,7 @@ function buildQuestion(
         key: key(`sub${i}-${j}`),
         style: j === 0 ? 'subQuestion' : 'questionContinued',
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
+        ...fontProp(p),
         editTarget: { field: `sub:${i}`, paragraph: j },
         runs: toRuns(p, at('subQuestions', i, 'content', j))
       })
@@ -220,6 +232,7 @@ function buildQuestion(
         key: key(`ans${i}`),
         style: 'answer',
         ...(i === 0 ? { label: '【答案】' } : {}),
+        ...fontProp(p),
         editTarget: { field: 'answer', paragraph: i },
         runs: toRuns(p, at('answer', i))
       })
@@ -377,6 +390,7 @@ function buildComposite(
         sourceBlockId: c.id,
         style: 'answer',
         ...(i === 0 ? { label: '【答案】' } : {}),
+        ...fontProp(p),
         editTarget: { field: 'answer', paragraph: i },
         runs: toRuns(p, { blockId: c.id, path: ['answer', i] })
       })
@@ -411,17 +425,20 @@ function buildComposite(
  * 决定选项每行几项。
  *
  * 自动模式下估算每个选项的宽度：能放进四分之一栏就排 4 列，
- * 能放进半栏就排 2 列，否则每行 1 项。与 Word 制表位（OPTION_TAB_STOPS）对应。
+ * 能放进半栏就排 2 列，否则每行 1 项。列的位置由 OptionStops 决定（对应 Word 制表位）。
  */
-export function resolveOptionColumns(options: ChoiceOption[], setting: OptionColumns): 1 | 2 | 4 {
+export function resolveOptionColumns(options: ChoiceOption[], setting: OptionColumns, stops: OptionStops = DEFAULT_OPTION_STOPS): 1 | 2 | 4 {
   if (setting !== 'auto') return setting
   const indent = STYLE_SPECS.option.indentLeftTwip
-  const quarter = OPTION_TAB_STOPS[4][0]! - indent - CHAR_TWIP // 留一个字的间隙
-  const half = OPTION_TAB_STOPS[2][0]! - indent - CHAR_TWIP
+  const right = contentWidthTwip(A4_PAGE)
+  /** 各列中最窄的一列，留一个字的间隙 */
+  const narrowest = (edges: readonly number[]): number =>
+    Math.min(...edges.slice(0, -1).map((e, i) => edges[i + 1]! - e)) - CHAR_TWIP
+  const quarter = narrowest([indent, ...stops.four, right])
+  const half = narrowest([indent, ...stops.two, right])
   const widest = Math.max(...options.map((o) => estimateWidthTwip(o.content) + LABEL_TWIP))
-  const full = contentWidthTwip(A4_PAGE) - indent
   if (options.length === 4 && widest <= quarter) return 4
-  if (widest <= half && widest <= full / 2) return 2
+  if (widest <= half) return 2
   return 1
 }
 
@@ -493,14 +510,21 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
 const INDENT_CHAR_TWIP = 210
 
 /** 段落格式 → DocIR 字段 */
-function formatProps(p: RichParagraph): Pick<DocParagraph, 'firstLineIndentTwip' | 'align' | 'pageBreakBefore'> {
+function formatProps(p: RichParagraph): Pick<DocParagraph, 'firstLineIndentTwip' | 'align' | 'pageBreakBefore' | 'font'> {
   const f = p.format
   if (f === undefined) return {}
   return {
+    ...fontProp(p),
     ...(f.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     ...(f.firstLineChars !== undefined && f.firstLineChars > 0 ? { firstLineIndentTwip: Math.round(f.firstLineChars * INDENT_CHAR_TWIP) } : {}),
     ...(f.align !== undefined ? { align: f.align } : {})
   }
+}
+
+/** 整段字体（不设则随样式） */
+function fontProp(p: RichParagraph): Pick<DocParagraph, 'font'> {
+  const font = p.format?.font
+  return font !== undefined ? { font } : {}
 }
 
 /** 段后空行：一个固定高度的空段落，与前一段同页 */

@@ -142,7 +142,8 @@ export const DocParagraphView = memo(function DocParagraphView({
   const className = [
     'para',
     `para--${p.style}`,
-    p.style === 'title' || p.style === 'section' ? 'font-hei' : 'font-song',
+    // 字体：段落自身的字体，否则样式的字体（与导出、模板一致）
+    `font-${p.font ?? spec.fontRole}`,
     p.shaded === true ? 'para--shaded' : '',
     selected ? 'is-selected' : ''
   ]
@@ -228,7 +229,7 @@ function renderRuns(
         }
         const Tag = m.script === 'sup' ? 'sup' : m.script === 'sub' ? 'sub' : 'span'
         return (
-          <Tag key={i} style={style}>
+          <Tag key={i} style={style} {...(m.font !== undefined ? { className: `font-${m.font}` } : {})}>
             {run.text}
           </Tag>
         )

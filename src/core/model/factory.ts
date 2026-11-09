@@ -8,6 +8,7 @@ import type {
   KnowledgeBlock,
   Project,
   ProjectBundle,
+  OptionStops,
   ProjectLayout,
   Question,
   QuestionLayout,
@@ -21,11 +22,27 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
+/**
+ * 选项列位置的默认值（twip）：每行 4 项时 B、C、D 列从第 13、24、35 个字处开始，每行 2 项时 B 列从第 24 个字处开始。
+ * 比模板样式自带的 11、20、29 字（LEGACY_OPTION_STOPS）略宽，栏右侧不再空出一大块。
+ */
+export const DEFAULT_OPTION_STOPS: Readonly<OptionStops> = Object.freeze({
+  two: [24 * 210] as [number],
+  four: [13 * 210, 24 * 210, 35 * 210] as [number, number, number]
+})
+
+/** 模板“题目 选项”样式自带的制表位；第 6 版之前的工程一律使用它，迁移后排版不变 */
+export const LEGACY_OPTION_STOPS: Readonly<OptionStops> = Object.freeze({
+  two: [4200] as [number],
+  four: [2310, 4200, 6090] as [number, number, number]
+})
+
 /** 教案默认允许跨页以节省纸张；学案默认整题同页，保证题目与作答空间在一起 */
 export const DEFAULT_PROJECT_LAYOUT: Readonly<ProjectLayout> = Object.freeze({
   keepQuestionTogether: Object.freeze({ teacher: false, student: true }),
   /** 知识点通常较长，默认允许跨页 */
-  keepKnowledgeTogether: Object.freeze({ teacher: false, student: false })
+  keepKnowledgeTogether: Object.freeze({ teacher: false, student: false }),
+  optionStops: DEFAULT_OPTION_STOPS
 })
 
 export const DEFAULT_QUESTION_LAYOUT: Readonly<QuestionLayout> = Object.freeze({
@@ -43,7 +60,8 @@ export function createEmptyProject(now: Date = new Date()): Project {
     header: { left: '', phone: '', right: '' },
     layout: {
       keepQuestionTogether: { ...DEFAULT_PROJECT_LAYOUT.keepQuestionTogether },
-      keepKnowledgeTogether: { ...DEFAULT_PROJECT_LAYOUT.keepKnowledgeTogether }
+      keepKnowledgeTogether: { ...DEFAULT_PROJECT_LAYOUT.keepKnowledgeTogether },
+      optionStops: copyStops(DEFAULT_OPTION_STOPS)
     },
     templateId: DEFAULT_TEMPLATE_ID,
     blocks: []
@@ -144,4 +162,8 @@ export function plainText(rich: RichText | RichParagraph): string {
         .join('')
     )
     .join('\n')
+}
+
+export function copyStops(s: Readonly<OptionStops>): OptionStops {
+  return { two: [s.two[0]], four: [s.four[0], s.four[1], s.four[2]] }
 }

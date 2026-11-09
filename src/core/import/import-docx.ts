@@ -6,6 +6,7 @@ import { createEmptyProject } from '../model/factory'
 import type { Asset, Block } from '../model/types'
 import { collectAssetRefs } from '../project-file/codec'
 import { readDocx } from './docx-reader'
+import { normalizeFonts } from './normalize-fonts'
 import { recognize } from './recognize'
 
 export interface DocxImportResult {
@@ -20,7 +21,10 @@ export interface DocxImportResult {
 
 export async function importDocx(bytes: Uint8Array): Promise<DocxImportResult> {
   const read = await readDocx(bytes)
-  const { blocks, questionCount, firstTitle } = recognize(read.paragraphs)
+  const recognized = recognize(read.paragraphs)
+  const { questionCount, firstTitle } = recognized
+  // 去掉与样式相同的字体，整段同一字体时提升为段落字体
+  const blocks = normalizeFonts(recognized.blocks)
 
   // 只保留被引用的图片（水印、页眉图片等不会进入正文）
   const refs = collectAssetRefs({ ...createEmptyProject(), blocks })
