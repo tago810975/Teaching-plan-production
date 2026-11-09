@@ -146,3 +146,117 @@ function findClosingDollar(s: string, from: number): number {
   }
   return -1
 }
+
+// ---------------- 格式工具：加粗、倾斜、下划线 ----------------
+
+export type MarkKind = 'bold' | 'italic' | 'underline'
+
+export interface MarkEdit {
+  text: string
+  /** 修改后应选中的范围（覆盖改动的部分） */
+  start: number
+  end: number
+}
+
+/**
+ * 在可编辑文本中给选中范围切换格式（像 Word 的 Ctrl+B）：
+ * - 普通文字包成格式标记，如 ⟦加粗3:文字⟧；新写的 $公式$ 变成公式标记；
+ * - 已有的格式标记、公式标记在原有格式上增减（选区只碰到标记的一部分时按整个标记处理）；
+ * - 选中的内容都已有该格式时取消，否则加上；
+ * - 公式只支持加粗、下划线（倾斜对公式不起作用）；图片、填空不受影响。
+ * 新的标记编号登记在 objects 中（会修改传入的 Map）。没有可改的内容时返回 null。
+ */
+export function toggleMark(text: string, objects: Map<number, Inline>, start: number, end: number, mark: MarkKind): MarkEdit | null {
+  // 选区扩展到完整的标记
+  for (const m of text.matchAll(TOKEN)) {
+    const s = m.index
+    const e = s + m[0].length
+    if (s < start && e > start) start = s
+    if (s < end && e > end) end = e
+  }
+  if (start >= end) return null
+  const range = text.slice(start, end)
+
+  interface Piece {
+    plain?: string
+    token?: RegExpMatchArray
+  }
+  const pieces: Piece[] = []
+  let last = 0
+  for (const m of range.matchAll(TOKEN)) {
+    if (m.index > last) pieces.push({ plain: range.slice(last, m.index) })
+    pieces.push({ token: m })
+    last = m.index + m[0].length
+  }
+  if (last < range.length) pieces.push({ plain: range.slice(last) })
+
+  // 当前状态：所有可改的内容都已有该格式？
+  const states: boolean[] = []
+  for (const p of pieces) {
+    if (p.plain !== undefined) {
+      if (p.plain.trim() !== '') states.push(false)
+      continue
+    }
+    const obj = objects.get(Number(p.token![2] ?? p.token![4]))
+    if (obj?.type === 'text' && p.token![5] !== undefined) states.push(obj.marks?.[mark] === true)
+    else if (obj?.type === 'math' && mark !== 'italic') states.push(obj[mark] === true)
+  }
+  if (states.length === 0) return null
+  const on = !states.every(Boolean)
+
+  let next = Math.max(0, ...objects.keys()) + 1
+  const register = (inline: Inline): number => {
+    objects.set(next, inline)
+    return next++
+  }
+  const setMark = <T extends object>(o: T, value: boolean): T => {
+    const copy = { ...o } as Record<string, unknown>
+    if (value) copy[mark] = true
+    else delete copy[mark]
+    return copy as T
+  }
+
+  let out = ''
+  for (const p of pieces) {
+    if (p.plain !== undefined) {
+      if (!on) {
+        out += p.plain
+        continue
+      }
+      // 逐行处理：标记不能跨行
+      out += p.plain
+        .split('\n')
+        .map((line) => {
+          const inlines: Inline[] = []
+          pushPlain(inlines, line)
+          return inlines
+            .map((i) => {
+              if (i.type === 'text') {
+                if (i.text.trim() === '') return i.text
+                const marks = { [mark]: true } as TextMarks
+                return formatToken(register({ type: 'text', text: i.text, marks }), marks, i.text)
+              }
+              if (i.type === 'math') {
+                if (mark === 'italic') return `$${i.latex ?? ''}$`
+                return `⟦公式${register(setMark(i, true))}⟧`
+              }
+              return ''
+            })
+            .join('')
+        })
+        .join('\n')
+      continue
+    }
+    const m = p.token!
+    const obj = objects.get(Number(m[2] ?? m[4]))
+    if (obj?.type === 'text' && m[5] !== undefined) {
+      const marks = setMark(obj.marks ?? {}, on)
+      out += Object.keys(marks).length === 0 ? m[5] : formatToken(register({ type: 'text', text: m[5], marks }), marks, m[5])
+    } else if (obj?.type === 'math' && mark !== 'italic') {
+      out += `⟦公式${register(setMark(obj, on))}⟧`
+    } else {
+      out += m[0]
+    }
+  }
+  return { text: text.slice(0, start) + out + text.slice(end), start, end: start + out.length }
+}

@@ -201,7 +201,7 @@ describe('字体的排版与导出', async () => {
       .file('word/document.xml')!
       .async('string')
     expect(doc).toContain(
-      '<w:tabs><w:tab w:val="clear" w:pos="2310"/><w:tab w:val="left" w:pos="2730"/><w:tab w:val="clear" w:pos="4200"/><w:tab w:val="left" w:pos="5040"/><w:tab w:val="clear" w:pos="6090"/><w:tab w:val="left" w:pos="7350"/></w:tabs>'
+      '<w:tabs><w:tab w:val="clear" w:pos="2310"/><w:tab w:val="left" w:pos="2940"/><w:tab w:val="clear" w:pos="4200"/><w:tab w:val="left" w:pos="5460"/><w:tab w:val="clear" w:pos="6090"/><w:tab w:val="left" w:pos="7980"/></w:tabs>'
     )
   })
 })

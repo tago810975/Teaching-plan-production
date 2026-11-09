@@ -111,17 +111,29 @@ describe('工程文件编解码', () => {
     await expect(encodeBundle(bundle, opts)).rejects.toThrow('不存在的图片资源')
   })
 
-  it('第 5 版工程：迁移后选项列位置取模板原有的制表位，排版不变', async () => {
-    const bytes = await encodeBundle(createEmptyBundle(), opts)
-    const zip = await JSZip.loadAsync(bytes)
+  /** 把当前工程改写成旧版本文件：layout 按 edit 修改，manifest 写成 version */
+  async function oldFile(version: number, edit: (layout: Record<string, unknown>) => void): Promise<Uint8Array> {
+    const zip = await JSZip.loadAsync(await encodeBundle(createEmptyBundle(), opts))
     const project = JSON.parse(await zip.file('project.json')!.async('string'))
-    delete project.layout.optionStops
+    edit(project.layout)
     zip.file('project.json', JSON.stringify(project))
     const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'))
-    manifest.formatVersion = 5
+    manifest.formatVersion = version
     zip.file('manifest.json', JSON.stringify(manifest))
-    const old = await zip.generateAsync({ type: 'uint8array' })
-    const decoded = await decodeBundle(old)
-    expect(decoded.project.layout.optionStops).toEqual({ two: [4200], four: [2310, 4200, 6090] })
+    return zip.generateAsync({ type: 'uint8array' })
+  }
+
+  it('旧工程：没改过的选项列位置换成加宽后的默认值；难度显示默认两者都显示', async () => {
+    const v5 = await decodeBundle(await oldFile(5, (l) => { delete l.optionStops; delete l.difficultyDisplay }))
+    expect(v5.project.layout.optionStops).toEqual({ two: [5460], four: [2940, 5460, 7980] })
+    expect(v5.project.layout.difficultyDisplay).toBe('both')
+    const v7 = await decodeBundle(await oldFile(7, (l) => { l.optionStops = { two: [5040], four: [2730, 5040, 7350] }; delete l.difficultyDisplay }))
+    expect(v7.project.layout.optionStops).toEqual({ two: [5460], four: [2940, 5460, 7980] })
+  })
+
+  it('旧工程：用户改过的选项列位置保持不变', async () => {
+    const custom = { two: [5000], four: [2600, 5000, 7400] }
+    const v7 = await decodeBundle(await oldFile(7, (l) => { l.optionStops = custom; delete l.difficultyDisplay }))
+    expect(v7.project.layout.optionStops).toEqual(custom)
   })
 })

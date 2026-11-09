@@ -51,23 +51,6 @@
     "blankChars": 8,
     "pageBreakBefore": true
   },
-  "knowledgeEmphasis": [
-    {
-      "label": "红色加粗下划线",
-      "marks": {
-        "bold": true,
-        "underline": true,
-        "color": "C00000"
-      }
-    },
-    {
-      "label": "黑色加粗下划线",
-      "marks": {
-        "bold": true,
-        "underline": true
-      }
-    }
-  ],
   "import": {
     "renameLabels": {
       "【详解】": "【解析】"

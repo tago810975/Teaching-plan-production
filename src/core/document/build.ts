@@ -6,6 +6,7 @@
  */
 import type {
   OptionStops,
+  DifficultyDisplay,
   WorksheetBlock,
   ChoiceOption,
   CompositeBlock,
@@ -77,14 +78,14 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         out.push(
           ...buildComposite(block, variant, (item) => {
             questionNo += 1
-            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops, preset)
+            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay)
           })
         )
         break
       }
       case 'question':
         questionNo += 1
-        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset))
+        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset, project.layout.difficultyDisplay))
         break
     }
   }
@@ -143,7 +144,8 @@ function buildQuestion(
   variant: Variant,
   keepTogetherByDefault: boolean,
   projectStops: OptionStops = DEFAULT_OPTION_STOPS,
-  preset: FormatPreset = getPreset(undefined)
+  preset: FormatPreset = getPreset(undefined),
+  difficultyDisplay: DifficultyDisplay = 'both'
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
@@ -158,8 +160,11 @@ function buildQuestion(
   stem.forEach((p, i) => {
     const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined)
     // 难度：等级写作【B】，其后是对应的星级，如【B】★★（等级与星级的对应见格式预设）
+    // 显示哪些由版式设置决定（等级和星级 / 只显示等级 / 只显示星级 / 不显示）
     const d = difficultyOf(q, preset)
-    const prefix = (d.grade !== undefined ? `【${d.grade}】` : '') + starText(d.stars)
+    const showGrade = difficultyDisplay === 'both' || difficultyDisplay === 'grade'
+    const showStars = difficultyDisplay === 'both' || difficultyDisplay === 'stars'
+    const prefix = (showGrade && d.grade !== undefined ? `【${d.grade}】` : '') + (showStars ? starText(d.stars) : '')
     if (i === 0 && prefix !== '') runs.unshift({ kind: 'text', text: prefix })
     push({
       key: key(`stem${i}`),

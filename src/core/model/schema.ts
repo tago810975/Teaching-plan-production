@@ -32,7 +32,9 @@ const inline = z.discriminatedUnion('type', [
       type: z.literal('math'),
       omml: z.string().optional(),
       latex: z.string().optional(),
-      display: z.boolean().optional()
+      display: z.boolean().optional(),
+      bold: z.boolean().optional(),
+      underline: z.boolean().optional()
     })
     .refine((m) => m.omml !== undefined || m.latex !== undefined, '公式至少需要 omml 或 latex'),
   z.object({
@@ -168,7 +170,8 @@ export const projectSchema = z.object({
   layout: z.object({
     keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
     keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
-    optionStops
+    optionStops,
+    difficultyDisplay: z.enum(['both', 'grade', 'stars', 'none'])
   }),
   templateId: z.string(),
   presetId: z.string(),

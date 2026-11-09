@@ -235,8 +235,8 @@ function renderRuns(
           </Tag>
         )
       }
-      case 'math':
-        return (
+      case 'math': {
+        const view = (
           <MathView
             key={i}
             latex={run.latex}
@@ -245,6 +245,15 @@ function renderRuns(
             {...(onEditMath !== undefined && run.ref !== undefined ? { onEdit: () => onEditMath(run) } : {})}
           />
         )
+        // 公式整体加粗、加下划线
+        if (run.bold !== true && run.underline !== true) return view
+        const cls = [run.bold === true ? 'math-bold' : '', run.underline === true ? 'math-underline' : ''].filter(Boolean).join(' ')
+        return (
+          <span key={i} className={cls}>
+            {view}
+          </span>
+        )
+      }
       case 'image': {
         // 选项中的图片：可单张缩放，或全部一起缩放
         const opt = figures?.optionImages

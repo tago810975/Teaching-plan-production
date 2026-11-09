@@ -7,8 +7,8 @@
 import JSZip from 'jszip'
 import { projectSchema } from '../model/schema'
 import { countQuestions } from '../model/stats'
-import { copyStops, DEFAULT_PRESET_ID, LEGACY_OPTION_STOPS } from '../model/factory'
-import type { Asset, Project, ProjectBundle } from '../model/types'
+import { copyStops, DEFAULT_OPTION_STOPS, DEFAULT_PRESET_ID, LEGACY_OPTION_STOPS, PREVIOUS_OPTION_STOPS } from '../model/factory'
+import type { Asset, OptionStops, Project, ProjectBundle } from '../model/types'
 import {
   CURRENT_FORMAT_VERSION,
   PROJECT_FILE_MIMETYPE,
@@ -182,7 +182,26 @@ function migrate(raw: unknown, fromVersion: number): unknown {
   if (fromVersion < 3) data = migrateV2toV3(data)
   if (fromVersion < 6) data = migrateV5toV6(data)
   if (fromVersion < 7) data = migrateV6toV7(data)
+  if (fromVersion < 8) data = migrateV7toV8(data)
   return data
+}
+
+/**
+ * 版本 7 → 8：
+ * - 难度显示开关，默认等级和星级都显示（与第 7 版一致）；
+ * - 选项列位置：仍是第 6、7 版的默认值或模板原值（用户没有改过）时，换成加宽后的默认值。
+ */
+function migrateV7toV8(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const project = raw as Record<string, unknown>
+  const layout = (project.layout ?? {}) as Record<string, unknown>
+  layout.difficultyDisplay ??= 'both'
+  const same = (a: unknown, b: Readonly<OptionStops>): boolean => JSON.stringify(a) === JSON.stringify({ two: b.two, four: b.four })
+  if (layout.optionStops === undefined || same(layout.optionStops, PREVIOUS_OPTION_STOPS) || same(layout.optionStops, LEGACY_OPTION_STOPS)) {
+    layout.optionStops = copyStops(DEFAULT_OPTION_STOPS)
+  }
+  project.layout = layout
+  return project
 }
 
 /** 版本 6 → 7：补上格式预设（此前只有物理教案 V1.0 一种格式） */

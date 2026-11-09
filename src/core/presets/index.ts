@@ -2,7 +2,7 @@
  * 格式预设：一种教学案的整套格式约定，存为 JSON 文件（本目录下，每个预设一个文件）。
  *
  * 包含：大标题 / 二级标题 / 三级标题（题型分类）的格式、常用的二级标题名称、
- * 作业单模块的格式、知识梳理中常用的强调格式、导入时的整理规则、难度等级。
+ * 作业单模块的格式、导入时的整理规则、难度等级。
  * 工程记录所用的预设（project.presetId）；新建或从 Word 新建时选择，设置中可指定导入时默认使用的预设。
  *
  * 新增预设：在本目录添加 JSON 文件，并加入下面的 PRESETS。
@@ -10,7 +10,6 @@
 import { z } from 'zod'
 import { DEFAULT_PRESET_ID } from '../model/factory'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
-import type { TextMarks } from '../model/types'
 import physicsV1 from './physics-v1.json'
 
 const heading = z.object({
@@ -38,12 +37,6 @@ const presetSchema = z.object({
     blankChars: z.number().min(1),
     pageBreakBefore: z.boolean()
   }),
-  knowledgeEmphasis: z.array(
-    z.object({
-      label: z.string(),
-      marks: z.object({ bold: z.boolean().optional(), underline: z.boolean().optional(), color: z.string().optional() })
-    })
-  ),
   import: z.object({
     /** 导入时把这些标签改写，如【详解】→【解析】 */
     renameLabels: z.record(z.string(), z.string()),
@@ -96,10 +89,6 @@ export function gradeForStars(stars: number, preset: FormatPreset): string | und
   return preset.difficulty.levels.find((l) => l.stars === stars)?.grade
 }
 
-/** 知识梳理强调格式的文字格式（确保类型完整） */
-export function emphasisMarks(m: FormatPreset['knowledgeEmphasis'][number]['marks']): TextMarks {
-  return { ...m } as TextMarks
-}
 
 /**
  * 预设对应的段落样式表：在 STYLE_SPECS 的基础上换成预设中的标题格式。

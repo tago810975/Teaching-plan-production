@@ -84,6 +84,11 @@ function children(inner: string): Kid[] {
   return out
 }
 
+/** 文字属性（rPr 的内容）按规范顺序排列；可先追加元素再调用 */
+export function sortRunProps(inner: string): string {
+  return sorted(children(inner), RPR_ORDER)
+}
+
 function sorted(kids: Kid[], order: string[]): string {
   const rank = (n: string): number => {
     const i = order.indexOf(n)

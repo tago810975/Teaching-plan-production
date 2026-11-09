@@ -47,6 +47,10 @@ export interface MathInline {
   latex?: string
   /** 是否为独立成行的公式（对应 `<m:oMathPara>`） */
   display?: boolean
+  /** 公式整体加粗 */
+  bold?: boolean
+  /** 公式整体加下划线 */
+  underline?: boolean
 }
 
 export interface ImageInline {
@@ -334,7 +338,11 @@ export interface ProjectLayout {
   keepKnowledgeTogether: Record<Variant, boolean>
   /** 选项分列的列位置（单道题可另行设置） */
   optionStops: OptionStops
+  /** 题干开头的难度显示：等级和星级（【B】★★）、只显示等级、只显示星级、不显示 */
+  difficultyDisplay: DifficultyDisplay
 }
+
+export type DifficultyDisplay = 'both' | 'grade' | 'stars' | 'none'
 
 export interface Project {
   meta: ProjectMeta

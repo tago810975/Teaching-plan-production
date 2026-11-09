@@ -90,7 +90,7 @@ describe('选项分列', () => {
     expect(resolveOptionColumns(opts('2', '3', '4', '5'), 'auto')).toBe(4)
   })
   it('中等长度选项排成一行两项', () => {
-    expect(resolveOptionColumns(opts('离子运动时间都相等', '运动半径不等', '时间最长', '偏转角最大'), 'auto')).toBe(2)
+    expect(resolveOptionColumns(opts('离子运动的时间都相等吗', '运动半径不等', '时间最长', '偏转角最大'), 'auto')).toBe(2)
   })
 
   it('列位置决定能否排成四项：默认列宽比模板原有的略宽', () => {

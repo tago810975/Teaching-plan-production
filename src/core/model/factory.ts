@@ -26,10 +26,17 @@ export function newId(): string {
 }
 
 /**
- * 选项列位置的默认值（twip）：每行 4 项时 B、C、D 列从第 13、24、35 个字处开始，每行 2 项时 B 列从第 24 个字处开始。
- * 比模板样式自带的 11、20、29 字（LEGACY_OPTION_STOPS）略宽，栏右侧不再空出一大块。
+ * 选项列位置的默认值（twip）：四列等宽并铺满整栏——每行 4 项时 B、C、D 列从第 14、26、38 个字处开始
+ * （每列约 12 个字宽），每行 2 项时 B 列从第 26 个字处开始。
+ * 模板样式自带的是 11、20、29 字（LEGACY_OPTION_STOPS），第 6、7 版的默认值是 13、24、35 字（PREVIOUS_OPTION_STOPS）。
  */
 export const DEFAULT_OPTION_STOPS: Readonly<OptionStops> = Object.freeze({
+  two: [26 * 210] as [number],
+  four: [14 * 210, 26 * 210, 38 * 210] as [number, number, number]
+})
+
+/** 第 6、7 版的默认列位置；迁移时若工程仍是它（没有改过），换成新的默认值 */
+export const PREVIOUS_OPTION_STOPS: Readonly<OptionStops> = Object.freeze({
   two: [24 * 210] as [number],
   four: [13 * 210, 24 * 210, 35 * 210] as [number, number, number]
 })
@@ -45,7 +52,8 @@ export const DEFAULT_PROJECT_LAYOUT: Readonly<ProjectLayout> = Object.freeze({
   keepQuestionTogether: Object.freeze({ teacher: false, student: true }),
   /** 知识点通常较长，默认允许跨页 */
   keepKnowledgeTogether: Object.freeze({ teacher: false, student: false }),
-  optionStops: DEFAULT_OPTION_STOPS
+  optionStops: DEFAULT_OPTION_STOPS,
+  difficultyDisplay: 'both' as const
 })
 
 export const DEFAULT_QUESTION_LAYOUT: Readonly<QuestionLayout> = Object.freeze({
@@ -64,7 +72,8 @@ export function createEmptyProject(now: Date = new Date()): Project {
     layout: {
       keepQuestionTogether: { ...DEFAULT_PROJECT_LAYOUT.keepQuestionTogether },
       keepKnowledgeTogether: { ...DEFAULT_PROJECT_LAYOUT.keepKnowledgeTogether },
-      optionStops: copyStops(DEFAULT_OPTION_STOPS)
+      optionStops: copyStops(DEFAULT_OPTION_STOPS),
+      difficultyDisplay: 'both'
     },
     templateId: DEFAULT_TEMPLATE_ID,
     presetId: DEFAULT_PRESET_ID,

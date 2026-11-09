@@ -44,7 +44,7 @@ export function DifficultyField({ grade, levels, onChange }: Props) {
           </button>
         )}
       </div>
-      <p className="field-hint">显示在题干开头，如【B】★★；星越多越难。</p>
+      <p className="field-hint">显示在题干开头，如【B】★★；星越多越难。显示等级、星级还是两者都显示，在“版式设置”中选择。</p>
     </div>
   )
 }

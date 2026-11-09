@@ -11,10 +11,10 @@ import { createKnowledge, createQuestion, newId, plainText } from '@core/model/f
 import { FigureList } from './FigureList'
 import { OptionImageControls } from './OptionImageControls'
 import { FontSelect } from './FontSelect'
+import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
 import { difficultyOf, getPreset, type FormatPreset } from '@core/presets'
-import { formatToken } from '@core/model/markup'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
 import { copyStops, DEFAULT_OPTION_STOPS, LEGACY_OPTION_STOPS } from '@core/model/factory'
@@ -29,6 +29,7 @@ import type {
   KnowledgeBlock,
   OptionColumns,
   OptionStops,
+  DifficultyDisplay,
   Question,
   QuestionBlock,
   RichParagraph,
@@ -57,6 +58,7 @@ interface Props {
 }
 
 export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout, preset = getPreset(undefined) }: Props) {
+  const format = useFormatTargets()
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
@@ -96,7 +98,9 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   return (
     <aside className="panel inspector" aria-label="属性">
       <h2 className="panel-title">{BLOCK_NAMES[block.type]}</h2>
+      <FormatToolbar active={format.active} onApply={format.apply} />
       {/* key 保证切换选中项时各输入框重新初始化 */}
+      <FormatTargetProvider value={format.provider}>
       <div key={`${block.id}:${revision}`} className="inspector-body">
         {block.type === 'question' ? (
           <QuestionForm
@@ -114,7 +118,6 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             update={update as (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void}
             assetUrls={assetUrls}
             dispatch={dispatch}
-            emphasis={preset.knowledgeEmphasis}
           />
         ) : block.type === 'composite' ? (
           <CompositeForm
@@ -169,6 +172,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
           </Field>
         )}
       </div>
+      </FormatTargetProvider>
     </aside>
   )
 }
@@ -218,6 +222,20 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
         <p className="field-hint">整块同页时，排不下的知识点会整块移到下一页；允许跨页时，知识点的文字可以接到下一页。</p>
         {row('keepKnowledgeTogether', 'teacher', '教案', '整块同页')}
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
+      </fieldset>
+      <fieldset className="group">
+        <legend>难度显示</legend>
+        <p className="field-hint">题干开头的难度标记。左侧大纲中始终显示等级和星级，方便浏览。</p>
+        <Segmented<DifficultyDisplay>
+          value={layout.difficultyDisplay}
+          options={[
+            ['both', '【B】★★'],
+            ['grade', '只显示【B】'],
+            ['stars', '只显示 ★★'],
+            ['none', '不显示']
+          ]}
+          onChange={(difficultyDisplay) => dispatch({ type: 'update-layout', layout: { ...layout, difficultyDisplay } })}
+        />
       </fieldset>
       <fieldset className="group">
         <legend>选项位置</legend>
@@ -346,10 +364,8 @@ function KnowledgeForm({
   block,
   update,
   assetUrls,
-  dispatch,
-  emphasis
+  dispatch
 }: {
-  emphasis: FormatPreset['knowledgeEmphasis']
   block: KnowledgeBlock
   update: (fn: (b: KnowledgeBlock) => KnowledgeBlock) => void
   assetUrls: ReadonlyMap<string, string>
@@ -367,7 +383,7 @@ function KnowledgeForm({
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
         aside={fontSelect('内容', block.content, STYLE_SPECS.body.fontRole, (content) => set({ content }), dispatch)}
       >
-        <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} emphasis={emphasis} />
+        <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
       </Field>
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
@@ -790,14 +806,11 @@ function RichTextField({
   value,
   rows,
   onChange,
-  fieldId,
-  emphasis
+  fieldId
 }: {
   value: RichText
   rows: number
   onChange: (v: RichText) => void
-  /** 强调格式按钮（如知识梳理中的红色加粗下划线）：给选中的文字加上该格式 */
-  emphasis?: FormatPreset['knowledgeEmphasis']
   /** 对应预览段落的字段名，用于“点击预览定位到编辑框” */
   fieldId?: string
 }) {
@@ -816,6 +829,8 @@ function RichTextField({
     })
     onChange(next)
   }
+  // 加粗、倾斜、下划线：属性面板顶部的格式工具与 Ctrl+B / I / U
+  const formattable = useFormattable(ref, () => ({ text: draft, objects: initial.objects as Map<number, Inline> }), update)
   return (
     <div className="text-field">
       <textarea
@@ -825,37 +840,9 @@ function RichTextField({
         spellCheck={false}
         title={EDIT_HINT}
         onChange={(e) => update(e.target.value)}
+        {...formattable}
       />
       <div className="text-field-tools">
-        {emphasis?.map((e) => (
-          <button
-            key={e.label}
-            type="button"
-            className="emphasis-button"
-            title={`给选中的文字设为${e.label}`}
-            style={{ color: e.marks.color !== undefined ? `#${e.marks.color}` : undefined, fontWeight: e.marks.bold === true ? 700 : undefined, textDecoration: e.marks.underline === true ? 'underline' : undefined }}
-            onMouseDown={(ev) => ev.preventDefault() /* 保持输入框中的选区 */}
-            onClick={() => {
-              const el = ref.current
-              if (el === null) return
-              const { selectionStart: a, selectionEnd: b } = el
-              const sel = draft.slice(a, b)
-              // 只处理普通文字：不跨段、不含已有标记或公式
-              if (sel === '' || /[⟦⟧\n$]/.test(sel)) return
-              const n = Math.max(0, ...initial.objects.keys()) + 1
-              const marks = { ...e.marks }
-              ;(initial.objects as Map<number, Inline>).set(n, { type: 'text', text: sel, marks })
-              const token = formatToken(n, marks, sel)
-              update(draft.slice(0, a) + token + draft.slice(b))
-              requestAnimationFrame(() => {
-                el.focus()
-                el.setSelectionRange(a, a + token.length)
-              })
-            }}
-          >
-            {e.label}
-          </button>
-        ))}
         <InsertFormulaButton target={ref} text={draft} onInsert={update} />
       </div>
     </div>
@@ -876,6 +863,7 @@ function ParagraphField({ value, onChange, fieldId }: { value: RichParagraph; on
     const format = latest.current.format
     onChange(format !== undefined ? { ...next, format } : next)
   }
+  const formattable = useFormattable(ref, () => ({ text: draft, objects: initial.objects as Map<number, Inline> }), update)
   return (
     <div className="text-field text-field--inline">
       <input
@@ -885,6 +873,7 @@ function ParagraphField({ value, onChange, fieldId }: { value: RichParagraph; on
         spellCheck={false}
         title={EDIT_HINT}
         onChange={(e) => update(e.target.value)}
+        {...formattable}
       />
       <InsertFormulaButton target={ref} text={draft} onInsert={update} compact />
     </div>

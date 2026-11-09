@@ -14,6 +14,7 @@ import { A4_PAGE, contentWidthTwip } from '../document/units'
 import { STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
 import { applyHeadingStyles } from './heading-styles'
+import { applyMathMarks } from './math-marks'
 import { latexToOmml } from '../math/mathml-to-omml'
 import type { Asset, FontFamily, HeaderImage, TextMarks } from '../model/types'
 import { extForMime } from '../project-file/format'
@@ -182,7 +183,7 @@ class ExportContext {
           }
         }
         if (omml === undefined) return ''
-        omml = normalizeOmml(omml)
+        omml = applyMathMarks(normalizeOmml(omml), run)
         return run.display === true ? `<m:oMathPara>${omml}</m:oMathPara>` : omml
       }
     }
