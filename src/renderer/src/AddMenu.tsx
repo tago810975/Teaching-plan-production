@@ -22,6 +22,13 @@ const ITEMS: ReadonlyArray<readonly [Kind, string] | 'divider'> = [
   ['title', '大标题（如“作业单”）']
 ]
 
+/** 知识点手册只有大标题、知识点与正文 */
+const HANDBOOK_ITEMS: ReadonlyArray<readonly [Kind, string] | 'divider'> = [
+  ['knowledge', '知识点（标题、内容与插图）'],
+  ['paragraph', '正文段落'],
+  ['title', '大标题（如“光的折射 全反射”）']
+]
+
 /** 预制模块：作业单（分页、大标题、姓名栏，题号重新编排） */
 export function createWorksheet(preset: FormatPreset, projectTitle: string): Block {
   const name = projectTitle.trim().replace(/专题$/, '')
@@ -100,7 +107,7 @@ export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block)
       </button>
       {open && (
         <div className="menu-popup" role="menu">
-          {ITEMS.map((item, i) =>
+          {(preset.kind === 'handbook' ? HANDBOOK_ITEMS : ITEMS).map((item, i) =>
             item === 'divider' ? (
               <div key={i} className="menu-divider" role="separator" />
             ) : (
@@ -117,6 +124,8 @@ export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block)
               </button>
             )
           )}
+          {preset.kind === 'lesson' && (
+            <>
           <div className="menu-divider" role="separator" />
           <div className="menu-heading" role="presentation">
             {preset.name} 预制模块
@@ -144,6 +153,8 @@ export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block)
               栏目标题：{name}
             </button>
           ))}
+            </>
+          )}
         </div>
       )}
     </div>

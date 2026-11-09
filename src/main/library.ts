@@ -190,7 +190,10 @@ export async function createProject(
   const bundle = withTemplateDefaults(createEmptyBundle(), defaults)
   bundle.project.meta.title = title.trim() === '' ? '未命名教学案' : title.trim()
   bundle.project.templateId = templateId
-  bundle.project.presetId = getPreset(presetId).id
+  const preset = getPreset(presetId)
+  bundle.project.presetId = preset.id
+  // 预设规定的页眉左侧文字（如知识点手册为“墨帝教育物理知识单”）
+  if (preset.header.left !== undefined) bundle.project.header = { ...bundle.project.header, left: preset.header.left }
   if (content !== undefined) {
     bundle.project.blocks = content.blocks
     bundle.assets = { ...bundle.assets, ...content.assets }

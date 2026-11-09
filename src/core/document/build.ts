@@ -94,11 +94,54 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   return {
     variant,
     page: A4_PAGE,
-    header: { ...header, right: header.right === '' ? '' : header.right + VARIANT_SUFFIX[variant] },
+    header: { ...header, right: header.right === '' || !preset.header.variantSuffix ? header.right : header.right + VARIANT_SUFFIX[variant] },
     bodyTopTwip: bodyTopTwip(header, A4_PAGE),
-    paragraphs: out,
+    // 知识点手册的学生版：红色加粗的重点挖空成横线，用于默写
+    paragraphs: variant === 'student' && preset.dictation.enabled ? out.map((p) => blankKeyPoints(p, preset.dictation)) : out,
     styles: presetStyles(preset)
   }
+}
+
+// ---------------- 默写挖空 ----------------
+
+const HEADING_STYLES = new Set(['title', 'section', 'topic'])
+
+/**
+ * 默写挖空：段落中加粗且为指定颜色的文字与公式换成横线（填空），相邻的合成一条。
+ * 横线长度按内容估算：汉字、全角符号算一个字，字母数字算半个字，公式按 5 个字估计；
+ * 至少 minChars 个字，并多留一个字的书写空间。标题不挖空。
+ */
+export function blankKeyPoints(p: DocParagraph, d: FormatPreset['dictation']): DocParagraph {
+  if (HEADING_STYLES.has(p.style)) return p
+  const colors = new Set(d.colors.map((c) => c.toUpperCase()))
+  const isKey = (r: DocRun): boolean => {
+    if (r.kind === 'text') return r.text.trim() !== '' && (!d.bold || r.marks?.bold === true) && colors.has((r.marks?.color ?? '').toUpperCase())
+    if (r.kind === 'math') return (!d.bold || r.bold === true) && colors.has((r.color ?? '').toUpperCase())
+    return false
+  }
+  if (!p.runs.some(isKey)) return p
+  const runs: DocRun[] = []
+  let width = 0
+  const flush = (): void => {
+    if (width > 0) runs.push({ kind: 'blank', widthChars: Math.max(d.minChars, Math.ceil(width) + 1) })
+    width = 0
+  }
+  for (const r of p.runs) {
+    if (isKey(r)) width += r.kind === 'text' ? textWidthChars(r.text) : 5
+    else {
+      flush()
+      runs.push(r)
+    }
+  }
+  flush()
+  return { ...p, runs }
+}
+
+/** 文字宽度（以字为单位）：汉字与全角符号 1，其余 0.5 */
+function textWidthChars(s: string): number {
+  let w = 0
+  for (const ch of s) w += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u3000-\u303F]/.test(ch) ? 1 : 0.5
+  return w
 }
 
 // ---------------- 作业单 ----------------

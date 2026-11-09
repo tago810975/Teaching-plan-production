@@ -1,0 +1,107 @@
+{
+  "id": "physics-handbook-v1",
+  "name": "物理知识点手册 V1.0",
+  "subject": "物理",
+  "description": "墨帝教育物理知识点手册（知识单）：大标题与“一、二、三……”知识点，没有知识梳理等二级标题；学生版把红色加粗的重点挖空成横线，用于默写。",
+  "templateId": "physics-default",
+  "kind": "handbook",
+  "header": {
+    "variantSuffix": false,
+    "left": "墨帝教育物理知识单"
+  },
+  "headings": {
+    "title": {
+      "font": "song",
+      "sizeHalfPt": 36,
+      "bold": true,
+      "align": "center",
+      "spaceBeforeTwip": 160,
+      "spaceAfterTwip": 160
+    },
+    "section": {
+      "font": "song",
+      "sizeHalfPt": 28,
+      "bold": true,
+      "align": "left",
+      "spaceBeforeTwip": 160,
+      "spaceAfterTwip": 160
+    },
+    "topic": {
+      "font": "song",
+      "sizeHalfPt": 21,
+      "bold": true,
+      "align": "left",
+      "spaceBeforeTwip": 120,
+      "spaceAfterTwip": 120
+    }
+  },
+  "sectionNames": [],
+  "worksheet": {
+    "titlePrefix": "作业单-",
+    "fields": [
+      "姓名",
+      "教室",
+      "正确率"
+    ],
+    "tabStopsTwip": [
+      3980,
+      7980
+    ],
+    "blankChars": 8,
+    "pageBreakBefore": true
+  },
+  "textColors": [
+    {
+      "label": "红",
+      "color": "C00000"
+    },
+    {
+      "label": "黑"
+    },
+    {
+      "label": "蓝",
+      "color": "2F5597"
+    }
+  ],
+  "keyPoint": {
+    "label": "重点",
+    "description": "知识梳理中需要记忆的内容（以后做默写单时挖空）：红色加粗下划线",
+    "marks": {
+      "bold": true,
+      "underline": true,
+      "color": "C00000"
+    }
+  },
+  "import": {
+    "renameLabels": {},
+    "analysisColor": "keep"
+  },
+  "difficulty": {
+    "levels": [
+      {
+        "grade": "A",
+        "stars": 1,
+        "label": "简单"
+      },
+      {
+        "grade": "B",
+        "stars": 2,
+        "label": "中等"
+      },
+      {
+        "grade": "C",
+        "stars": 3,
+        "label": "难"
+      }
+    ]
+  },
+  "dictation": {
+    "enabled": true,
+    "colors": [
+      "C00000",
+      "FF0000"
+    ],
+    "bold": true,
+    "minChars": 4
+  }
+}

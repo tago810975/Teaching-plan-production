@@ -85,7 +85,7 @@ class Reader {
    * 正在读取的域（可嵌套）。phase 为 instr 时正在读域代码；
    * skip 为 true 时跳过域结果（EQ 域的结果是 Word 缓存的显示效果，已按代码转成公式）。
    */
-  private fields: Array<{ instr: string; phase: 'instr' | 'result'; skip: boolean }> = []
+  private fields: Array<{ instr: string; phase: 'instr' | 'result'; skip: boolean; marks: TextMarks }> = []
 
   constructor(private zip: JSZip) {}
 
@@ -179,9 +179,9 @@ class Reader {
       const ns = node.namespaceURI
       const name = node.localName
       if (ns === M && name === 'oMath') {
-        para.inlines.push({ type: 'math', omml: serializeMath(node) })
+        para.inlines.push({ type: 'math', omml: serializeMath(node), ...ommlMarks(node) })
       } else if (ns === M && name === 'oMathPara') {
-        for (const om of children(node, M, 'oMath')) para.inlines.push({ type: 'math', omml: serializeMath(om), display: true })
+        for (const om of children(node, M, 'oMath')) para.inlines.push({ type: 'math', omml: serializeMath(om), display: true, ...ommlMarks(om) })
       } else if (ns === W && name === 'r') {
         await this.readRun(node, para, textBoxes)
       } else if (ns === W && name === 'fldSimple' && isEqField(attr(node, W, 'instr') ?? '')) {
@@ -208,7 +208,7 @@ class Reader {
     for (const node of children(container)) {
       const name = node.localName
       if (node.namespaceURI === W && name === 'fldChar') {
-        this.fieldChar(attr(node, W, 'fldCharType'), para)
+        this.fieldChar(attr(node, W, 'fldCharType'), para, marks)
         continue
       }
       if (node.namespaceURI === W && name === 'instrText') {
@@ -232,9 +232,10 @@ class Reader {
     }
   }
 
-  private fieldChar(type: string | undefined, para: ReadParagraph): void {
+  private fieldChar(type: string | undefined, para: ReadParagraph, marks: TextMarks): void {
     if (type === 'begin') {
-      this.fields.push({ instr: '', phase: 'instr', skip: false })
+      // 记下域开始处的文字格式：EQ 域公式随之加粗、加下划线、设颜色（如知识点手册中红色加粗的重点公式）
+      this.fields.push({ instr: '', phase: 'instr', skip: false, marks })
       return
     }
     const top = this.fields[this.fields.length - 1]
@@ -242,20 +243,20 @@ class Reader {
     if (type === 'separate') {
       top.phase = 'result'
       if (isEqField(top.instr)) {
-        this.pushEq(top.instr, para)
+        this.pushEq(top.instr, para, top.marks)
         top.skip = true
       }
     } else if (type === 'end') {
-      if (top.phase === 'instr' && isEqField(top.instr)) this.pushEq(top.instr, para)
+      if (top.phase === 'instr' && isEqField(top.instr)) this.pushEq(top.instr, para, top.marks)
       this.fields.pop()
     }
   }
 
-  private pushEq(instr: string, para: ReadParagraph): void {
+  private pushEq(instr: string, para: ReadParagraph, marks: TextMarks = {}): void {
     const latex = eqFieldToLatex(instr)
     if (latex !== null) {
       this.counts.eqConverted += 1
-      para.inlines.push({ type: 'math', latex })
+      para.inlines.push({ type: 'math', latex, ...mathMarks(marks) })
     } else {
       this.counts.eqFailed += 1
       pushText(para, instr.replace(/^\s*eq\s*/i, ''), {})
@@ -405,6 +406,37 @@ class Reader {
 // ---------------- 工具函数 ----------------
 
 /** 保存公式时带上命名空间声明，使其可以单独解析 */
+/** 文字格式中公式也支持的部分：加粗、下划线、颜色 */
+function mathMarks(m: TextMarks): Pick<Extract<Inline, { type: 'math' }>, 'bold' | 'underline' | 'color'> {
+  return {
+    ...(m.bold === true ? { bold: true } : {}),
+    ...(m.underline === true ? { underline: true } : {}),
+    ...(m.color !== undefined ? { color: m.color } : {})
+  }
+}
+
+/**
+ * OMML 公式整体的加粗、颜色：每个 <m:r> 都是同一颜色、都加粗时才算（只有部分字符变色的不算）。
+ * 用于知识点手册中把红色加粗的重点公式挖空。
+ */
+function ommlMarks(oMath: Element): Pick<Extract<Inline, { type: 'math' }>, 'bold' | 'color'> {
+  const runs = descendants(oMath, M, 'r')
+  if (runs.length === 0) return {}
+  const colors = new Set<string | undefined>()
+  let bold = true
+  for (const r of runs) {
+    const rPr = child(r, W, 'rPr')
+    const mrPr = child(r, M, 'rPr')
+    const c = rPr !== undefined ? attr(child(rPr, W, 'color'), W, 'val') : undefined
+    colors.add(c !== undefined && /^[0-9A-Fa-f]{6}$/.test(c) && c !== '000000' ? c.toUpperCase() : undefined)
+    const b = rPr !== undefined ? child(rPr, W, 'b') : undefined
+    const sty = mrPr !== undefined ? attr(child(mrPr, M, 'sty'), M, 'val') : undefined
+    if (!(b !== undefined && attr(b, W, 'val') !== '0' && attr(b, W, 'val') !== 'false') && sty !== 'b' && sty !== 'bi') bold = false
+  }
+  const color = colors.size === 1 ? [...colors][0] : undefined
+  return { ...(bold ? { bold: true } : {}), ...(color !== undefined ? { color } : {}) }
+}
+
 function serializeMath(oMath: Element): string {
   let xml = serializeXml(oMath)
   if (!xml.includes(`xmlns:m="${M}"`)) xml = xml.replace(/^<m:oMath\b/, `<m:oMath xmlns:m="${M}"`)

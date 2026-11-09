@@ -4,6 +4,10 @@
   "subject": "物理",
   "description": "墨帝教育物理教学案：大标题、知识梳理 / 例题精讲 / 课堂练习 / 课后练习等二级标题、题型分类三级标题，以及作业单模块。",
   "templateId": "physics-default",
+  "kind": "lesson",
+  "header": {
+    "variantSuffix": true
+  },
   "headings": {
     "title": {
       "font": "song",
@@ -97,5 +101,14 @@
         "label": "难"
       }
     ]
+  },
+  "dictation": {
+    "enabled": false,
+    "colors": [
+      "C00000",
+      "FF0000"
+    ],
+    "bold": true,
+    "minChars": 4
   }
 }

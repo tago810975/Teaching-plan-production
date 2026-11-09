@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { DEFAULT_PRESET_ID } from '../model/factory'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
 import physicsV1 from './physics-v1.json'
+import physicsHandbookV1 from './physics-handbook-v1.json'
 
 const heading = z.object({
   font: z.enum(['song', 'hei', 'kai', 'fang']),
@@ -28,6 +29,17 @@ const presetSchema = z.object({
   subject: z.string(),
   description: z.string(),
   templateId: z.string(),
+  /**
+   * 文档类型。lesson：教学案（知识梳理、例题、练习……，识别题目）；
+   * handbook：知识点手册（只有大标题与知识点，导入时不识别题目）
+   */
+  kind: z.enum(['lesson', 'handbook']),
+  header: z.object({
+    /** 页眉右侧是否加“(教案)”“(学案)” */
+    variantSuffix: z.boolean(),
+    /** 新建时页眉左侧的文字（不设则用模板的） */
+    left: z.string().optional()
+  }),
   headings: z.object({ title: heading, section: heading, topic: heading }),
   sectionNames: z.array(z.string()),
   worksheet: z.object({
@@ -55,6 +67,16 @@ const presetSchema = z.object({
     analysisColor: z.enum(['black', 'keep'])
   }),
   /** 难度等级，每级对应若干颗星（如 A=1 星简单、C=3 星难），从易到难 */
+  /**
+   * 默写挖空（学生版）：加粗且为这些颜色的文字与公式换成横线；横线至少 minChars 个字宽，
+   * 字多时按字数加一个字（相邻的重点合成一条横线）
+   */
+  dictation: z.object({
+    enabled: z.boolean(),
+    colors: z.array(z.string().regex(/^[0-9A-Fa-f]{6}$/)),
+    bold: z.boolean(),
+    minChars: z.number().min(1)
+  }),
   difficulty: z.object({
     levels: z.array(z.object({ grade: z.string().min(1), stars: z.number().int().min(1).max(5), label: z.string() })).min(1)
   })
@@ -65,7 +87,7 @@ export type HeadingFormat = FormatPreset['headings']['title']
 export type HeadingKey = keyof FormatPreset['headings']
 
 /** 全部预设，按显示顺序 */
-export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1)]
+export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1)]
 
 export { DEFAULT_PRESET_ID }
 

@@ -59,7 +59,7 @@ const SECTION_TITLES = /^(知识梳理|知识点梳理|知识清单|例题精讲
 const KNOWLEDGE_SECTION = /知识|梳理|清单|总结|要点|归纳|概念|方法/
 
 /** 未使用样式的知识标题：“一、”“二、”开头的短段落 */
-const KNOWLEDGE_HEADING = /^\s*[一二三四五六七八九十]{1,3}\s*[、．.]/
+export const KNOWLEDGE_HEADING = /^\s*[一二三四五六七八九十]{1,3}\s*[、．.]/
 const KNOWLEDGE_HEADING_MAX_CHARS = 40
 
 const ANSWER_LABEL = /^\s*【\s*答案\s*】\s*/
@@ -493,25 +493,25 @@ function isSharedAnswer(text: string): boolean {
 }
 
 /** 带上原段落的格式（首行缩进、对齐） */
-function withFormat(rp: RichParagraph, para: ReadParagraph): RichParagraph {
+export function withFormat(rp: RichParagraph, para: ReadParagraph): RichParagraph {
   return para.format !== undefined && Object.keys(para.format).length > 0 ? { ...rp, format: { ...para.format } } : rp
 }
 
-function styleRole(styleName: string | undefined): Role | undefined {
+export function styleRole(styleName: string | undefined): Role | undefined {
   if (styleName === undefined) return undefined
   for (const [re, role] of STYLE_ROLES) if (re.test(styleName)) return role
   return undefined
 }
 
-function textOf(p: Pick<ReadParagraph, 'inlines'> & Partial<ReadParagraph>): string {
+export function textOf(p: Pick<ReadParagraph, 'inlines'> & Partial<ReadParagraph>): string {
   return p.inlines.map((i) => (i.type === 'text' ? i.text : i.type === 'math' ? '\uFFFC' : '')).join('')
 }
 
-function isBlank(p: ReadParagraph): boolean {
+export function isBlank(p: ReadParagraph): boolean {
   return p.floating.length === 0 && p.inlines.every((i) => i.type === 'text' && i.text.trim() === '')
 }
 
-function isImageOnly(p: ReadParagraph): boolean {
+export function isImageOnly(p: ReadParagraph): boolean {
   const hasImage = p.inlines.some((i) => i.type === 'image')
   return hasImage && p.inlines.every((i) => i.type === 'image' || (i.type === 'text' && i.text.trim() === ''))
 }
@@ -531,7 +531,7 @@ function stripPrefix(inlines: Inline[], re: RegExp): Inline[] {
 }
 
 /** 整理行内内容：制表符换成空格，去掉首尾空白，合并相邻文字 */
-function clean(inlines: Inline[]): RichParagraph {
+export function clean(inlines: Inline[]): RichParagraph {
   const out: Inline[] = []
   for (const i of inlines) {
     if (i.type !== 'text') {
