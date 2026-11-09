@@ -21,8 +21,18 @@ export interface InlineRef {
   path: ReadonlyArray<string | number>
 }
 
+/**
+ * 文字在工程数据中的来源：所在段落的路径（如 ['question', 'stem', 0]）与第几个行内元素。
+ * 用于在预览中选中文字后直接改格式。
+ */
+export interface TextSrc {
+  blockId: string
+  path: ReadonlyArray<string | number>
+  inline: number
+}
+
 export type DocRun =
-  | { kind: 'text'; text: string; marks?: TextMarks }
+  | { kind: 'text'; text: string; marks?: TextMarks; src?: TextSrc }
   | ({ kind: 'math'; ref?: InlineRef } & Omit<MathInline, 'type'>)
   | { kind: 'image'; assetId: string; widthEmu: number; heightEmu: number; ref?: FigureRef; optionRef?: OptionImageRef }
   | { kind: 'blank'; widthChars: number }

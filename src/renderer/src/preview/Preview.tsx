@@ -10,6 +10,10 @@ import type { DocIR, OptionImageRef } from '@core/document/ir'
 import { paginate, type PageSlice } from '@core/document/paginate'
 import { STYLE_SPECS } from '@core/document/styles'
 import { StylesContext } from './styles-context'
+import { SelectionToolbar } from './SelectionToolbar'
+import type { FormatOp } from '@core/model/markup'
+import type { FormatPreset } from '@core/presets'
+import type { TextRange } from '../state/store'
 import { contentWidthTwip, twipToPt } from '@core/document/units'
 import { DocParagraphView, type MathRun, type OptionImageHandlers, type ParagraphFocus } from './DocParagraphView'
 import type { FigureChangeHandler } from './FigureImage'
@@ -31,6 +35,10 @@ interface Props {
   onOptionImageResize?: (ref: OptionImageRef, widthEmu: number, group: boolean) => void
   /** 在预览中拖动一张选项图片时，默认是否全部一起缩放 */
   linkOptionImages?: boolean
+  /** 在预览中选中文字后改格式（不提供时不显示选区工具条） */
+  onFormatRange?: (ranges: TextRange[], op: FormatOp) => void
+  formatColors?: FormatPreset['textColors']
+  keyPoint?: FormatPreset['keyPoint']
 }
 
 export function Preview({
@@ -44,7 +52,10 @@ export function Preview({
   onEditMath,
   onFigureChange,
   onOptionImageResize,
-  linkOptionImages = false
+  linkOptionImages = false,
+  onFormatRange,
+  formatColors = [],
+  keyPoint
 }: Props) {
   const measureRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -226,6 +237,7 @@ export function Preview({
         ))}
       </div>
     </div>
+      {onFormatRange !== undefined && <SelectionToolbar container={scrollRef} onApply={onFormatRange} colors={formatColors} keyPoint={keyPoint} />}
     </StylesContext.Provider>
   )
 }

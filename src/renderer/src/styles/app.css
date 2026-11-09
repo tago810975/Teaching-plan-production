@@ -1888,3 +1888,56 @@ body.is-dragging-outline * {
   flex: 1 1 100%;
   margin-left: 0;
 }
+
+/* 预览中的选区工具条 */
+.selection-toolbar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(31, 42, 46, 0.2);
+}
+.sel-btn {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sel-btn:hover {
+  background: #e8eef8;
+}
+.sel-btn--bold {
+  font-weight: 700;
+  font-family: 'Times New Roman', serif;
+  font-size: 15px;
+}
+.sel-btn--italic {
+  font-style: italic;
+  font-family: 'Times New Roman', serif;
+  font-size: 15px;
+}
+.sel-btn--underline {
+  text-decoration: underline;
+  font-family: 'Times New Roman', serif;
+  font-size: 15px;
+}
+.sel-btn--key {
+  color: #c00000;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.sel-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--rule);
+}

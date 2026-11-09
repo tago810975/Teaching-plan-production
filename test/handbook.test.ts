@@ -110,6 +110,6 @@ describe('默写挖空规则', () => {
     p.presetId = 'physics-handbook-v1'
     p.blocks = [{ id: newId(), type: 'knowledge', title: '一、测试', content: [{ inlines: [{ type: 'text', text: '光路' }, { type: 'text', text: '可逆', marks: { bold: true, underline: true, color: 'C00000' } }] }, para('完')], figures: [], layout: { keepTogether: 'auto', teacherSpaceLines: 0, studentSpaceLines: 0 } } as never]
     const s = buildDocument(p, 'student').paragraphs.find((x) => x.runs.some((u) => u.kind === 'blank'))!
-    expect(s.runs).toEqual([{ kind: 'text', text: '光路' }, { kind: 'blank', widthChars: 4 }])
+    expect(s.runs.map((r) => (r.kind === 'text' ? { kind: r.kind, text: r.text } : r))).toEqual([{ kind: 'text', text: '光路' }, { kind: 'blank', widthChars: 4 }])
   })
 })

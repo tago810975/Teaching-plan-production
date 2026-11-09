@@ -604,7 +604,12 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
   return p.inlines.map((i, index): DocRun => {
     switch (i.type) {
       case 'text':
-        return { kind: 'text', text: i.text, ...(i.marks !== undefined ? { marks: i.marks } : {}) }
+        return {
+          kind: 'text',
+          text: i.text,
+          ...(i.marks !== undefined ? { marks: i.marks } : {}),
+          ...(base !== undefined ? { src: { blockId: base.blockId, path: base.path, inline: index } } : {})
+        }
       case 'math': {
         const { type: _type, ...rest } = i
         const ref = base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }
@@ -615,19 +620,20 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
       case 'blank':
         return { kind: 'blank', widthChars: i.widthChars }
       case 'table':
-        return { kind: 'table', table: toDocTable(i) }
+        return { kind: 'table', table: toDocTable(i, base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }) }
     }
   })
 }
 
 /** 表格 → DocTable：列宽不超过栏宽，单元格内容转为 DocRun */
-function toDocTable(t: TableInline): DocTable {
+function toDocTable(t: TableInline, base?: RefBase): DocTable {
   return {
     colWidthsTwip: columnWidths(t, contentWidthTwip(A4_PAGE)),
-    rows: t.rows.map((r) => ({
-      cells: r.cells.map((c) => ({
-        paragraphs: (c.content.length > 0 ? c.content : [{ inlines: [] }]).map((p) => ({
-          runs: toRuns(p),
+    rows: t.rows.map((r, ri) => ({
+      cells: r.cells.map((c, ci) => ({
+        // 单元格中的文字也记下来源（可在预览中选中改格式、点击编辑公式）
+        paragraphs: (c.content.length > 0 ? c.content : [{ inlines: [] }]).map((p, k) => ({
+          runs: toRuns(p, base === undefined || c.content.length === 0 ? undefined : { blockId: base.blockId, path: [...base.path, 'rows', ri, 'cells', ci, 'content', k] }),
           ...(p.format?.align !== undefined ? { align: p.format.align } : {})
         })),
         ...(c.colSpan !== undefined && c.colSpan > 1 ? { colSpan: c.colSpan } : {}),

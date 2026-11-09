@@ -82,7 +82,10 @@ describe('表格的排版与导出', () => {
     expect(t.kind === 'table' && t.table.colWidthsTwip).toEqual([1500, 3000, 3000])
     const s = run('student')
     const cellRuns = s.kind === 'table' ? s.table.rows[1]!.cells[1]!.paragraphs[0]!.runs : []
-    expect(cellRuns).toEqual([{ kind: 'text', text: '中央宽' }, { kind: 'blank', widthChars: 4 }])
+    expect(cellRuns.map((r) => (r.kind === 'text' ? { kind: r.kind, text: r.text } : r))).toEqual([{ kind: 'text', text: '中央宽' }, { kind: 'blank', widthChars: 4 }])
+    // 单元格中的文字记下来源：可在预览中选中改格式
+    const t2 = run('teacher')
+    expect(t2.kind === 'table' && t2.table.rows[1]!.cells[1]!.paragraphs[0]!.runs[0]).toMatchObject({ src: { path: ['content', 0, 'inlines', 0, 'rows', 1, 'cells', 1, 'content', 0], inline: 0 } })
     // 教学案预设不挖空
     expect(blankKeyPoints(buildDocument(projectWith([{ inlines: [sampleTable()] }]), 'student').paragraphs[1]!, { ...getPreset('physics-v1').dictation, enabled: false })).toBeDefined()
   })

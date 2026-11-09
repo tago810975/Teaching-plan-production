@@ -313,6 +313,9 @@ function EditorBody({
           onEditMath={editMath}
           onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
           onOptionImageResize={resizeOptionImageFromPreview}
+          onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
+          formatColors={preset.textColors}
+          keyPoint={preset.keyPoint}
           linkOptionImages={state.linkOptionImages}
         />
         <FieldFocusContext.Provider value={state.focusRequest}>

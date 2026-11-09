@@ -144,3 +144,42 @@ describe('撤销 / 重做', () => {
     expect(Object.keys(s.bundle.assets)).not.toContain(asset.id)
   })
 })
+
+describe('在预览中选中文字改格式', () => {
+  it('按范围改格式，跨段落合为一步撤销；属性面板重新读取', () => {
+    let s = start()
+    s = run(s, [[typeStem('原题干'), 500]])
+    const b0 = s.bundle.project.blocks.find((b) => b.id === 'q1')
+    if (b0?.type !== 'question') throw new Error()
+    // 题干改成两段
+    s = run(s, [[{ type: 'update-block', blockId: 'q1', update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, stem: [para('原题干'), para('第二段')] } } : b) }, 5000]])
+    const rev = s.revision
+    s = reduceAt(
+      s,
+      {
+        type: 'format-range',
+        op: { mark: 'bold' },
+        ranges: [
+          { blockId: 'q1', path: ['question', 'stem', 0], start: { inline: 0, offset: 1 }, end: { inline: 0, offset: 3 } },
+          { blockId: 'q1', path: ['question', 'stem', 1], start: { inline: 0, offset: 0 }, end: { inline: 0, offset: 1 } }
+        ]
+      },
+      9000
+    )
+    const b = s.bundle.project.blocks.find((x) => x.id === 'q1')
+    expect(b?.type === 'question' && b.question.stem.map((p) => p.inlines)).toEqual([
+      [{ type: 'text', text: '原' }, { type: 'text', text: '题干', marks: { bold: true } }],
+      [{ type: 'text', text: '第', marks: { bold: true } }, { type: 'text', text: '二段' }]
+    ])
+    expect(s.revision).toBe(rev + 1)
+    s = reduceAt(s, { type: 'undo' }, 9100)
+    const u = s.bundle.project.blocks.find((x) => x.id === 'q1')
+    expect(u?.type === 'question' && u.question.stem).toEqual([para('原题干'), para('第二段')])
+  })
+
+  it('范围内没有可改的内容时不产生修改', () => {
+    const s = start()
+    const r = reduceAt(s, { type: 'format-range', op: { mark: 'bold' }, ranges: [{ blockId: 'q1', path: ['question', 'stem', 0], start: { inline: 0, offset: 1 }, end: { inline: 0, offset: 1 } }] }, 1000)
+    expect(r).toBe(s)
+  })
+})

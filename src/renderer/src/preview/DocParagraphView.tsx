@@ -157,7 +157,16 @@ export const DocParagraphView = memo(function DocParagraphView({
       style={style}
       data-block-id={p.sourceBlockId}
       data-anchor-index={p.anchorIndex}
-      onClick={onSelect === undefined ? undefined : (e) => onSelect(p.sourceBlockId, focusFromClick(p, e.nativeEvent))}
+      onClick={
+        onSelect === undefined
+          ? undefined
+          : (e) => {
+              // 选中了文字（要用浮动工具条改格式）：只选中内容，不跳到属性面板的输入框，以免选区被取消
+              const sel = window.getSelection()
+              if (sel !== null && !sel.isCollapsed) onSelect(p.sourceBlockId)
+              else onSelect(p.sourceBlockId, focusFromClick(p, e.nativeEvent))
+            }
+      }
     >
       {floating}
       {label}
@@ -226,7 +235,9 @@ function renderRuns(
     switch (run.kind) {
       case 'text': {
         const m = run.marks
-        if (m === undefined) return run.text
+        // 带来源的文字加上标记，预览中选中后可换算回工程数据（见 Preview 的选区工具条）
+        const src = run.src !== undefined ? srcAttrs(run.src.blockId, run.src.path, run.src.inline) : {}
+        if (m === undefined) return run.src === undefined ? run.text : <span key={i} {...src}>{run.text}</span>
         const style: CSSProperties = {
           fontWeight: m.bold === true ? 700 : undefined,
           fontStyle: m.italic === true ? 'italic' : undefined,
@@ -235,7 +246,7 @@ function renderRuns(
         }
         const Tag = m.script === 'sup' ? 'sup' : m.script === 'sub' ? 'sub' : 'span'
         return (
-          <Tag key={i} style={style} {...(m.font !== undefined ? { className: `font-${m.font}` } : {})}>
+          <Tag key={i} style={style} {...(m.font !== undefined ? { className: `font-${m.font}` } : {})} {...src}>
             {run.text}
           </Tag>
         )
@@ -250,11 +261,12 @@ function renderRuns(
             {...(onEditMath !== undefined && run.ref !== undefined ? { onEdit: () => onEditMath(run) } : {})}
           />
         )
-        // 公式整体加粗、加下划线、设颜色
-        if (run.bold !== true && run.underline !== true && run.color === undefined) return view
+        // 公式整体加粗、加下划线、设颜色；带来源的公式加上标记（预览中可与文字一起选中改格式）
+        const msrc = run.ref !== undefined && run.ref.path.length >= 2 ? srcAttrs(run.ref.blockId, run.ref.path.slice(0, -2), Number(run.ref.path[run.ref.path.length - 1]), true) : {}
+        if (run.bold !== true && run.underline !== true && run.color === undefined) return run.ref === undefined ? view : <span key={i} {...msrc}>{view}</span>
         const cls = [run.bold === true ? 'math-bold' : '', run.underline === true ? 'math-underline' : ''].filter(Boolean).join(' ')
         return (
-          <span key={i} className={cls} {...(run.color !== undefined ? { style: { color: `#${run.color}` } } : {})}>
+          <span key={i} className={cls} {...(run.color !== undefined ? { style: { color: `#${run.color}` } } : {})} {...msrc}>
             {view}
           </span>
         )
@@ -314,6 +326,16 @@ function renderRuns(
         return <TableView key={i} table={run.table} assetUrls={assetUrls} onEditMath={onEditMath} />
     }
   })
+}
+
+/** 文字、公式在工程数据中的来源，写在预览元素上（data-src-*） */
+function srcAttrs(blockId: string, path: ReadonlyArray<string | number>, inline: number, math = false): Record<string, string> {
+  return {
+    'data-src-block': blockId,
+    'data-src-path': JSON.stringify(path),
+    'data-src-inline': String(inline),
+    ...(math ? { 'data-src-math': '1' } : {})
+  }
 }
 
 /** 表格：与导出一致——细实线边框、固定列宽、居中；单元格内容垂直居中，不首行缩进 */
