@@ -21,6 +21,8 @@ interface Props {
   onFigureChange?: FigureChangeHandler
   /** 选项图片的缩放（单张或全部一起），见 OptionImageHandlers */
   optionImages?: OptionImageHandlers
+  /** 右键：弹出快捷版式窗口（不提供时用系统菜单） */
+  onBlockMenu?: (blockId: string, x: number, y: number) => void
 }
 
 /** 选择题选项图片在预览中的缩放 */
@@ -83,6 +85,7 @@ export const DocParagraphView = memo(function DocParagraphView({
   assetUrls,
   selected,
   onSelect,
+  onBlockMenu,
   onEditMath,
   onFigureChange,
   optionImages
@@ -158,6 +161,14 @@ export const DocParagraphView = memo(function DocParagraphView({
       style={style}
       data-block-id={p.sourceBlockId}
       data-anchor-index={p.anchorIndex}
+      onContextMenu={
+        onBlockMenu === undefined
+          ? undefined
+          : (e) => {
+              e.preventDefault()
+              onBlockMenu(p.sourceBlockId, e.clientX, e.clientY)
+            }
+      }
       onClick={
         onSelect === undefined
           ? undefined

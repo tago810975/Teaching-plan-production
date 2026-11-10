@@ -13,6 +13,7 @@ import { usePanelWidths } from './layout/usePanelWidths'
 import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
+import { BlockQuickMenu } from './BlockQuickMenu'
 import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
 import { ommlToLatex } from '@core/math/omml-to-latex'
 import type { MathRun, ParagraphFocus } from './preview/DocParagraphView'
@@ -204,6 +205,17 @@ function EditorBody({
       off()
     }
   }, [travel])
+  // 快捷版式窗口（预览或大纲中右键内容）
+  const [quickMenu, setQuickMenu] = useState<{ blockId: string; x: number; y: number } | null>(null)
+  const openQuickMenu = useCallback(
+    (blockId: string, x: number, y: number) => {
+      dispatch({ type: 'select', blockId })
+      setQuickMenu({ blockId, x, y })
+    },
+    [dispatch]
+  )
+  const closeQuickMenu = useCallback(() => setQuickMenu(null), [])
+  const quickBlock = quickMenu !== null ? findBlock(project.blocks, quickMenu.blockId) : null
   const canUndo = state.history.past.length > 0
   const canRedo = state.history.future.length > 0
 
@@ -281,6 +293,18 @@ function EditorBody({
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
       {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
+      {quickMenu !== null && quickBlock !== null && (
+        <BlockQuickMenu
+          key={quickMenu.blockId}
+          block={quickBlock}
+          {...(questionNumbers.get(quickBlock.id) !== undefined ? { number: questionNumbers.get(quickBlock.id)! } : {})}
+          x={quickMenu.x}
+          y={quickMenu.y}
+          preset={preset}
+          dispatch={dispatch}
+          onClose={closeQuickMenu}
+        />
+      )}
       {exportOpen && (
         <ExportDialog
           bundle={state.bundle}
@@ -304,6 +328,7 @@ function EditorBody({
           selectedBlockId={state.selectedBlockId}
           dispatch={dispatch}
           preset={preset}
+          onBlockMenu={openQuickMenu}
         />
         <Preview
           ir={ir}
@@ -318,6 +343,7 @@ function EditorBody({
           onOptionImageResize={resizeOptionImageFromPreview}
           onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
           onTableWidths={(ref, widths) => dispatch({ type: 'set-table-widths', ref, widths })}
+          onBlockMenu={openQuickMenu}
           formatColors={preset.textColors}
           keyPoint={preset.keyPoint}
           linkOptionImages={state.linkOptionImages}

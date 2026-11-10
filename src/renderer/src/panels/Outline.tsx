@@ -1,7 +1,7 @@
 /**
  * 大纲：按顺序列出全部内容块，用于定位、选择和调整顺序。
  */
-import { useRef, type Dispatch } from 'react'
+import { useRef, type Dispatch, type MouseEvent as ReactMouseEvent } from 'react'
 import { useOutlineDrag } from './useOutlineDrag'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
@@ -16,9 +16,17 @@ interface Props {
   dispatch: Dispatch<EditorAction>
   /** 格式预设：等级与星级的对应 */
   preset: FormatPreset
+  /** 右键内容：弹出快捷版式窗口 */
+  onBlockMenu?: (blockId: string, x: number, y: number) => void
 }
 
-export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset }: Props) {
+export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu }: Props) {
+  const menu = (id: string) => (e: ReactMouseEvent): void => {
+    if (onBlockMenu === undefined) return
+    e.preventDefault()
+    dispatch({ type: 'select', blockId: id })
+    onBlockMenu(id, e.clientX, e.clientY)
+  }
   // 上移、下移：顶层块在大纲中移动；综合题中的小题在综合题内移动
   const parent = blocks.find((b) => b.type === 'composite' && b.items.some((it) => it.id === selectedBlockId))
   const siblings: Array<{ id: string }> = parent?.type === 'composite' ? parent.items : blocks
@@ -56,8 +64,9 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
               <button
                 type="button"
                 className={`outline-item outline-item--${block.type}${block.id === selectedBlockId ? ' is-selected' : ''}`}
-                title="点击选中；按住拖动可调整顺序"
+                title="点击选中；按住拖动可调整顺序；右键快捷设置"
                 onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block))}
+                onContextMenu={menu(block.id)}
                 onClick={() => {
                   if (consumeClick()) return
                   dispatch({ type: 'select', blockId: block.id })
@@ -75,6 +84,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
                     <button
                       type="button"
                       className={`outline-item outline-item--question outline-item--nested${item.id === selectedBlockId ? ' is-selected' : ''}`}
+                      onContextMenu={menu(item.id)}
                       onClick={() => {
                         if (consumeClick()) return
                         dispatch({ type: 'select', blockId: item.id })

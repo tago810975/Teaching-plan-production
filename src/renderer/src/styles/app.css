@@ -1971,3 +1971,84 @@ body.is-dragging-outline * {
 .table-editor-total.is-over {
   color: var(--red-pen);
 }
+
+/* 快捷版式窗口（右键题目） */
+.quick-menu {
+  position: fixed;
+  z-index: 45;
+  width: 340px;
+  padding: 8px 10px 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(31, 42, 46, 0.22);
+}
+.quick-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.quick-menu-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.quick-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.quick-menu-label {
+  flex: none;
+  width: 2.6em;
+  color: var(--ink-soft);
+}
+.quick-menu-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.quick-menu-seg {
+  flex-wrap: wrap;
+}
+.quick-menu-seg button {
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.quick-menu-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.quick-menu-stepper button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+}
+.quick-menu-stepper input {
+  width: 3em;
+  text-align: center;
+}
+.quick-menu-check {
+  margin: 4px 0 4px 3.3em;
+}
+.quick-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.quick-menu-actions .danger {
+  margin-left: auto;
+  color: var(--red-pen);
+}

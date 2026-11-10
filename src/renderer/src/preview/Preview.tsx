@@ -36,6 +36,8 @@ interface Props {
   onOptionImageResize?: (ref: OptionImageRef, widthEmu: number, group: boolean) => void
   /** 在预览中拖动一张选项图片时，默认是否全部一起缩放 */
   linkOptionImages?: boolean
+  /** 右键内容：弹出快捷版式窗口 */
+  onBlockMenu?: (blockId: string, x: number, y: number) => void
   /** 在预览中拖动表格列边框后设置列宽（不提供时不显示拖动手柄） */
   onTableWidths?: (ref: InlineRef, widthsTwip: number[]) => void
   /** 在预览中选中文字后改格式（不提供时不显示选区工具条） */
@@ -58,6 +60,7 @@ export function Preview({
   linkOptionImages = false,
   onFormatRange,
   onTableWidths,
+  onBlockMenu,
   formatColors = [],
   keyPoint
 }: Props) {
@@ -218,6 +221,7 @@ export function Preview({
                     assetUrls={assetUrls}
                     selected={p.sourceBlockId === selectedBlockId}
                     onSelect={selectFromPreview}
+                    {...(onBlockMenu !== undefined ? { onBlockMenu } : {})}
                     {...(onEditMath !== undefined ? { onEditMath } : {})}
                     {...(onFigureChange !== undefined ? { onFigureChange } : {})}
                     {...(p.style === 'option' && optionHandlers !== undefined
