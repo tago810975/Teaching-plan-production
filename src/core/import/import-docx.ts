@@ -36,10 +36,8 @@ export async function importDocx(bytes: Uint8Array, options: DocxImportOptions =
   // 知识点手册只有大标题与知识点，不识别题目
   const recognized =
     preset.kind === 'handbook' ? recognizeHandbook(read.paragraphs) : recognize(zujuan !== null ? zujuan.paragraphs : read.paragraphs)
-  if (zujuan !== null) {
-    applyZujuanDifficulty(recognized.blocks, zujuan.difficulty)
-    distributeZujuanKnowledge(recognized.blocks)
-  }
+  // 组卷网题组的【知识点】是整组共用的，保留在综合题共用解析的开头（只显示一次，与原文一致）
+  if (zujuan !== null) applyZujuanDifficulty(recognized.blocks, zujuan.difficulty)
   const { questionCount, firstTitle } = recognized
   // 去掉与样式相同的字体，整段同一字体时提升为段落字体；再按预设整理作业单、难度星级与解析
   const blocks = applyPresetRules(normalizeFonts(recognized.blocks), preset)
@@ -81,30 +79,5 @@ function applyZujuanDifficulty(blocks: Block[], difficulty: Map<number, number>)
   for (const b of blocks) {
     if (b.type === 'question') visit(b.question)
     else if (b.type === 'composite') b.items.forEach((it) => visit(it.question))
-  }
-}
-
-/**
- * 组卷网题组的【知识点】在共用解析的开头：取出来分给组中的每道小题（已有知识点的不改），并从解析中去掉
- */
-function distributeZujuanKnowledge(blocks: Block[]): void {
-  const LABEL = /^\s*【\s*(知识点|考点)\s*】\s*/
-  for (const b of blocks) {
-    if (b.type !== 'composite') continue
-    const keep = []
-    for (const p of b.analysis) {
-      const text = p.inlines.map((i) => (i.type === 'text' ? i.text : '')).join('')
-      if (!LABEL.test(text)) {
-        keep.push(p)
-        continue
-      }
-      const points = text
-        .replace(LABEL, '')
-        .split(/[、，,；;]/)
-        .map((s) => s.trim())
-        .filter((s) => s !== '')
-      for (const it of b.items) if (it.question.knowledgePoints.length === 0) it.question.knowledgePoints = points.slice()
-    }
-    b.analysis = keep
   }
 }

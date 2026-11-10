@@ -74,13 +74,21 @@ describe('组卷网下载的题目', async () => {
     expect(qs[16]!.question.subQuestions).toHaveLength(2)
   })
 
-  it('难度按组卷网难度系数换算；知识点分给组中的每道小题', () => {
+  it('难度按组卷网难度系数换算；整组共用的知识点在共用解析开头，只出现一次', () => {
     const qs = questions(r.blocks)
     expect(qs[0]!.question.difficulty).toBe('B') // 0.61
     expect(qs[15]!.question.difficulty).toBe('C') // 0.4
-    expect(qs[0]!.question.knowledgePoints).toEqual(['简谐运动的定义及特征', '波长', '频率和波速的关系', '波的图像'])
-    expect(plainText(composites[0]!.analysis)).not.toContain('【知识点】')
+    expect(plainText([composites[0]!.analysis[0]!])).toBe('【知识点】简谐运动的定义及特征、波长、频率和波速的关系、波的图像')
+    expect(qs.slice(0, 5).every((q) => q.question.knowledgePoints.length === 0)).toBe(true)
     expect([gradeOfCoefficient(0.85), gradeOfCoefficient(0.7), gradeOfCoefficient(0.65), gradeOfCoefficient(0.49)]).toEqual(['A', 'A', 'B', 'C'])
+  })
+
+  it('句子中的公式是行内公式（组卷网把每个公式都包在公式段落中）', () => {
+    const qs = questions(r.blocks)
+    const stem = qs[21]!.question.stem[0]!.inlines
+    expect(stem.filter((i) => i.type === 'math')).not.toHaveLength(0)
+    expect(stem.some((i) => i.type === 'math' && i.display === true)).toBe(false)
+    expect(qs[21]!.question.stem).toHaveLength(1)
   })
 
   it('导入提示中说明识别为组卷网格式', () => {

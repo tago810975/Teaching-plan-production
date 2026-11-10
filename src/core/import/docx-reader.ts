@@ -240,6 +240,11 @@ class Reader {
     }
     const textBoxes: Element[] = []
     await this.readInlines(p, para, {}, textBoxes)
+    // 公式段落（m:oMathPara）只有在段中没有别的内容时才是行间公式；与文字同在一段时按行内排（与 Word 一致）。
+    // 组卷网把每个公式都包在 m:oMathPara 中，即使它在句子中间。
+    if (para.inlines.some((i) => (i.type === 'text' && i.text.trim() !== '') || i.type === 'image' || i.type === 'blank')) {
+      para.inlines = para.inlines.map((i) => (i.type === 'math' && i.display === true ? (({ display: _d, ...rest }) => rest)(i) : i))
+    }
     this.paragraphs.push(para)
     // 文本框里的段落排在所在段落之后
     for (const tb of textBoxes) await this.readContainer(tb)
