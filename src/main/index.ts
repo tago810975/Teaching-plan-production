@@ -14,6 +14,7 @@ import { IPC, type FolderListing, type LocalPlace, type MenuCommand, type Opened
 import type { ProjectBundle } from '@core/model/types'
 import { listDrives, listFolder, listSubfolders, renameEntry } from './files'
 import { buildAppMenu } from './menu'
+import { openMoanCapture } from './moan-capture'
 import { readTemplateDefaults } from './template-io'
 import { currentCatalog, deleteTemplateFolder, duplicateTemplate, exportTemplate, importTemplate, loadUserTemplates, userTemplateDir } from './user-templates'
 import { importDocxFiles } from './import-io'
@@ -116,7 +117,9 @@ function createWindow(): void {
   mainWindow = win
 
   Menu.setApplicationMenu(
-    buildAppMenu((command: MenuCommand) => win.webContents.send(IPC.menuCommand, command))
+    buildAppMenu((command: MenuCommand) => win.webContents.send(IPC.menuCommand, command), {
+      moanCapture: () => openMoanCapture(win)
+    })
   )
 
   win.once('ready-to-show', () => win.show())

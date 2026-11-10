@@ -4,7 +4,13 @@
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import type { MenuCommand } from '@shared/ipc'
 
-export function buildAppMenu(send: (command: MenuCommand) => void): Menu {
+/** 由主进程自己处理、不经过界面的菜单动作 */
+export interface MainMenuActions {
+  /** 打开墨案（老教学案系统）数据采集窗口 */
+  moanCapture: () => void
+}
+
+export function buildAppMenu(send: (command: MenuCommand) => void, actions: MainMenuActions): Menu {
   const isMac = process.platform === 'darwin'
   const isDev = !app.isPackaged
 
@@ -18,6 +24,8 @@ export function buildAppMenu(send: (command: MenuCommand) => void): Menu {
       { label: '另存为…', accelerator: 'CmdOrCtrl+Shift+S', click: () => send('save-as') },
       { type: 'separator' },
       { label: '导出 Word…', accelerator: 'CmdOrCtrl+E', click: () => send('export-word') },
+      { type: 'separator' },
+      { label: '从墨案采集数据…', click: () => actions.moanCapture() },
       { type: 'separator' },
       { label: '关闭当前标签页', accelerator: 'CmdOrCtrl+W', click: () => send('close') },
       ...(isMac ? [] : [{ type: 'separator' } as const, { label: '退出', role: 'quit' } as const])
