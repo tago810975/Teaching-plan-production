@@ -159,6 +159,10 @@
 .para-float {
   margin-bottom: 4pt;
   text-indent: 0;
+  /* 段落是 position: relative，后面的段落框会盖住前面段落的环绕图，点不到（右键、拖动）；
+     文字本身会绕开图片，所以把图片叠在上层不影响显示 */
+  position: relative;
+  z-index: 1;
 }
 
 /* ---------- 题图、插图：选中内容时可缩放，自由位置可拖动 ---------- */

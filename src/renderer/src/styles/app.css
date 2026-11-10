@@ -2034,7 +2034,8 @@ body.is-dragging-outline * {
   padding: 0;
 }
 .quick-menu-stepper input {
-  width: 3em;
+  /* 放得下“12.5”这样的小数 */
+  width: 4.4em;
   text-align: center;
 }
 .quick-menu-check {
