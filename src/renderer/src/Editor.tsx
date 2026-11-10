@@ -14,6 +14,8 @@ import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { BlockQuickMenu } from './BlockQuickMenu'
+import { FigureQuickMenu, OptionImageQuickMenu } from './ImageQuickMenu'
+import type { ImageTarget } from './preview/image-menu'
 import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
 import { ommlToLatex } from '@core/math/omml-to-latex'
 import type { MathRun, ParagraphFocus } from './preview/DocParagraphView'
@@ -205,12 +207,28 @@ function EditorBody({
       off()
     }
   }, [travel])
-  // 快捷版式窗口（预览或大纲中右键内容）
-  const [quickMenu, setQuickMenu] = useState<{ blockId: string; x: number; y: number } | null>(null)
+  // 快捷窗口：右键内容（预览或大纲）弹出版式窗口，右键图片弹出图片窗口
+  const [quickMenu, setQuickMenu] = useState<
+    | { kind: 'block'; blockId: string; x: number; y: number }
+    | { kind: 'figure'; blockId: string; figureIndex: number; x: number; y: number }
+    | { kind: 'option'; blockId: string; ref: OptionImageRef; x: number; y: number }
+    | null
+  >(null)
   const openQuickMenu = useCallback(
     (blockId: string, x: number, y: number) => {
       dispatch({ type: 'select', blockId })
-      setQuickMenu({ blockId, x, y })
+      setQuickMenu({ kind: 'block', blockId, x, y })
+    },
+    [dispatch]
+  )
+  const openImageMenu = useCallback(
+    (target: ImageTarget, x: number, y: number) => {
+      dispatch({ type: 'select', blockId: target.ref.blockId })
+      setQuickMenu(
+        target.kind === 'figure'
+          ? { kind: 'figure', blockId: target.ref.blockId, figureIndex: target.ref.figureIndex, x, y }
+          : { kind: 'option', blockId: target.ref.blockId, ref: target.ref, x, y }
+      )
     },
     [dispatch]
   )
@@ -293,7 +311,21 @@ function EditorBody({
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
       {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
-      {quickMenu !== null && quickBlock !== null && (
+      {quickMenu?.kind === 'figure' && quickBlock !== null && (
+        <FigureQuickMenu
+          block={quickBlock}
+          figureIndex={quickMenu.figureIndex}
+          x={quickMenu.x}
+          y={quickMenu.y}
+          dispatch={dispatch}
+          onClose={closeQuickMenu}
+          onIndexChange={(figureIndex) => setQuickMenu({ ...quickMenu, figureIndex })}
+        />
+      )}
+      {quickMenu?.kind === 'option' && quickBlock !== null && (
+        <OptionImageQuickMenu block={quickBlock} optionRef={quickMenu.ref} x={quickMenu.x} y={quickMenu.y} dispatch={dispatch} onClose={closeQuickMenu} />
+      )}
+      {quickMenu?.kind === 'block' && quickBlock !== null && (
         <BlockQuickMenu
           key={quickMenu.blockId}
           block={quickBlock}
@@ -344,6 +376,7 @@ function EditorBody({
           onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
           onTableWidths={(ref, widths) => dispatch({ type: 'set-table-widths', ref, widths })}
           onBlockMenu={openQuickMenu}
+          onImageMenu={openImageMenu}
           formatColors={preset.textColors}
           keyPoint={preset.keyPoint}
           linkOptionImages={state.linkOptionImages}

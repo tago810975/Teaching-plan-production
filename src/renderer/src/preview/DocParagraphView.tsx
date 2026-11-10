@@ -298,6 +298,7 @@ function renderRuns(
               figureRef={undefined}
               active={figures!.active}
               onChange={undefined}
+              optionRef={ref}
               onResizeEnd={(size, group) => opt.onResize(ref, size.widthEmu, group)}
               onResizeDraft={(scale, group) => opt.onDraft(ref, scale, group)}
               groupByDefault={opt.groupByDefault}

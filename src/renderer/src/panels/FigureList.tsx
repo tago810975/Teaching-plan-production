@@ -4,8 +4,7 @@
 import { useRef, useState } from 'react'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/model/types'
-import { plainText } from '@core/model/factory'
-import { A4_PAGE, contentWidthTwip } from '@core/document/units'
+import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm } from './figure-options'
 
 interface Props {
   /** 分组标题，默认“题图” */
@@ -23,27 +22,9 @@ interface Props {
 }
 
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-const EMU_PER_CM = 360000
 /** 新加图片的默认宽度：5 厘米 */
 const DEFAULT_WIDTH_CM = 5
 
-const QUESTION_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
-  ['below', '题干下方'],
-  ['right', '题干右侧（文字环绕）'],
-  ['right-items', '题干下方，位于选项或小问右侧'],
-  ['below-item', '某个小问下方'],
-  ['below-all', '全部题目文字下方'],
-  ['free', '自由位置（文字环绕，可拖动）']
-]
-
-const KNOWLEDGE_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
-  ['below', '某段之后'],
-  ['right', '某段右侧（文字环绕）'],
-  ['free', '自由位置（文字环绕，可拖动）']
-]
-
-/** EMU / twip */
-const EMU_PER_TWIP = 635
 
 export function FigureList({
   title = '题图',
@@ -236,31 +217,4 @@ export function FigureList({
       />
     </fieldset>
   )
-}
-
-function toCm(emu: number): number {
-  return Math.round((emu / EMU_PER_CM) * 10) / 10
-}
-
-function needsParagraph(kind: 'question' | 'knowledge', placement: FigurePlacement): boolean {
-  if (kind === 'knowledge') return true
-  return placement === 'right' || placement === 'free'
-}
-
-function excerpt(p: RichText[number]): string {
-  const t = plainText(p).replace(/\$[^$]*\$/g, '…').replace(/\s+/g, ' ')
-  return t.length > 14 ? `${t.slice(0, 14)}…` : t || '（空）'
-}
-
-/** 切换位置时补上需要的字段：自由位置默认放在栏的右上角 */
-function placementPatch(f: QuestionFigure, placement: FigurePlacement): Partial<QuestionFigure> {
-  if (placement !== 'free' || f.offsetXEmu !== undefined) return { placement }
-  const columnEmu = contentWidthTwip(A4_PAGE) * EMU_PER_TWIP
-  return { placement, offsetXEmu: Math.max(0, columnEmu - f.widthEmu), offsetYEmu: 0 }
-}
-
-function swap<T>(arr: T[], a: number, b: number): T[] {
-  const out = arr.slice()
-  ;[out[a], out[b]] = [out[b]!, out[a]!]
-  return out
 }

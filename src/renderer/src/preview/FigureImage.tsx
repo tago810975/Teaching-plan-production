@@ -8,9 +8,10 @@
  * 选择题的选项图片也用这个组件（只有缩放，没有拖动摆放）：此时不提供 figureRef，
  * 改用 onResizeEnd / onResizeDraft；“全部一起缩放”时，拖动过程中其他选项图片按 groupScale 同步显示。
  */
-import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import type { FigureRef, FloatingImage } from '@core/document/ir'
+import { useContext, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import type { FigureRef, OptionImageRef, FloatingImage } from '@core/document/ir'
 import { emuToPt } from '@core/document/units'
+import { ImageMenuContext, type ImageTarget } from './image-menu'
 
 export interface FigurePatch {
   widthEmu?: number
@@ -42,6 +43,8 @@ interface Props {
   groupByDefault?: boolean
   /** 别的图片正在“全部一起缩放”时，本图按此比例显示 */
   groupScale?: number
+  /** 选项中的图片：右键时弹出选项图片的快捷窗口 */
+  optionRef?: OptionImageRef
 }
 
 /** 屏幕像素 → EMU：先除以预览缩放，再按 96 DPI 换算 */
@@ -56,7 +59,9 @@ export function previewZoom(el: Element): number {
 }
 
 export function FigureImage(props: Props) {
-  const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style, onResizeEnd, onResizeDraft, groupByDefault = false, groupScale } = props
+  const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style, onResizeEnd, onResizeDraft, groupByDefault = false, groupScale, optionRef } = props
+  const openMenu = useContext(ImageMenuContext)
+  const target: ImageTarget | null = figureRef !== undefined ? { kind: 'figure', ref: figureRef } : optionRef !== undefined ? { kind: 'option', ref: optionRef } : null
   const [draft, setDraft] = useState<{ widthEmu?: number; heightEmu?: number; dx?: number; dy?: number } | null>(null)
   const start = useRef<{ x: number; y: number; zoom: number; mode: 'move' | 'resize'; group: boolean } | null>(null)
   const boxRef = useRef<HTMLSpanElement>(null)
@@ -131,6 +136,16 @@ export function FigureImage(props: Props) {
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={end}
+      onContextMenu={
+        openMenu === null || target === null
+          ? undefined
+          : (e) => {
+              // 只弹出图片的快捷窗口，不再冒泡到所在段落（否则会弹出题目的快捷窗口）
+              e.preventDefault()
+              e.stopPropagation()
+              openMenu(target, e.clientX, e.clientY)
+            }
+      }
       title={interactive ? (onResizeEnd !== undefined ? (groupByDefault ? '拖动右下角，全部选项图片一起缩放；按住 Shift 只缩放这一张' : '拖动右下角调整这一张的大小；按住 Shift 全部选项图片一起缩放') : float !== undefined ? (float.movable === 'free' ? '拖动摆放；拖动右下角调整大小' : '上下拖动调整位置；拖动右下角调整大小') : '拖动右下角调整大小') : undefined}
     >
       <img src={src} alt="" draggable={false} />

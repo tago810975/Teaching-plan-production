@@ -2052,3 +2052,15 @@ body.is-dragging-outline * {
   margin-left: auto;
   color: var(--red-pen);
 }
+.quick-menu-row select {
+  max-width: 240px;
+}
+.quick-menu-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.quick-menu-inline button {
+  padding: 2px 8px;
+  font-size: 12px;
+}

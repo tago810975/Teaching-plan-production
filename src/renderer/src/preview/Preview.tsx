@@ -12,6 +12,7 @@ import { STYLE_SPECS } from '@core/document/styles'
 import { StylesContext } from './styles-context'
 import { SelectionToolbar } from './SelectionToolbar'
 import { TableResizeContext } from './table-resize'
+import { ImageMenuContext, type ImageTarget } from './image-menu'
 import type { FormatOp } from '@core/model/markup'
 import type { FormatPreset } from '@core/presets'
 import type { TextRange } from '../state/store'
@@ -38,6 +39,8 @@ interface Props {
   linkOptionImages?: boolean
   /** 右键内容：弹出快捷版式窗口 */
   onBlockMenu?: (blockId: string, x: number, y: number) => void
+  /** 右键图片：弹出图片的快捷窗口 */
+  onImageMenu?: (target: ImageTarget, x: number, y: number) => void
   /** 在预览中拖动表格列边框后设置列宽（不提供时不显示拖动手柄） */
   onTableWidths?: (ref: InlineRef, widthsTwip: number[]) => void
   /** 在预览中选中文字后改格式（不提供时不显示选区工具条） */
@@ -61,6 +64,7 @@ export function Preview({
   onFormatRange,
   onTableWidths,
   onBlockMenu,
+  onImageMenu,
   formatColors = [],
   keyPoint
 }: Props) {
@@ -185,6 +189,7 @@ export function Preview({
   return (
     <StylesContext.Provider value={ir.styles ?? STYLE_SPECS}>
     <TableResizeContext.Provider value={onTableWidths ?? null}>
+    <ImageMenuContext.Provider value={onImageMenu ?? null}>
     <div className="preview" ref={scrollRef}>
       <div className="preview-measure" aria-hidden="true">
         <div ref={measureRef} style={{ width: bodyStyle.width }}>
@@ -247,6 +252,7 @@ export function Preview({
       </div>
     </div>
       {onFormatRange !== undefined && <SelectionToolbar container={scrollRef} onApply={onFormatRange} colors={formatColors} keyPoint={keyPoint} />}
+    </ImageMenuContext.Provider>
     </TableResizeContext.Provider>
     </StylesContext.Provider>
   )

@@ -5,6 +5,7 @@
  * - 知识点、综合题：整块同页、从新页开始、留白；
  * - 大标题、栏目标题、题型分组：从新的一页开始、题号重新开始。
  * 所有修改都可撤销（删除也是），所以删除不再确认。上移下移后窗口保持打开，可连续调整。
+ * 右键图片时弹出的是图片的快捷窗口（ImageQuickMenu.tsx），两者互不冲突。
  */
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type ReactNode } from 'react'
 import { difficultyOf, type FormatPreset } from '@core/presets'
@@ -26,40 +27,6 @@ interface Props {
 type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pick<QuestionLayout, 'optionColumns'>>
 
 export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose }: Props) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
-
-  // 靠近窗口边缘时向内收
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (el === null) return
-    const r = el.getBoundingClientRect()
-    setPos({ left: Math.max(6, Math.min(x, window.innerWidth - r.width - 6)), top: Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) })
-  }, [x, y, block.type])
-
-  useEffect(() => {
-    const onDown = (e: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(e.target as Node)) onClose()
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', onDown, true)
-    document.addEventListener('keydown', onKey, true)
-    window.addEventListener('resize', onClose)
-    window.addEventListener('blur', onClose)
-    return () => {
-      document.removeEventListener('mousedown', onDown, true)
-      document.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('resize', onClose)
-      window.removeEventListener('blur', onClose)
-    }
-  }, [onClose])
-
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -81,13 +48,7 @@ export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose 
   const unit = isQuestion ? '题' : '块'
 
   return (
-    <div ref={ref} className="quick-menu" role="dialog" aria-label="快捷版式" style={{ left: pos.left, top: pos.top }}>
-      <div className="quick-menu-head">
-        <span className="quick-menu-title">{title(block, number)}</span>
-        <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
-          ×
-        </button>
-      </div>
+    <QuickPopover x={x} y={y} title={title(block, number)} label="快捷版式" onClose={onClose}>
 
       {block.type === 'question' && (
         <Row label="难度">
@@ -157,15 +118,6 @@ export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose 
         </button>
         <button
           type="button"
-          onClick={() => {
-            dispatch({ type: 'select', blockId: block.id })
-            onClose()
-          }}
-        >
-          更多设置…
-        </button>
-        <button
-          type="button"
           className="danger"
           title="删除后可用 Ctrl+Z 撤销"
           onClick={() => {
@@ -176,7 +128,7 @@ export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose 
           删除
         </button>
       </div>
-    </div>
+    </QuickPopover>
   )
 }
 
@@ -202,7 +154,7 @@ function title(b: Block, number: string | undefined): string {
   }
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+export function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="quick-menu-row">
       <span className="quick-menu-label">{label}</span>
@@ -211,7 +163,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Choice<T extends string | number>({ value, options, onChange }: { value: T; options: Array<[T, string]>; onChange: (v: T) => void }) {
+export function Choice<T extends string | number>({ value, options, onChange }: { value: T; options: Array<[T, string]>; onChange: (v: T) => void }) {
   return (
     <div className="segmented quick-menu-seg" role="radiogroup">
       {options.map(([v, label]) => (
@@ -224,7 +176,7 @@ function Choice<T extends string | number>({ value, options, onChange }: { value
 }
 
 /** 行数：− / + 按钮与输入框（0～40 行） */
-function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+export function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   const set = (v: number): void => onChange(Math.max(0, Math.min(40, Math.round(v))))
   return (
     <span className="quick-menu-stepper">
@@ -248,5 +200,52 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
       </button>
       行
     </span>
+  )
+}
+
+/**
+ * 快捷窗口的外壳：在鼠标位置弹出，靠近窗口边缘时向内收；Esc、点窗口外、窗口失去焦点时关闭。
+ */
+export function QuickPopover({ x, y, title, label, onClose, children }: { x: number; y: number; title: string; label: string; onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: x, top: y })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el === null) return
+    const r = el.getBoundingClientRect()
+    setPos({ left: Math.max(6, Math.min(x, window.innerWidth - r.width - 6)), top: Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) })
+  }, [x, y, title])
+  useEffect(() => {
+    const onDown = (e: MouseEvent): void => {
+      if (ref.current !== null && !ref.current.contains(e.target as Node)) onClose()
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', onDown, true)
+    document.addEventListener('keydown', onKey, true)
+    window.addEventListener('resize', onClose)
+    window.addEventListener('blur', onClose)
+    return () => {
+      document.removeEventListener('mousedown', onDown, true)
+      document.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('resize', onClose)
+      window.removeEventListener('blur', onClose)
+    }
+  }, [onClose])
+  return (
+    <div ref={ref} className="quick-menu" role="dialog" aria-label={label} style={{ left: pos.left, top: pos.top }}>
+      <div className="quick-menu-head">
+        <span className="quick-menu-title">{title}</span>
+        <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      {children}
+    </div>
   )
 }
