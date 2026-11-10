@@ -40,23 +40,19 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   for (const block of project.blocks) {
     switch (block.type) {
       case 'title':
+      case 'section':
+      case 'topic':
+        // 大标题、栏目标题、题型分组：可从新的一页开始（文档开头的不另起一页，免得出现空白页）、题号重新开始
         if (block.restartNumbering === true) questionNo = 0
         out.push({
-          ...textPara(block.id, 'title', block.text),
+          ...textPara(block.id, block.type, block.text),
           ...(block.restartNumbering === true ? { restartNumbering: true } : {}),
-          // 从新的一页开始（文档开头的大标题不另起一页，免得出现空白页）
           ...(block.pageBreakBefore === true && out.length > 0 ? { pageBreakBefore: true } : {})
         })
-        break
-      case 'section':
-        out.push(textPara(block.id, 'section', block.text))
         break
       case 'worksheet':
         questionNo = 0
         out.push(...buildWorksheet(block, preset))
-        break
-      case 'topic':
-        out.push(textPara(block.id, 'topic', block.text))
         break
       case 'paragraph':
         if (block.onlyIn !== undefined && block.onlyIn !== variant) break

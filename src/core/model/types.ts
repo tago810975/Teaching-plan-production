@@ -248,6 +248,10 @@ export interface SectionBlock {
   id: string
   type: 'section'
   text: string
+  /** 是否从此处重新开始题号 */
+  restartNumbering?: boolean
+  /** 是否从新的一页开始 */
+  pageBreakBefore?: boolean
 }
 
 /** 题目类型分组，如“放缩圆”“旋转圆” */
@@ -255,6 +259,10 @@ export interface TopicBlock {
   id: string
   type: 'topic'
   text: string
+  /** 是否从此处重新开始题号 */
+  restartNumbering?: boolean
+  /** 是否从新的一页开始 */
+  pageBreakBefore?: boolean
 }
 
 export interface ParagraphBlock {

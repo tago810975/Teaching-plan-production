@@ -190,3 +190,41 @@ describe('大标题从新的一页开始', async () => {
     expect(doc).not.toMatch(/<w:pageBreakBefore\/>[^]*?光的折射 全反射/)
   })
 })
+
+describe('栏目标题、题型分组从新的一页开始、题号重新开始', async () => {
+  const { buildDocument: build } = await import('@core/document/build')
+  const q = (id: string) => ({ id, type: 'question' as const, question: createQuestion({ stem: [{ inlines: [{ type: 'text' as const, text: '题' }] }] }) })
+  it('栏目标题与题型分组都可设置；题号重新开始；导出为段前分页与新的编号', async () => {
+    const p = createEmptyProject()
+    p.blocks = [
+      { id: 's1', type: 'section', text: '课堂练习', pageBreakBefore: true },
+      q('a'),
+      q('b'),
+      { id: 's2', type: 'section', text: '课后练习', pageBreakBefore: true, restartNumbering: true },
+      { id: 't1', type: 'topic', text: '放缩圆' },
+      q('c'),
+      { id: 't2', type: 'topic', text: '旋转圆', pageBreakBefore: true, restartNumbering: true },
+      q('d')
+    ]
+    const ir = build(p, 'teacher')
+    const heads = ir.paragraphs.filter((x) => x.style === 'section' || x.style === 'topic')
+    // 文档开头的“课堂练习”不另起一页
+    expect(heads.map((h) => [h.runs.map((r) => (r.kind === 'text' ? r.text : '')).join(''), h.pageBreakBefore === true, h.restartNumbering === true])).toEqual([
+      ['课堂练习', false, false],
+      ['课后练习', true, true],
+      ['放缩圆', false, false],
+      ['旋转圆', true, true]
+    ])
+    expect(ir.paragraphs.filter((x) => x.style === 'question').map((x) => x.label)).toEqual(['1.', '2.', '1.', '1.'])
+    const doc = await (await JSZip.loadAsync(await writeDocx({ ir, assets: {}, title: 't', template: TEMPLATE }))).file('word/document.xml')!.async('string')
+    expect(doc).toMatch(/<w:pageBreakBefore\/>[\s\S]*?课后练习/)
+    expect(doc).toMatch(/<w:pageBreakBefore\/>[\s\S]*?旋转圆/)
+  })
+
+  it('工程文件保存、读取保留这两个选项', async () => {
+    const { projectSchema } = await import('@core/model/schema')
+    const p = createEmptyProject()
+    p.blocks = [{ id: 's', type: 'section', text: '课后练习', pageBreakBefore: true, restartNumbering: true }, { id: 't', type: 'topic', text: '放缩圆', pageBreakBefore: true }]
+    expect(projectSchema.parse(p).blocks).toEqual(p.blocks)
+  })
+})

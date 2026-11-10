@@ -176,7 +176,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             <Field label="文字">
               <TextInput fieldId="text" value={block.text} onChange={(text) => update((b) => ({ ...b, text }) as Block)} />
             </Field>
-            {block.type === 'title' && (
+            {(block.type === 'title' || block.type === 'section' || block.type === 'topic') && (
               <fieldset className="group">
                 <legend>版式</legend>
                 <label className="checkbox">
@@ -185,7 +185,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
                     checked={block.pageBreakBefore === true}
                     onChange={(e) =>
                       update((b) => {
-                        if (b.type !== 'title') return b
+                        if (b.type !== 'title' && b.type !== 'section' && b.type !== 'topic') return b
                         const { pageBreakBefore: _p, ...rest } = b
                         return e.target.checked ? { ...rest, pageBreakBefore: true } : rest
                       })
@@ -199,7 +199,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
                     checked={block.restartNumbering === true}
                     onChange={(e) =>
                       update((b) => {
-                        if (b.type !== 'title') return b
+                        if (b.type !== 'title' && b.type !== 'section' && b.type !== 'topic') return b
                         const { restartNumbering: _r, ...rest } = b
                         return e.target.checked ? { ...rest, restartNumbering: true } : rest
                       })
@@ -207,7 +207,14 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
                   />
                   之后的题号从 1 重新开始
                 </label>
-                <p className="field-hint">如知识点手册的第二章、教学案中另起的一部分。文档开头的大标题不会另起一页。</p>
+                <p className="field-hint">
+                  {block.type === 'title'
+                    ? '如知识点手册的第二章、教学案中另起的一部分。'
+                    : block.type === 'section'
+                      ? '如让“课后练习”从新的一页开始、题号重新编排。'
+                      : '如某一类题型单独成页。'}
+                  文档开头的标题不会另起一页。
+                </p>
               </fieldset>
             )}
           </>

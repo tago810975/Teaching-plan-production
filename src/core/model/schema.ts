@@ -145,9 +145,21 @@ const block = z.discriminatedUnion('type', [
     restartNumbering: z.boolean().optional(),
     pageBreakBefore: z.boolean().optional()
   }),
-  z.object({ id: z.string(), type: z.literal('section'), text: z.string() }),
+  z.object({
+    id: z.string(),
+    type: z.literal('section'),
+    text: z.string(),
+    restartNumbering: z.boolean().optional(),
+    pageBreakBefore: z.boolean().optional()
+  }),
   z.object({ id: z.string(), type: z.literal('worksheet'), title: z.string(), fields: z.array(z.string()) }),
-  z.object({ id: z.string(), type: z.literal('topic'), text: z.string() }),
+  z.object({
+    id: z.string(),
+    type: z.literal('topic'),
+    text: z.string(),
+    restartNumbering: z.boolean().optional(),
+    pageBreakBefore: z.boolean().optional()
+  }),
   z.object({
     id: z.string(),
     type: z.literal('paragraph'),

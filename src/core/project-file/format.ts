@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 11
+export const CURRENT_FORMAT_VERSION = 12
 
 /*
  * 版本记录：
@@ -36,6 +36,7 @@ export const CURRENT_FORMAT_VERSION = 11
  * 9 —— 公式颜色 math.color（只增加可选字段，无需迁移）
  * 10 —— 表格（行内元素 type: 'table'，独占一段；单元格内容为富文本，可合并、可有底纹）。无需迁移
  * 11 —— 大标题可从新的一页开始（title.pageBreakBefore）。无需迁移
+ * 12 —— 栏目标题、题型分组也可从新的一页开始、题号重新开始（section / topic 的 pageBreakBefore、restartNumbering）。无需迁移
  */
 
 export interface Manifest {
