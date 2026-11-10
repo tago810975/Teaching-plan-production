@@ -10,7 +10,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type ReactNode } from 'react'
 import { difficultyOf, type FormatPreset } from '@core/presets'
 import { plainText } from '@core/model/factory'
-import type { Block, KeepTogether, OptionColumns, QuestionLayout } from '@core/model/types'
+import type { Block, CompositeBlock, KeepTogether, OptionColumns, QuestionLayout } from '@core/model/types'
+import { answerPlacement } from '@core/model/composite-answers'
 import type { EditorAction } from './state/store'
 import { AnswerPlacementControl } from './panels/AnswerPlacementControl'
 
@@ -20,6 +21,8 @@ interface Props {
   number?: string
   /** 各题在全卷中的题号（综合题答案集中到最后时使用） */
   questionNumbers?: ReadonlyMap<string, string>
+  /** 全部内容（题目可移到哪道综合题） */
+  blocks?: readonly Block[]
   x: number
   y: number
   preset: FormatPreset
@@ -29,7 +32,7 @@ interface Props {
 
 type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pick<QuestionLayout, 'optionColumns'>>
 
-export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, y, preset, dispatch, onClose }: Props) {
+export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blocks = [], x, y, preset, dispatch, onClose }: Props) {
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -99,6 +102,7 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, 
           </label>
         </>
       )}
+      {block.type === 'question' && <MoveTo block={block} blocks={blocks} questionNumbers={questionNumbers} dispatch={dispatch} />}
       {block.type === 'composite' && block.items.length > 0 && (
         <Row label="答案">
           <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
@@ -137,6 +141,51 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, 
         </button>
       </div>
     </QuickPopover>
+  )
+}
+
+/**
+ * “移到”：把题目一步移到某道综合题的最后，或移出综合题。所在综合题的答案还集中在最后时提示先分到各小题
+ * （否则共用答案里仍写着这道题的答案）。
+ */
+function MoveTo({ block, blocks, questionNumbers, dispatch }: { block: Block; blocks: readonly Block[]; questionNumbers: ReadonlyMap<string, string>; dispatch: Dispatch<EditorAction> }) {
+  const composites = blocks.filter((b): b is CompositeBlock => b.type === 'composite')
+  const parent = composites.find((c) => c.items.some((it) => it.id === block.id))
+  if (composites.length === 0) return null
+  const range = (c: CompositeBlock): string => {
+    const ns = c.items.map((it) => questionNumbers.get(it.id)?.replace(/\.$/, '')).filter((n): n is string => n !== undefined)
+    return ns.length === 0 ? '无小题' : ns.length === 1 ? `第 ${ns[0]} 题` : `第 ${ns[0]}～${ns[ns.length - 1]} 题`
+  }
+  const name = (c: CompositeBlock): string => {
+    const t = c.title.trim() || plainText(c.background).trim()
+    return `${t.length > 10 ? `${t.slice(0, 10)}…` : t || '综合题'}（${range(c)}）`
+  }
+  const shared = parent !== undefined && answerPlacement(parent) === 'end'
+  return (
+    <>
+      <Row label="移到">
+        <select
+          aria-label="把这道题移到"
+          value=""
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '') return
+            dispatch({ type: 'move-question-to', blockId: block.id, compositeId: v === '\u0000' ? null : v })
+          }}
+        >
+          <option value="">{parent !== undefined ? `现在在：${name(parent)}` : '现在是独立的题目'}</option>
+          {parent !== undefined && <option value={'\u0000'}>移出综合题（成为独立的题目）</option>}
+          {composites
+            .filter((c) => c !== parent)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                综合题：{name(c)} 的最后
+              </option>
+            ))}
+        </select>
+      </Row>
+      {shared && <p className="field-hint quick-menu-note">所在综合题的答案与解析集中在最后，移走前建议先在综合题中选“分到各小题”，答案才会跟着这道题走。</p>}
+    </>
   )
 }
 

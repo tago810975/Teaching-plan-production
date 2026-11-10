@@ -331,6 +331,7 @@ function EditorBody({
           block={quickBlock}
           {...(questionNumbers.get(quickBlock.id) !== undefined ? { number: questionNumbers.get(quickBlock.id)! } : {})}
           questionNumbers={questionNumbers}
+          blocks={project.blocks}
           x={quickMenu.x}
           y={quickMenu.y}
           preset={preset}

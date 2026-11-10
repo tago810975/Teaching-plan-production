@@ -2073,3 +2073,7 @@ body.is-dragging-outline * {
   opacity: 1;
   cursor: default;
 }
+
+.quick-menu-note {
+  margin: 2px 0 4px 3.3em;
+}

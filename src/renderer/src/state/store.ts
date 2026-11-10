@@ -10,6 +10,7 @@ import type { FigureRef, InlineRef } from '@core/document/ir'
 import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
+import { moveQuestion, moveQuestionTo } from '@core/model/move-question'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -104,6 +105,8 @@ export type EditorAction =
   | { type: 'select'; blockId: string | null; focus?: Omit<FocusRequest, 'blockId' | 'nonce'> }
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
+  /** 把题目移到某道综合题的最后（compositeId），或移出综合题（null） */
+  | { type: 'move-question-to'; blockId: string; compositeId: string | null }
   | { type: 'delete-block'; blockId: string }
   /** 拖拽排序：把内容块移到第 toIndex 个位置之前（toIndex 按移动前的顺序计算） */
   | { type: 'move-block-to'; blockId: string; toIndex: number }
@@ -284,8 +287,13 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       }
     case 'update-block':
       return withBlocks(state, (blocks) => mapBlockById(blocks, action.blockId, action.update))
+    case 'move-question-to':
+      return withBlocks(state, (blocks) => moveQuestionTo(blocks, action.blockId, action.compositeId))
     case 'move-block':
       return withBlocks(state, (blocks) => {
+        // 题目（含综合题中的小题）：可以移出、移进综合题
+        const isQuestion = blocks.some((b) => (b.id === action.blockId && b.type === 'question') || (b.type === 'composite' && b.items.some((it) => it.id === action.blockId)))
+        if (isQuestion) return moveQuestion(blocks, action.blockId, action.delta)
         const swapIn = <T>(list: T[], i: number): T[] => {
           const j = i + action.delta
           if (i === -1 || j < 0 || j >= list.length) return list
@@ -294,13 +302,7 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
           return next
         }
         const i = blocks.findIndex((b) => b.id === action.blockId)
-        if (i !== -1) return swapIn(blocks, i)
-        // 综合题中的小题：在综合题内移动
-        return blocks.map((b) =>
-          b.type === 'composite' && b.items.some((it) => it.id === action.blockId)
-            ? { ...b, items: swapIn(b.items, b.items.findIndex((it) => it.id === action.blockId)) }
-            : b
-        )
+        return i !== -1 ? swapIn(blocks, i) : blocks
       })
     case 'move-block-to': {
       const next = withBlocks(state, (blocks) => {
