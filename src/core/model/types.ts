@@ -232,6 +232,13 @@ export interface Question {
   /** 详解，包括【详解】【点睛】等段落 */
   analysis: RichText
   /**
+   * 审题（仅教师版，排在解析之前，标签【审题】）。是否在编辑面板中出现、是否排版由“题目可选项”决定
+   * （格式预设 questionFields，工程版式设置可另行打开或关闭）；关闭时数据保留。
+   */
+  review?: RichText
+  /** 重点题：教师版题干前显示【重点题】（同样由“题目可选项”决定是否使用） */
+  important?: boolean
+  /**
    * 题号样式。不设时按 1. 2. 3. 依次编号；variant（变式题）编为 a. b. c.，接在上一道编号题之后，
    * 不占用数字题号（墨案教案的例题与变式）。
    */
@@ -401,6 +408,16 @@ export interface ProjectLayout {
   difficultyDisplay: DifficultyDisplay
   /** 行距；不设（或其中某项不设）时用格式预设的行距，预设也没有时为单倍 */
   lineSpacing?: Partial<LineSpacing>
+  /** 题目可选项（审题、重点题）是否使用；不设（或某项不设）时用格式预设的设置，预设也没有时不使用 */
+  questionFields?: Partial<QuestionFields>
+}
+
+/** 题目可选项：所有题型都可以使用，由格式预设决定默认是否打开 */
+export interface QuestionFields {
+  /** 审题（question.review） */
+  review: boolean
+  /** 重点题（question.important） */
+  important: boolean
 }
 
 export type DifficultyDisplay = 'both' | 'grade' | 'stars' | 'none'

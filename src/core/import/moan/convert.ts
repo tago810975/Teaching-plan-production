@@ -12,7 +12,7 @@
  * 富文本都是 HTML，公式写作 $…$（KaTeX），见 html.ts。
  */
 import { createKnowledge, createQuestion, newId } from '../../model/factory'
-import type { Block, ChoiceOption, ImageInline, QuestionFigure, QuestionKind, RichParagraph, RichText } from '../../model/types'
+import type { Block, ChoiceOption, ImageInline, Inline, QuestionFigure, QuestionKind, RichParagraph, RichText } from '../../model/types'
 import { htmlPlainText, htmlToRich, parseHtml, type HtmlNode } from './html'
 
 export interface MoanItem {
@@ -208,7 +208,7 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     return true
   })
   const { stem: body, options } = extractOptions(stem)
-  const analysis = rich(item.review_topic, `${where}解析`)
+  const { review, analysis } = splitReview(rich(item.review_topic, `${where}解析`))
   if (analysis.length > 0) analysis[0] = { ...analysis[0]!, inlines: [{ type: 'text', text: '【解析】' }, ...analysis[0]!.inlines] }
   const answer = rich(item.answer, `${where}答案`)
   const stars = Number(item.difficultyLevel_id)
@@ -220,6 +220,8 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     figures,
     answer,
     analysis,
+    ...(review.length > 0 ? { review } : {}),
+    ...(item.isImportant === 1 ? { important: true } : {}),
     ...(Number.isInteger(stars) && stars >= 1 && stars <= 5 ? { stars } : {}),
     ...(variant ? { numberStyle: 'variant' as const } : {}),
     source: {
@@ -233,6 +235,38 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     layout: { studentSpaceLines: Math.max(0, item.blankArea ?? 0), pageBreakBefore: item.paging === 1 }
   })
   return { id: newId(), type: 'question', question: q }
+}
+
+const REVIEW_START = /^\s*审题\s*[:：]\s*/
+const REVIEW_END = /讲解提要|讲解|注意点/
+
+/**
+ * 墨案的解析写作“审题：…／讲解提要：…／注意点：…”。“审题”一段拆出来放进题目的审题（去掉“审题：”），
+ * 其余仍是解析。“审题：…讲解提要：”写在同一段时从“讲解提要”处断开。没有“审题”时原样都是解析。
+ */
+export function splitReview(text: RichText): { review: RichText; analysis: RichText } {
+  const textOf = (p: RichParagraph): string => p.inlines.map((i) => (i.type === 'text' ? i.text : i.type === 'math' ? '$' : '')).join('')
+  const at = text.findIndex((p) => REVIEW_START.test(textOf(p)))
+  if (at === -1 || text.slice(0, at).some((p) => p.inlines.length > 0)) return { review: [], analysis: text }
+  const first = text[at]!
+  const head = first.inlines[0]
+  if (head?.type !== 'text') return { review: [], analysis: text }
+  const stripped: RichParagraph = { ...first, inlines: [{ ...head, text: head.text.replace(REVIEW_START, '') }, ...first.inlines.slice(1)].filter((i) => i.type !== 'text' || i.text !== '') }
+  // 同一段中“讲解提要”之后的部分归还解析
+  let reviewPara = stripped
+  let rest: RichParagraph | null = null
+  const k = stripped.inlines.findIndex((i) => i.type === 'text' && REVIEW_END.test(i.text))
+  if (k !== -1) {
+    const t = stripped.inlines[k] as Extract<Inline, { type: 'text' }>
+    const cut = t.text.search(REVIEW_END)
+    const before = { ...t, text: t.text.slice(0, cut).replace(/\s+$/, '') }
+    const after = { ...t, text: t.text.slice(cut) }
+    reviewPara = { ...stripped, inlines: [...stripped.inlines.slice(0, k), before].filter((i) => i.type !== 'text' || i.text !== '') }
+    rest = { inlines: [after, ...stripped.inlines.slice(k + 1)] }
+  }
+  const analysis = [...(rest !== null ? [rest] : []), ...text.slice(at + 1)]
+  while (analysis.length > 0 && analysis[0]!.inlines.length === 0) analysis.shift()
+  return { review: reviewPara.inlines.length > 0 ? [reviewPara] : [], analysis }
 }
 
 const OPTION_START = /^\s*([A-H])\s*[.．、:：]\s*/

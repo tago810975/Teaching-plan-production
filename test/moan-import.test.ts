@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { collectMoanImageUrls, convertMoanPlan, extractOptions, headingText, splitPlanName, type MoanPlanShow } from '@core/import/moan/convert'
+import { collectMoanImageUrls, convertMoanPlan, extractOptions, headingText, splitPlanName, splitReview, type MoanPlanShow } from '@core/import/moan/convert'
 import { htmlPlainText, htmlToRich, parseColor, splitMath } from '@core/import/moan/html'
 import { readImageInfo } from '@core/import/moan/image-size'
 import { createMoanSession, observeMoanFrame, parseSocketFrame, teachingPlanIdFromUrl } from '@core/import/moan/session'
 import { buildDocument, variantLetters } from '@core/document/build'
-import { createEmptyProject, plainText } from '@core/model/factory'
-import { getPreset } from '@core/presets'
+import { createEmptyProject, createQuestion, para, plainText } from '@core/model/factory'
+import { getPreset, resolveQuestionFields } from '@core/presets'
 import type { Block, QuestionBlock } from '@core/model/types'
 
 const SECTIONS = getPreset('math-v1').sectionNames
@@ -135,7 +135,13 @@ describe('墨案教案 → 教学案', () => {
     expect(first.stars).toBe(5)
     expect(first.layout.studentSpaceLines).toBe(5)
     expect(plainText(first.answer)).toBe('标准答案: $\\pi-\\arctan 2$')
-    expect(plainText(first.analysis).startsWith('【解析】审题: 倾斜角与斜率')).toBe(true)
+    // 审题单独拆出，解析从“讲解提要”开始
+    expect(plainText(first.review ?? [])).toBe('倾斜角与斜率')
+    expect(plainText(first.analysis).startsWith('【解析】讲解提要')).toBe(true)
+    expect(qs.filter((q) => q.review !== undefined)).toHaveLength(34)
+    // 重点题
+    expect(qs.filter((q) => q.important === true)).toHaveLength(11)
+    expect(qs[1]!.important).toBe(true)
     expect(first.source?.moan).toEqual({ itemId: 102417, exerciseId: 249, questionTypeId: 1 })
     // 第 19 题是选择题
     const last = qs[qs.length - 1]!
@@ -160,6 +166,53 @@ describe('墨案教案 → 教学案', () => {
     expect(labels.slice(0, 9)).toEqual(['1.', 'a.', 'b.', '2.', 'a.', 'b.', '3.', 'a.', 'b.'])
     expect(labels.filter((l) => /^\d/.test(l!))).toHaveLength(19)
     expect(labels[labels.length - 1]).toBe('19.')
+  })
+})
+
+describe('拆出审题', () => {
+  it('“审题：”一段放进审题，其余为解析；同一段中的“讲解提要”归还解析', () => {
+    const a = splitReview(htmlToRich('<p><br></p><p>审题：倾斜角与斜率</p><p>讲解提要：</p><p>A1：$k=-2$</p>'))
+    expect(a.review.map((p) => plainText(p))).toEqual(['倾斜角与斜率'])
+    expect(a.analysis.map((p) => plainText(p))).toEqual(['讲解提要：', 'A1：$k=-2$'])
+    const b = splitReview(htmlToRich('<p>审题: 求直线方程讲解提要:</p><p>A1</p>'))
+    expect(b.review.map((p) => plainText(p))).toEqual(['求直线方程'])
+    expect(b.analysis.map((p) => plainText(p))).toEqual(['讲解提要:', 'A1'])
+    const c = splitReview(htmlToRich('<p>讲解提要：</p><p>A1</p>'))
+    expect(c.review).toEqual([])
+    expect(c.analysis).toHaveLength(2)
+  })
+})
+
+describe('题目可选项：审题、重点题', () => {
+  const q = createQuestion({ kind: 'solve', stem: [para('题干')], analysis: [para('【解析】讲解')], review: [para('先求斜率')], important: true })
+  const doc = (presetId: string, layout: Partial<ReturnType<typeof createEmptyProject>['layout']> = {}, variant: 'teacher' | 'student' = 'teacher') => {
+    const p = createEmptyProject()
+    return buildDocument({ ...p, presetId, layout: { ...p.layout, ...layout }, blocks: [{ id: 'q', type: 'question', question: q }] }, variant)
+  }
+  const texts = (ir: ReturnType<typeof buildDocument>): string[] => ir.paragraphs.map((p) => p.runs.map((r) => (r.kind === 'text' ? r.text : '')).join(''))
+
+  it('数学教学案默认打开：审题排在解析之前，教师版题干前有【重点题】', () => {
+    expect(resolveQuestionFields({}, getPreset('math-v1'))).toEqual({ review: true, important: true })
+    const t = texts(doc('math-v1'))
+    expect(t[0]).toBe('【重点题】题干')
+    expect(t.indexOf('【审题】先求斜率')).toBeGreaterThan(0)
+    expect(t.indexOf('【审题】先求斜率')).toBe(t.indexOf('【解析】讲解') - 1)
+    // 学生版两者都不出现
+    const s2 = texts(doc('math-v1', {}, 'student'))
+    expect(s2[0]).toBe('题干')
+    expect(s2.some((x) => x.includes('审题'))).toBe(false)
+  })
+
+  it('其他预设默认关闭（数据保留）；工程的版式设置可以打开', () => {
+    expect(resolveQuestionFields({}, getPreset('physics-v1'))).toEqual({ review: false, important: false })
+    const off = texts(doc('physics-v1'))
+    expect(off[0]).toBe('题干')
+    expect(off.some((x) => x.includes('审题'))).toBe(false)
+    const on = texts(doc('physics-v1', { questionFields: { review: true } }))
+    expect(on[0]).toBe('题干')
+    expect(on.includes('【审题】先求斜率')).toBe(true)
+    // 数学预设也可以关掉其中一项
+    expect(texts(doc('math-v1', { questionFields: { important: false } }))[0]).toBe('题干')
   })
 })
 

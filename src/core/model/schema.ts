@@ -97,6 +97,12 @@ const tableInline: z.ZodType<TableInline> = z.object({
 
 /** 行距倍数：单倍 1，最大 3 */
 const spacingFactor = z.number().min(1).max(3)
+/** 题目可选项（审题、重点题）是否使用；工程与格式预设中都可只写其中几项 */
+export const questionFields = z.object({
+  review: z.boolean().optional(),
+  important: z.boolean().optional()
+})
+
 export const lineSpacing = z.object({
   heading: spacingFactor.optional(),
   question: spacingFactor.optional(),
@@ -138,6 +144,8 @@ const question = z.object({
   keyPoint: z.string().optional(),
   difficultPoint: z.string().optional(),
   analysis: richText,
+  review: richText.optional(),
+  important: z.boolean().optional(),
   numberStyle: z.literal('variant').optional(),
   source: z
     .object({
@@ -237,7 +245,8 @@ export const projectSchema = z.object({
     keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
     optionStops,
     difficultyDisplay: z.enum(['both', 'grade', 'stars', 'none']),
-    lineSpacing: lineSpacing.optional()
+    lineSpacing: lineSpacing.optional(),
+    questionFields: questionFields.optional()
   }),
   templateId: z.string(),
   presetId: z.string(),

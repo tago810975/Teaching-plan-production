@@ -18,6 +18,7 @@ import type {
   OptionColumns,
   Project,
   Question,
+  QuestionFields,
   QuestionFigure,
   RichParagraph,
   RichText,
@@ -28,7 +29,7 @@ import type { DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from './ir'
 import { columnWidths } from '../model/table'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
-import { difficultyOf, getPreset, presetStyles, resolveLineSpacing, starText, type FormatPreset } from '../presets'
+import { difficultyOf, getPreset, presetStyles, resolveLineSpacing, resolveQuestionFields, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
 const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: '(学案)' }
@@ -50,6 +51,7 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   }
   const preset = getPreset(project.presetId)
   const spacing = resolveLineSpacing(project.layout, preset)
+  const fields = resolveQuestionFields(project.layout, preset)
   /** 各类块用哪一项行距 */
   const spacingOf = (type: Block['type']): number =>
     type === 'title' || type === 'section' || type === 'topic' || type === 'worksheet'
@@ -116,13 +118,13 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         const kt = project.layout.keepQuestionTogether[variant]
         out.push(
           ...buildComposite(block, variant, (item) =>
-            buildQuestion(item.id, item.question, nextLabel(item.question), variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay)
+            buildQuestion(item.id, item.question, nextLabel(item.question), variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay, fields)
           )
         )
         break
       }
       case 'question':
-        out.push(...buildQuestion(block.id, block.question, nextLabel(block.question), variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset, project.layout.difficultyDisplay))
+        out.push(...buildQuestion(block.id, block.question, nextLabel(block.question), variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset, project.layout.difficultyDisplay, fields))
         break
     }
   }
@@ -273,6 +275,9 @@ function buildWorksheet(w: WorksheetBlock, preset: FormatPreset): DocParagraph[]
 
 // ---------------- 题目 ----------------
 
+export const REVIEW_LABEL = '【审题】'
+export const IMPORTANT_LABEL = '【重点题】'
+
 /** 变式题字母：1 → a，26 → z，27 → aa */
 export function variantLetters(n: number): string {
   let out = ''
@@ -289,7 +294,9 @@ function buildQuestion(
   keepTogetherByDefault: boolean,
   projectStops: OptionStops = DEFAULT_OPTION_STOPS,
   preset: FormatPreset = getPreset(undefined),
-  difficultyDisplay: DifficultyDisplay = 'both'
+  difficultyDisplay: DifficultyDisplay = 'both',
+  /** 题目可选项（审题、重点题）是否使用 */
+  fields: QuestionFields = { review: false, important: false }
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${blockId}:${suffix}`
@@ -310,6 +317,10 @@ function buildQuestion(
     const showStars = difficultyDisplay === 'both' || difficultyDisplay === 'stars'
     const prefix = (showGrade && d.grade !== undefined ? `【${d.grade}】` : '') + (showStars ? starText(d.stars) : '')
     if (i === 0 && prefix !== '') runs.unshift({ kind: 'text', text: prefix })
+    // 重点题：教师版题干前加【重点题】（与“重点”格式同色、加粗）
+    if (i === 0 && fields.important && q.important === true && variant === 'teacher') {
+      runs.unshift({ kind: 'text', text: IMPORTANT_LABEL, marks: { bold: true, color: preset.keyPoint.marks.color } })
+    }
     // 不编号（题型整理）：题干不显示题号，取消悬挂缩进，各段首行缩进两个字
     const numbered = preset.numberQuestions !== false
     push({
@@ -441,6 +452,14 @@ function buildQuestion(
     }
     if (q.difficultPoint !== undefined && q.difficultPoint !== '') {
       push({ ...fixedLabelPara(key('diff'), 'difficultPoint', q.difficultPoint), editTarget: { field: 'difficultPoint', paragraph: 0 } })
+    }
+    // 审题：排在解析之前，第一段前加【审题】
+    if (fields.review && q.review !== undefined) {
+      q.review.forEach((p, i) => {
+        const runs = toRuns(p, at('review', i))
+        if (i === 0) runs.unshift({ kind: 'text', text: REVIEW_LABEL })
+        push({ key: key(`rev${i}`), style: 'analysis', ...formatProps(p), editTarget: { field: 'review', paragraph: i }, runs })
+      })
     }
     q.analysis.forEach((p, i) => {
       push({ key: key(`ana${i}`), style: 'analysis', ...formatProps(p), editTarget: { field: 'analysis', paragraph: i }, runs: toRuns(p, at('analysis', i)) })

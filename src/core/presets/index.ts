@@ -9,8 +9,8 @@
  */
 import { z } from 'zod'
 import { DEFAULT_PRESET_ID } from '../model/factory'
-import { lineSpacing } from '../model/schema'
-import type { LineSpacing, ProjectLayout } from '../model/types'
+import { lineSpacing, questionFields } from '../model/schema'
+import type { LineSpacing, ProjectLayout, QuestionFields } from '../model/types'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
 import physicsV1 from './physics-v1.json'
 import physicsHandbookV1 from './physics-handbook-v1.json'
@@ -44,6 +44,8 @@ const presetSchema = z.object({
   numberQuestions: z.boolean().optional(),
   /** 默认行距（倍数）；工程的版式设置中可另行设置。不设时为单倍 */
   lineSpacing: lineSpacing.optional(),
+  /** 题目可选项（审题、重点题）默认是否使用；不设的项为不使用。工程的版式设置中可另行打开或关闭 */
+  questionFields: questionFields.optional(),
   header: z.object({
     /** 页眉右侧是否加“(教案)”“(学案)” */
     variantSuffix: z.boolean(),
@@ -197,6 +199,12 @@ export function presetStyles(preset: FormatPreset): Readonly<Record<StyleKey, Pa
 export function resolveLineSpacing(layout: Pick<ProjectLayout, 'lineSpacing'>, preset: FormatPreset): LineSpacing {
   const pick = (k: keyof LineSpacing): number => layout.lineSpacing?.[k] ?? preset.lineSpacing?.[k] ?? 1
   return { heading: pick('heading'), question: pick('question'), knowledge: pick('knowledge'), body: pick('body') }
+}
+
+/** 题目可选项：工程的设置优先，其次格式预设，都没有时不使用 */
+export function resolveQuestionFields(layout: Pick<ProjectLayout, 'questionFields'>, preset: FormatPreset): QuestionFields {
+  const pick = (k: keyof QuestionFields): boolean => layout.questionFields?.[k] ?? preset.questionFields?.[k] ?? false
+  return { review: pick('review'), important: pick('important') }
 }
 
 /** zod 校验问题的中文说明（老师照着改 preset.json） */

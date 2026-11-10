@@ -18,7 +18,7 @@ import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable }
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
 import { AnswerPlacementControl } from './AnswerPlacementControl'
-import { difficultyOf, getPreset, resolveLineSpacing, type FormatPreset } from '@core/presets'
+import { difficultyOf, getPreset, resolveLineSpacing, resolveQuestionFields, type FormatPreset } from '@core/presets'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
 import { copyStops, DEFAULT_OPTION_STOPS } from '@core/model/factory'
@@ -42,7 +42,7 @@ import type {
 } from '@core/model/types'
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
-import type { LineSpacing, PageHeader, ProjectLayout, Variant } from '@core/model/types'
+import type { LineSpacing, PageHeader, ProjectLayout, QuestionFields, Variant } from '@core/model/types'
 
 interface Props {
   block: Block | null
@@ -119,6 +119,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             linkOptionImages={linkOptionImages}
             projectStops={projectLayout?.optionStops ?? DEFAULT_OPTION_STOPS}
             preset={preset}
+            fields={resolveQuestionFields(projectLayout ?? {}, preset)}
           />
         ) : block.type === 'knowledge' ? (
           <KnowledgeForm
@@ -291,6 +292,7 @@ function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispa
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
       </fieldset>
       <LineSpacingFields layout={layout} dispatch={dispatch} preset={preset} />
+      <QuestionFieldsSettings layout={layout} dispatch={dispatch} preset={preset} />
       <fieldset className="group">
         <legend>难度显示</legend>
         <p className="field-hint">题干开头的难度标记。左侧大纲中始终显示等级和星级，方便浏览。</p>
@@ -312,6 +314,36 @@ function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispa
       </fieldset>
       <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
     </>
+  )
+}
+
+/** 题目可选项：审题、重点题是否使用（默认随格式预设；关闭后不显示、不排版，数据保留） */
+function QuestionFieldsSettings({ layout, dispatch, preset }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction>; preset: FormatPreset }) {
+  const effective = resolveQuestionFields(layout, preset)
+  const presetValue = resolveQuestionFields({}, preset)
+  const items: ReadonlyArray<readonly [keyof QuestionFields, string, string]> = [
+    ['review', '审题', '题目中可填写审题，教师版排在解析之前'],
+    ['important', '重点题', '题目可标为重点题，教师版题干前显示【重点题】']
+  ]
+  const set = (key: keyof QuestionFields, value: boolean): void => {
+    const next: Partial<QuestionFields> = { ...layout.questionFields }
+    // 与预设相同时不另存，以后换预设时跟随新预设
+    if (value === presetValue[key]) delete next[key]
+    else next[key] = value
+    const { questionFields: _old, ...rest } = layout
+    dispatch({ type: 'update-layout', layout: Object.keys(next).length > 0 ? { ...rest, questionFields: next } : rest })
+  }
+  return (
+    <fieldset className="group">
+      <legend>题目可选项</legend>
+      <p className="field-hint">所有题型都可以使用的可选内容。默认随格式预设（“{preset.name}”{presetValue.review || presetValue.important ? '已打开' : '未打开'}）；关闭后不显示、不排版，已填写的内容保留。</p>
+      {items.map(([key, label, hint]) => (
+        <label key={key} className="checkbox" title={hint}>
+          <input type="checkbox" checked={effective[key]} onChange={(e) => set(key, e.target.checked)} />
+          {label}
+        </label>
+      ))}
+    </fieldset>
   )
 }
 
@@ -648,7 +680,8 @@ function QuestionForm({
   dispatch,
   linkOptionImages,
   projectStops,
-  preset
+  preset,
+  fields
 }: {
   block: QuestionBlock
   update: (fn: (b: QuestionBlock) => QuestionBlock) => void
@@ -657,6 +690,8 @@ function QuestionForm({
   linkOptionImages: boolean
   projectStops: OptionStops
   preset: FormatPreset
+  /** 题目可选项（审题、重点题）：关闭的不显示，数据保留 */
+  fields: QuestionFields
 }) {
   const q = block.question
   // 选项图片的尺寸变化时，选项输入框需要重新读取内容（它只在挂载时读取一次行内图片）
@@ -680,6 +715,12 @@ function QuestionForm({
         />
         变式题（题号 a. b. c.）
       </label>
+      {fields.important && (
+        <label className="checkbox" title="教师版题干前显示【重点题】">
+          <input type="checkbox" checked={q.important === true} onChange={(e) => set({ important: e.target.checked ? true : undefined })} />
+          重点题
+        </label>
+      )}
       <Field
         label="题干"
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
@@ -846,6 +887,11 @@ function QuestionForm({
         <Field label="难点">
           <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
         </Field>
+        {fields.review && (
+          <Field label="审题" hint="排在解析之前，教师版显示【审题】">
+            <RichTextField fieldId="review" value={q.review ?? []} rows={2} onChange={(review) => set({ review: review.length > 0 ? review : undefined })} />
+          </Field>
+        )}
         <Field label="解析" aside={fontSelect('解析', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
           <RichTextField fieldId="analysis" value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
         </Field>
