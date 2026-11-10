@@ -95,6 +95,15 @@ const tableInline: z.ZodType<TableInline> = z.object({
 })
 
 
+/** 行距倍数：单倍 1，最大 3 */
+const spacingFactor = z.number().min(1).max(3)
+export const lineSpacing = z.object({
+  heading: spacingFactor.optional(),
+  question: spacingFactor.optional(),
+  knowledge: spacingFactor.optional(),
+  body: spacingFactor.optional()
+})
+
 const variant = z.enum(['teacher', 'student'])
 
 const figure = z.object({
@@ -220,7 +229,8 @@ export const projectSchema = z.object({
     keepQuestionTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
     keepKnowledgeTogether: z.object({ teacher: z.boolean(), student: z.boolean() }),
     optionStops,
-    difficultyDisplay: z.enum(['both', 'grade', 'stars', 'none'])
+    difficultyDisplay: z.enum(['both', 'grade', 'stars', 'none']),
+    lineSpacing: lineSpacing.optional()
   }),
   templateId: z.string(),
   presetId: z.string(),

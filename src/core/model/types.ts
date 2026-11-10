@@ -392,9 +392,22 @@ export interface ProjectLayout {
   optionStops: OptionStops
   /** 题干开头的难度显示：等级和星级（【B】★★）、只显示等级、只显示星级、不显示 */
   difficultyDisplay: DifficultyDisplay
+  /** 行距；不设（或其中某项不设）时用格式预设的行距，预设也没有时为单倍 */
+  lineSpacing?: Partial<LineSpacing>
 }
 
 export type DifficultyDisplay = 'both' | 'grade' | 'stars' | 'none'
+
+/**
+ * 行距（倍数，1 = 单倍行距，与 Word 的“多倍行距”一致）：标题（大标题、栏目标题、题型分组）、
+ * 题目（含综合题、答案与解析）、知识点、正文段落。表格中的文字不受影响。
+ */
+export interface LineSpacing {
+  heading: number
+  question: number
+  knowledge: number
+  body: number
+}
 
 export interface Project {
   meta: ProjectMeta

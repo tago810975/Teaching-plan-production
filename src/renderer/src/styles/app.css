@@ -2082,3 +2082,71 @@ body.is-dragging-outline * {
 .outline-drop-line.is-nested {
   left: 30px;
 }
+
+/* 版式设置：行距（标题 / 题目 / 知识点 / 正文段落） */
+.line-spacing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 4px 0;
+}
+.line-spacing-grid label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.line-spacing-grid input {
+  width: 4.5em;
+}
+
+/* 模板管理对话框 */
+.templates-dialog {
+  width: min(760px, 92vw);
+}
+.templates-list {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.templates-list h3 {
+  font-size: 13px;
+  margin: 12px 0 4px;
+}
+.templates-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.templates-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.templates-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.templates-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.templates-problems {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #fff4e5;
+  border-radius: 4px;
+}
+.templates-message {
+  margin: 8px 0 0;
+}
+.templates-message.is-error {
+  color: #b42318;
+}

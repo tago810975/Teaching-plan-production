@@ -6,6 +6,12 @@
   "templateId": "physics-default",
   "kind": "typeSummary",
   "numberQuestions": false,
+  "lineSpacing": {
+    "heading": 1,
+    "question": 1.3,
+    "knowledge": 1.3,
+    "body": 1.3
+  },
   "header": {
     "variantSuffix": false,
     "left": "墨帝教育高中物理"
@@ -44,36 +50,72 @@
   ],
   "worksheet": {
     "titlePrefix": "作业单-",
-    "fields": ["姓名", "教室", "正确率"],
-    "tabStopsTwip": [3980, 7980],
+    "fields": [
+      "姓名",
+      "教室",
+      "正确率"
+    ],
+    "tabStopsTwip": [
+      3980,
+      7980
+    ],
     "blankChars": 8,
     "pageBreakBefore": true
   },
   "textColors": [
-    { "label": "红", "color": "C00000" },
-    { "label": "黑" },
-    { "label": "蓝", "color": "1F4E79" }
+    {
+      "label": "红",
+      "color": "C00000"
+    },
+    {
+      "label": "黑"
+    },
+    {
+      "label": "蓝",
+      "color": "1F4E79"
+    }
   ],
   "keyPoint": {
     "label": "重点",
     "description": "需要学生特别注意的条件或结论：红色加粗下划线",
-    "marks": { "bold": true, "underline": true, "color": "C00000" }
+    "marks": {
+      "bold": true,
+      "underline": true,
+      "color": "C00000"
+    }
   },
   "import": {
-    "renameLabels": { "【详解】": "【解析】" },
+    "renameLabels": {
+      "【详解】": "【解析】"
+    },
     "analysisColor": "black"
   },
   "dictation": {
     "enabled": false,
-    "colors": ["C00000", "FF0000"],
+    "colors": [
+      "C00000",
+      "FF0000"
+    ],
     "bold": true,
     "minChars": 4
   },
   "difficulty": {
     "levels": [
-      { "grade": "A", "stars": 1, "label": "简单" },
-      { "grade": "B", "stars": 2, "label": "中等" },
-      { "grade": "C", "stars": 3, "label": "难" }
+      {
+        "grade": "A",
+        "stars": 1,
+        "label": "简单"
+      },
+      {
+        "grade": "B",
+        "stars": 2,
+        "label": "中等"
+      },
+      {
+        "grade": "C",
+        "stars": 3,
+        "label": "难"
+      }
     ]
   }
 }

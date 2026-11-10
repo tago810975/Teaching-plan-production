@@ -5,6 +5,7 @@
  * 题后留白、防跨页），预览和 Word 导出不得各自另写规则。
  */
 import type {
+  Block,
   OptionStops,
   DifficultyDisplay,
   TableInline,
@@ -27,7 +28,7 @@ import type { DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from './ir'
 import { columnWidths } from '../model/table'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
-import { difficultyOf, getPreset, presetStyles, starText, type FormatPreset } from '../presets'
+import { difficultyOf, getPreset, presetStyles, resolveLineSpacing, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
 
 const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: '(学案)' }
@@ -36,8 +37,29 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
   const out: DocParagraph[] = []
   let questionNo = 0
   const preset = getPreset(project.presetId)
+  const spacing = resolveLineSpacing(project.layout, preset)
+  /** 各类块用哪一项行距 */
+  const spacingOf = (type: Block['type']): number =>
+    type === 'title' || type === 'section' || type === 'topic' || type === 'worksheet'
+      ? spacing.heading
+      : type === 'question' || type === 'composite'
+        ? spacing.question
+        : type === 'knowledge'
+          ? spacing.knowledge
+          : spacing.body
 
   for (const block of project.blocks) {
+    const start = out.length
+    buildBlock(block)
+    // 行距：这一块的段落（作答留白等固定高度的空段落除外）
+    const factor = spacingOf(block.type)
+    if (factor !== 1) {
+      const lineAuto = Math.round(240 * factor)
+      for (let i = start; i < out.length; i++) if (out[i]!.spacerTwip === undefined) out[i]!.lineAuto = lineAuto
+    }
+  }
+
+  function buildBlock(block: Block): void {
     switch (block.type) {
       case 'title':
       case 'section':

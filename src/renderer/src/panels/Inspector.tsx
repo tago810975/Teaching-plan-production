@@ -3,7 +3,7 @@
  *
  * 过渡期用“文字 + $公式$”的文本框编辑；接入 TipTap + MathLive 后替换各个 MarkupField。
  */
-import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
+import { useContext, useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
 import { useFieldFocus } from './fieldFocus'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
@@ -18,7 +18,7 @@ import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable }
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
 import { AnswerPlacementControl } from './AnswerPlacementControl'
-import { difficultyOf, getPreset, type FormatPreset } from '@core/presets'
+import { difficultyOf, getPreset, resolveLineSpacing, type FormatPreset } from '@core/presets'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
 import { copyStops, DEFAULT_OPTION_STOPS } from '@core/model/factory'
@@ -42,7 +42,7 @@ import type {
 } from '@core/model/types'
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
-import type { PageHeader, ProjectLayout, Variant } from '@core/model/types'
+import type { LineSpacing, PageHeader, ProjectLayout, Variant } from '@core/model/types'
 
 interface Props {
   block: Block | null
@@ -290,6 +290,7 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
         {row('keepKnowledgeTogether', 'teacher', '教案', '整块同页')}
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
       </fieldset>
+      <LineSpacingFields layout={layout} dispatch={dispatch} />
       <fieldset className="group">
         <legend>难度显示</legend>
         <p className="field-hint">题干开头的难度标记。左侧大纲中始终显示等级和星级，方便浏览。</p>
@@ -311,6 +312,60 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
       </fieldset>
       <p className="field-hint">单道题、单个知识点可以在各自的“版式”中另行设置。</p>
     </>
+  )
+}
+
+/** 行距：标题、题目、知识点、正文段落分别设置（倍数）；没改过的项显示格式预设的默认值 */
+function LineSpacingFields({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction> }) {
+  const preset = useContext(PresetContext)
+  const effective = resolveLineSpacing(layout, preset)
+  const presetValue = resolveLineSpacing({}, preset)
+  const items: ReadonlyArray<readonly [keyof LineSpacing, string]> = [
+    ['heading', '标题'],
+    ['question', '题目'],
+    ['knowledge', '知识点'],
+    ['body', '正文段落']
+  ]
+  const set = (key: keyof LineSpacing, value: number | undefined): void => {
+    const next: Partial<LineSpacing> = { ...layout.lineSpacing }
+    if (value === undefined) delete next[key]
+    else next[key] = value
+    const { lineSpacing: _l, ...rest } = layout
+    dispatch({ type: 'update-layout', layout: Object.keys(next).length > 0 ? { ...rest, lineSpacing: next } : rest })
+  }
+  const custom = layout.lineSpacing !== undefined && Object.keys(layout.lineSpacing).length > 0
+  return (
+    <fieldset className="group">
+      <legend>行距</legend>
+      <p className="field-hint">
+        倍数，1 为单倍行距（与 Word 的“多倍行距”相同）。“题目”包括综合题、答案与解析；表格中的文字不受影响。
+        默认值来自格式预设“{preset.name}”。
+      </p>
+      <div className="line-spacing-grid">
+        {items.map(([key, label]) => (
+          <label key={key} title={`${label}的行距（倍数）；格式预设的默认值为 ${presetValue[key]}`}>
+            {label}
+            <input
+              type="number"
+              min={1}
+              max={3}
+              step={0.1}
+              value={effective[key]}
+              onChange={(e) => {
+                const n = Math.round(Number(e.target.value) * 100) / 100
+                if (Number.isFinite(n) && n >= 1 && n <= 3) set(key, n === presetValue[key] ? undefined : n)
+              }}
+            />
+            倍
+          </label>
+        ))}
+      </div>
+      {custom && (
+        <button type="button" className="link" onClick={() => dispatch({ type: 'update-layout', layout: (({ lineSpacing: _l, ...rest }) => rest)(layout) })}>
+          恢复为格式预设的行距
+        </button>
+      )}
+    </fieldset>
   )
 }
 

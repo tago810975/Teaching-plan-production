@@ -166,6 +166,7 @@ async function scanDir(dir: string, depth: number): Promise<string[]> {
   const found: string[] = []
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue // 跳过隐藏文件与保存时的临时文件
+    if (depth === 0 && entry.isDirectory() && entry.name === '模板') continue // 用户模板文件夹（user-templates.ts），不是教学案
     const full = join(dir, entry.name)
     if (entry.isFile() && isProjectFilePath(entry.name)) found.push(full)
     else if (entry.isDirectory() && depth < MAX_SCAN_DEPTH) found.push(...(await scanDir(full, depth + 1)))

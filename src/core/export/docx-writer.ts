@@ -145,6 +145,9 @@ class ExportContext {
     if (p.tabStopsTwip !== undefined) pPr += tabsXml(p.style, p.tabStopsTwip)
     if (p.spacerTwip !== undefined) {
       pPr += `<w:spacing w:before="0" w:after="0" w:line="${p.spacerTwip}" w:lineRule="exact"/>`
+    } else if (p.lineAuto !== undefined) {
+      // 版式设置中的行距：只改行距，段前段后随样式
+      pPr += `<w:spacing w:line="${p.lineAuto}" w:lineRule="auto"/>`
     }
     if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined || p.indentLeftTwip !== undefined) {
       const leftTwip = p.indentLeftTwip ?? spec.directIndentTwip

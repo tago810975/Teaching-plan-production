@@ -7,8 +7,18 @@ import 'temml/dist/Temml-Local.css'
 import './styles/app.css'
 import './styles/page.css'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+import { setUserPresets } from '@core/presets'
+
+// 先登记用户模板的预设（主进程启动时已读取“教学案库\模板”），再显示界面：
+// 打开用自制模板做的教学案时才找得到它的预设
+void window.api
+  .listTemplates()
+  .then((catalog) => setUserPresets(catalog.presets))
+  .catch((err: unknown) => console.error('读取用户模板失败', err))
+  .finally(() => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <App />
+      </StrictMode>
+    )
+  })

@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 13
+export const CURRENT_FORMAT_VERSION = 14
 
 /*
  * 版本记录：
@@ -40,6 +40,8 @@ export const CURRENT_FORMAT_VERSION = 13
  * 13 —— 题型整理：表格单元格可在学生版换成书写横线（cell.studentLines）、表格边框颜色（table.borderColor）、
  *        顶端对齐（table.valign）、表头行（table.headerRow）、
  *        正文段落块的浅灰底纹（paragraph.shaded）。无需迁移
+ * 14 —— 行距 project.layout.lineSpacing（标题 / 题目 / 知识点 / 正文段落的倍数，可只设其中几项）。
+ *        不设时用格式预设的行距（预设 lineSpacing），都没有时为单倍，旧工程排版不变。无需迁移
  */
 
 export interface Manifest {

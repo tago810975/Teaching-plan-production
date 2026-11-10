@@ -98,7 +98,8 @@ export const DocParagraphView = memo(function DocParagraphView({
     fontWeight: css.fontWeight,
     color: css.color,
     textAlign: p.align ?? css.textAlign,
-    lineHeight: css.lineHeight,
+    // 版式设置中的行距（与 previewCss 的换算相同：单倍约为字号的 1.3 倍）
+    lineHeight: p.lineAuto !== undefined ? 1.3 * (p.lineAuto / 240) : css.lineHeight,
     paddingTop: css.marginTop,
     paddingBottom: css.marginBottom,
     paddingLeft: p.indentLeftTwip !== undefined ? `${twipToPt(p.indentLeftTwip)}pt` : css.paddingLeft,

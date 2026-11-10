@@ -15,6 +15,7 @@ import type { ProjectBundle } from '@core/model/types'
 import { listDrives, listFolder, listSubfolders, renameEntry } from './files'
 import { buildAppMenu } from './menu'
 import { readTemplateDefaults } from './template-io'
+import { currentCatalog, deleteTemplateFolder, duplicateTemplate, exportTemplate, importTemplate, loadUserTemplates, userTemplateDir } from './user-templates'
 import { importDocxFiles } from './import-io'
 import { existingExportFiles, exportWord } from './export-io'
 import type { ExportRequest } from '@shared/ipc'
@@ -72,8 +73,14 @@ if (!app.requestSingleInstanceLock()) {
     else pendingFile = filePath
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     registerIpc()
+    // 先读取用户模板（“教学案库\模板”），新建、打开教学案时才找得到自制的预设
+    try {
+      await loadUserTemplates()
+    } catch (err) {
+      console.error('读取用户模板失败', err)
+    }
     createWindow()
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -201,6 +208,8 @@ function registerIpc(): void {
     if (dir === null) return { ok: true, value: null }
     try {
       await setLibraryDir(dir)
+      // 用户模板跟着教学案库走
+      await loadUserTemplates()
       return { ok: true, value: dir }
     } catch (err) {
       return { ok: false, error: `无法使用该文件夹：${describeError(err)}` }
@@ -254,6 +263,56 @@ function registerIpc(): void {
       return { ok: true, value: await exportWord(req) }
     } catch (err) {
       return { ok: false, error: `导出失败：${describeError(err)}` }
+    }
+  })
+
+  // ---- 模板 ----
+  ipcMain.handle(IPC.listTemplates, () => currentCatalog())
+  ipcMain.handle(IPC.reloadTemplates, () => loadUserTemplates())
+  ipcMain.handle(IPC.importTemplate, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options = { title: '导入模板', filters: [{ name: '模板压缩包', extensions: ['zip'] }], properties: ['openFile' as const] }
+    const picked = win !== null ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    const zipPath = picked.filePaths[0]
+    if (picked.canceled || zipPath === undefined) return { ok: true, value: null }
+    try {
+      await importTemplate(zipPath)
+      return { ok: true, value: await loadUserTemplates() }
+    } catch (err) {
+      return { ok: false, error: `导入模板失败：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.exportTemplate, async (event, presetId: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const name = currentCatalog().user.find((u) => u.id === presetId)?.name ?? currentCatalog().builtin.find((b) => b.id === presetId)?.name ?? presetId
+    const options = {
+      title: '导出模板',
+      defaultPath: join(app.getPath('desktop'), `模板-${name.replace(/[\\/:*?"<>|]/g, '_')}.zip`),
+      filters: [{ name: '模板压缩包', extensions: ['zip'] }]
+    }
+    const picked = win !== null ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
+    if (picked.canceled || picked.filePath === undefined) return { ok: true, value: null }
+    try {
+      await exportTemplate(presetId, picked.filePath)
+      return { ok: true, value: picked.filePath }
+    } catch (err) {
+      return { ok: false, error: `导出模板失败：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.duplicateTemplate, async (_event, presetId: string) => {
+    try {
+      await duplicateTemplate(presetId)
+      return { ok: true, value: await loadUserTemplates() }
+    } catch (err) {
+      return { ok: false, error: `复制模板失败：${describeError(err)}` }
+    }
+  })
+  ipcMain.handle(IPC.deleteTemplate, async (_event, presetId: string) => {
+    try {
+      await deleteTemplateFolder(userTemplateDir(presetId))
+      return { ok: true, value: await loadUserTemplates() }
+    } catch (err) {
+      return { ok: false, error: `删除模板失败：${describeError(err)}` }
     }
   })
 

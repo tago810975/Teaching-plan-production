@@ -19,6 +19,12 @@ function subscribe<T extends unknown[]>(
 const api: RendererApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
   getTemplateDefaults: (templateId) => ipcRenderer.invoke(IPC.getTemplateDefaults, templateId),
+  listTemplates: () => ipcRenderer.invoke(IPC.listTemplates),
+  reloadTemplates: () => ipcRenderer.invoke(IPC.reloadTemplates),
+  importTemplate: () => ipcRenderer.invoke(IPC.importTemplate),
+  exportTemplate: (presetId) => ipcRenderer.invoke(IPC.exportTemplate, presetId),
+  duplicateTemplate: (presetId) => ipcRenderer.invoke(IPC.duplicateTemplate, presetId),
+  deleteTemplate: (presetId) => ipcRenderer.invoke(IPC.deleteTemplate, presetId),
   openProject: () => ipcRenderer.invoke(IPC.openProject),
   openProjectAt: (filePath) => ipcRenderer.invoke(IPC.openProjectAt, filePath),
   listProjects: () => ipcRenderer.invoke(IPC.listProjects),

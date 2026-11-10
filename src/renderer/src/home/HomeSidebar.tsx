@@ -15,9 +15,11 @@ interface Props {
   onNew: () => void
   onCreateFromDocx: () => void
   onOpenOther: () => void
+  /** 打开模板管理 */
+  onTemplates: () => void
 }
 
-export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateFromDocx, onOpenOther }: Props) {
+export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateFromDocx, onOpenOther, onTemplates }: Props) {
   const current = view.kind === 'folder' ? view.path : null
   // 当前文件夹只在“离它最近”的那个位置下展开、高亮（如桌面在 C 盘里，点桌面时不展开 C 盘）
   const scope =
@@ -38,6 +40,9 @@ export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateF
         </button>
         <button type="button" onClick={onOpenOther}>
           打开…
+        </button>
+        <button type="button" onClick={onTemplates} title="内置模板与自制模板：复制、导入、导出">
+          模板…
         </button>
       </div>
 

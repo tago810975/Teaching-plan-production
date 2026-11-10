@@ -9,6 +9,8 @@
  */
 import { z } from 'zod'
 import { DEFAULT_PRESET_ID } from '../model/factory'
+import { lineSpacing } from '../model/schema'
+import type { LineSpacing, ProjectLayout } from '../model/types'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
 import physicsV1 from './physics-v1.json'
 import physicsHandbookV1 from './physics-handbook-v1.json'
@@ -39,6 +41,8 @@ const presetSchema = z.object({
   kind: z.enum(['lesson', 'handbook', 'typeSummary']),
   /** 题干前是否显示题号（默认显示；题型整理一份只讲一道母题，不编号） */
   numberQuestions: z.boolean().optional(),
+  /** 默认行距（倍数）；工程的版式设置中可另行设置。不设时为单倍 */
+  lineSpacing: lineSpacing.optional(),
   header: z.object({
     /** 页眉右侧是否加“(教案)”“(学案)” */
     variantSuffix: z.boolean(),
@@ -91,14 +95,51 @@ export type FormatPreset = z.infer<typeof presetSchema>
 export type HeadingFormat = FormatPreset['headings']['title']
 export type HeadingKey = keyof FormatPreset['headings']
 
-/** 全部预设，按显示顺序 */
+/** 内置预设（随软件发布，只读），按显示顺序 */
 export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1), presetSchema.parse(physicsTypeSummaryV1)]
 
 export { DEFAULT_PRESET_ID }
 
-/** 按 ID 取预设；找不到（如来自更新版本的工程）时用默认预设 */
+/**
+ * 用户模板中的预设（“文档\教学案\模板”下各文件夹的 preset.json），由主进程读取后在启动时登记。
+ * 主进程与界面各自登记一份（两边是不同的 JS 环境）。
+ */
+let userPresets: readonly FormatPreset[] = []
+
+/** 登记用户模板的预设（整体替换）；与内置预设 ID 相同的忽略 */
+export function setUserPresets(list: readonly FormatPreset[]): void {
+  userPresets = list.filter((p) => !isBuiltinPreset(p.id))
+}
+
+/** 全部预设：内置的在前，其后是用户模板 */
+export function allPresets(): readonly FormatPreset[] {
+  return [...PRESETS, ...userPresets]
+}
+
+export function isBuiltinPreset(id: string): boolean {
+  return PRESETS.some((p) => p.id === id)
+}
+
+/** 按 ID 取预设；找不到（如来自更新版本的工程，或用户模板已删除）时用默认预设 */
 export function getPreset(id: string | undefined): FormatPreset {
-  return PRESETS.find((p) => p.id === id) ?? PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)!
+  return allPresets().find((p) => p.id === id) ?? PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)!
+}
+
+/** 预设 ID 与用户模板的 Word 模板 ID 只能用小写字母、数字和连字符（用作文件夹名、写进工程文件） */
+export const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/
+
+/**
+ * 校验一份预设 JSON（用户模板的 preset.json）。返回预设，或用中文说明的错误
+ * （列出前几处字段问题，便于老师对照修改）。
+ */
+export function parsePreset(json: unknown): { ok: true; preset: FormatPreset } | { ok: false; error: string } {
+  const r = presetSchema.safeParse(json)
+  if (!r.success) {
+    const issues = r.error.issues.slice(0, 5).map((i) => `${i.path.join('.') || '（整个文件）'}：${i.message}`)
+    return { ok: false, error: `preset.json 的内容不正确——${issues.join('；')}` }
+  }
+  if (!PRESET_ID_PATTERN.test(r.data.id)) return { ok: false, error: `preset.json 的 id“${r.data.id}”只能用小写字母、数字和连字符` }
+  return { ok: true, preset: r.data }
 }
 
 /** 星级难度的显示：★ 重复 n 次 */
@@ -149,4 +190,10 @@ export function presetStyles(preset: FormatPreset): Readonly<Record<StyleKey, Pa
     }
   }
   return out
+}
+
+/** 实际使用的行距：工程版式设置中设了的项优先，其次是格式预设，都没有时为单倍 */
+export function resolveLineSpacing(layout: Pick<ProjectLayout, 'lineSpacing'>, preset: FormatPreset): LineSpacing {
+  const pick = (k: keyof LineSpacing): number => layout.lineSpacing?.[k] ?? preset.lineSpacing?.[k] ?? 1
+  return { heading: pick('heading'), question: pick('question'), knowledge: pick('knowledge'), body: pick('body') }
 }

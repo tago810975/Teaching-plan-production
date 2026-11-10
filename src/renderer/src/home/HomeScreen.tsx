@@ -5,10 +5,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FolderListing, LibraryListing, LocalPlace, ProjectListItem } from '@shared/ipc'
 import type { ProjectBundle } from '@core/model/types'
-import { PRESETS } from '@core/presets'
+import { allPresets } from '@core/presets'
 import { ExportDialog, ExportDoneNotice } from '../export/ExportDialog'
 import { FileTable, stem, type FileActions, type FileItem } from './FileTable'
 import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
+import { TemplatesDialog } from './TemplatesDialog'
 import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
@@ -29,6 +30,9 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [exporting, setExporting] = useState<{ bundle: ProjectBundle; path: string } | null>(null)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  /** 模板列表变了：预设下拉框（导入时默认格式预设）重新读取 */
+  const [templatesRevision, setTemplatesRevision] = useState(0)
   const [exported, setExported] = useState<string[] | null>(null)
   const [places, setPlaces] = useState<LocalPlace[]>([])
   useEffect(() => {
@@ -153,6 +157,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
         onNew={onNew}
         onCreateFromDocx={() => onCreateFromDocx()}
         onOpenOther={onOpenOther}
+        onTemplates={() => setTemplatesOpen(true)}
       />
 
       <main className="home-main">
@@ -223,7 +228,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
               </button>
             </p>
           )}
-          <DefaultPresetSetting />
+          <DefaultPresetSetting key={templatesRevision} />
           <button type="button" className="link" onClick={onOpenDemo}>
             打开示例
           </button>
@@ -231,6 +236,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
       </main>
 
       {exported !== null && <ExportDoneNotice files={exported} onDismiss={() => setExported(null)} />}
+      {templatesOpen && <TemplatesDialog onClose={() => setTemplatesOpen(false)} onChanged={() => setTemplatesRevision((n) => n + 1)} />}
       {exporting !== null && (
         <ExportDialog
           bundle={exporting.bundle}
@@ -339,7 +345,7 @@ function DefaultPresetSetting() {
           void window.api.setDefaultPreset(e.target.value)
         }}
       >
-        {PRESETS.map((p) => (
+        {allPresets().map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>
