@@ -79,6 +79,11 @@ export interface FigureRef {
 /** 表格单元格中的一段：文字等内容与对齐 */
 export interface DocCellParagraph {
   runs: DocRun[]
+  /**
+   * 书写横线：一行供学生书写的空白，下方是一条虚线（学生版中替换掉设了 studentLines 的单元格内容）。
+   * Word 中为固定行高的空段落加虚线下边框。
+   */
+  ruleLine?: boolean
   align?: 'center' | 'right'
   /** 整段字体大类（不设则随正文） */
   font?: FontFamily
@@ -89,12 +94,18 @@ export interface DocTableCell {
   colSpan?: number
   rowSpan?: number
   shading?: string
+  /** 学生版换成几行书写横线（build.ts 处理后不再出现在学生版中） */
+  studentLines?: number
 }
 
 export interface DocTable {
   rows: Array<{ cells: DocTableCell[] }>
   /** 各列宽度（twip），总和不超过栏宽 */
   colWidthsTwip: number[]
+  /** 边框颜色，十六进制，不含 #；不设时为黑色 */
+  borderColor?: string
+  /** 单元格垂直对齐；不设时居中 */
+  valign?: 'top'
 }
 
 export interface DocParagraph {
@@ -132,6 +143,10 @@ export interface DocParagraph {
   noWrap?: boolean
   /** 首行缩进（twip），来自段落格式 */
   firstLineIndentTwip?: number
+  /** 左缩进（twip），覆盖样式中的左缩进与悬挂缩进（如不编号的题干） */
+  indentLeftTwip?: number
+  /** 不编号：题目样式的段落不显示题号（Word 中写 numId 0 取消样式自带的编号） */
+  unnumbered?: boolean
   /** 对齐方式，覆盖样式中的对齐 */
   align?: 'center' | 'right'
   /** 整段字体大类，覆盖样式中的字体（文字自身的 marks.font 优先） */

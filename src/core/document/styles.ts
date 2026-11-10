@@ -176,6 +176,16 @@ export const TEMPLATE_OPTION_TAB_STOPS: readonly number[] = [2310, 4200, 6090]
 /** 教师版答案区的底纹颜色，与参考样例一致 */
 export const TEACHER_SHADING = 'F2F2F2'
 
+/** 学生版书写横线：每行的高度（twip，28 磅）与虚线颜色（题型整理“书写过程”栏，取自样张的浅蓝虚线） */
+export const RULE_LINE_TWIP = 560
+export const RULE_LINE_COLOR = '9DB1C5'
+
+/** 彩色边框表格（题型整理对照表）的单元格留白（twip）：上下各 top，左右各 side */
+export const ROOMY_CELL_TWIP = { top: 100, side: 160 } as const
+
+/** 不编号的题干（题型整理）：首行缩进两个字，与样张一致 */
+export const UNNUMBERED_STEM_INDENT_TWIP = 420
+
 /** 正文单倍行高的近似值（twip），用于把“留白行数”换算为间距 */
 export const BODY_LINE_HEIGHT_TWIP = 312
 

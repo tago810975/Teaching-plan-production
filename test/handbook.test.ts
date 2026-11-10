@@ -22,7 +22,7 @@ describe('物理知识点手册 V1.0', async () => {
     p.runs.map((u) => (u.kind === 'text' ? u.text : u.kind === 'blank' ? `[${u.widthChars}]` : u.kind === 'math' ? '〔公式〕' : '')).join('')
 
   it('预设：物理教学案与物理知识点手册', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0'])
+    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0', '物理题型整理 V1.0'])
     expect(getPreset('physics-handbook-v1')).toMatchObject({ kind: 'handbook', sectionNames: [], header: { variantSuffix: false } })
   })
 

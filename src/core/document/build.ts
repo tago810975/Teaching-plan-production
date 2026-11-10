@@ -25,7 +25,7 @@ import type {
 import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from './ir'
 import { columnWidths } from '../model/table'
-import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, type StyleKey } from './styles'
+import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
 import { difficultyOf, getPreset, presetStyles, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
@@ -62,6 +62,8 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
             sourceBlockId: block.id,
             style: 'body',
             ...formatProps(p),
+            // 整块底纹（题型整理的审题注释框）
+            ...(block.shaded === true ? { shaded: true } : {}),
             editTarget: { field: 'content', paragraph: i },
             runs: toRuns(p, { blockId: block.id, path: ['content', i] })
           })
@@ -95,10 +97,50 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
     page: A4_PAGE,
     header: { ...header, right: header.right === '' || !preset.header.variantSuffix ? header.right : header.right + VARIANT_SUFFIX[variant] },
     bodyTopTwip: bodyTopTwip(header, A4_PAGE),
+    // 学生版：设了“书写横线”的表格单元格换成横线（题型整理的书写栏）；
     // 知识点手册的学生版：红色加粗的重点挖空成横线，用于默写
-    paragraphs: variant === 'student' && preset.dictation.enabled ? out.map((p) => blankKeyPoints(p, preset.dictation)) : out,
+    paragraphs:
+      variant === 'student'
+        ? out.map((p) => {
+            const lined = applyStudentLines(p)
+            return preset.dictation.enabled ? blankKeyPoints(lined, preset.dictation) : lined
+          })
+        : out,
     styles: presetStyles(preset)
   }
+}
+
+// ---------------- 学生版书写横线 ----------------
+
+/**
+ * 学生版：表格中设了 studentLines 的单元格，内容换成同样行数的书写横线（教师版照常显示内容）。
+ * 用于题型整理“思维过程 / 书写过程”对照表：教师版右栏是书写示范，学生版是空白的虚线格。
+ */
+export function applyStudentLines(p: DocParagraph): DocParagraph {
+  const lined = (runs: DocRun[]): boolean =>
+    runs.some((r) => r.kind === 'table' && r.table.rows.some((row) => row.cells.some((c) => (c.studentLines ?? 0) > 0 || c.paragraphs.some((cp) => lined(cp.runs)))))
+  if (!lined(p.runs)) return p
+  const mapRuns = (runs: DocRun[]): DocRun[] =>
+    runs.map((r) =>
+      r.kind !== 'table'
+        ? r
+        : {
+            ...r,
+            table: {
+              ...r.table,
+              rows: r.table.rows.map((row) => ({
+                cells: row.cells.map((c) => {
+                  const { studentLines, ...rest } = c
+                  if (studentLines !== undefined && studentLines > 0) {
+                    return { ...rest, paragraphs: Array.from({ length: studentLines }, () => ({ runs: [], ruleLine: true })) }
+                  }
+                  return { ...rest, paragraphs: c.paragraphs.map((cp) => ({ ...cp, runs: mapRuns(cp.runs) })) }
+                })
+              }))
+            }
+          }
+    )
+  return { ...p, runs: mapRuns(p.runs) }
 }
 
 // ---------------- 默写挖空 ----------------
@@ -224,12 +266,15 @@ function buildQuestion(
     const showStars = difficultyDisplay === 'both' || difficultyDisplay === 'stars'
     const prefix = (showGrade && d.grade !== undefined ? `【${d.grade}】` : '') + (showStars ? starText(d.stars) : '')
     if (i === 0 && prefix !== '') runs.unshift({ kind: 'text', text: prefix })
+    // 不编号（题型整理）：题干不显示题号，取消悬挂缩进，各段首行缩进两个字
+    const numbered = preset.numberQuestions !== false
     push({
       key: key(`stem${i}`),
       anchorIndex: i,
       editTarget: { field: 'stem', paragraph: i },
       style: i === 0 ? 'question' : 'questionContinued',
-      ...(i === 0 ? { label: `${no}.` } : {}),
+      ...(i === 0 && numbered ? { label: `${no}.` } : {}),
+      ...(numbered ? {} : { ...(i === 0 ? { unnumbered: true } : {}), indentLeftTwip: 0, firstLineIndentTwip: UNNUMBERED_STEM_INDENT_TWIP }),
       ...fontProp(p),
       runs
     })
@@ -639,9 +684,12 @@ function toDocTable(t: TableInline, base?: RefBase): DocTable {
         })),
         ...(c.colSpan !== undefined && c.colSpan > 1 ? { colSpan: c.colSpan } : {}),
         ...(c.rowSpan !== undefined && c.rowSpan > 1 ? { rowSpan: c.rowSpan } : {}),
-        ...(c.shading !== undefined ? { shading: c.shading } : {})
+        ...(c.shading !== undefined ? { shading: c.shading } : {}),
+        ...(c.studentLines !== undefined && c.studentLines > 0 ? { studentLines: c.studentLines } : {})
       }))
-    }))
+    })),
+    ...(t.borderColor !== undefined ? { borderColor: t.borderColor.toUpperCase() } : {}),
+    ...(t.valign !== undefined ? { valign: t.valign } : {})
   }
 }
 

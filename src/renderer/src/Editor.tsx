@@ -239,7 +239,7 @@ function EditorBody({
 
   /** 插入位置：选中内容之后；未选中或选中页眉时放在末尾 */
   const insertAfter = selectedBlock?.id ?? null
-  const addBlock = (block: Block): void => dispatch({ type: 'insert-blocks', blocks: [block], afterBlockId: insertAfter })
+  const addBlock = (block: Block | Block[]): void => dispatch({ type: 'insert-blocks', blocks: Array.isArray(block) ? block : [block], afterBlockId: insertAfter })
   const importWord = async (): Promise<void> => {
     // 按本工程的格式预设整理导入的内容
     const result = await window.api.importDocx(project.presetId)

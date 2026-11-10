@@ -245,6 +245,42 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
           {totalCm > cm(CONTENT_TWIP) + 0.01 ? '（超出版心，导出时按比例缩小）' : ''}
         </span>
       </div>
+      <div className="table-editor-widths" role="group" aria-label="学生版书写横线">
+        <label title="学生版中，这个单元格的内容换成若干行虚线，供学生书写；教师版照常显示内容。0 表示两版相同">
+          当前单元格在学生版换成书写横线
+          <input
+            type="number"
+            min={0}
+            max={60}
+            value={focused?.cell.studentLines ?? 0}
+            disabled={focused === undefined}
+            onChange={(e) => {
+              const n = Math.round(Number(e.target.value))
+              if (focused === undefined || !Number.isFinite(n) || n < 0) return
+              const { row, index } = { row: focus.row, index: focus.index }
+              reshape(
+                (t) => ({
+                  ...t,
+                  rows: t.rows.map((r, i) =>
+                    i !== row
+                      ? r
+                      : {
+                          cells: r.cells.map((c, j) => {
+                            if (j !== index) return c
+                            const { studentLines: _l, ...rest } = c
+                            return n > 0 ? { ...rest, studentLines: Math.min(60, n) } : rest
+                          })
+                        }
+                  )
+                }),
+                { row, index },
+                `lines:${row}:${index}`
+              )
+            }}
+          />
+          行
+        </label>
+      </div>
       <p className="field-hint">
         按住 Shift 点另一个单元格可选中一片范围（用于合并）。
       </p>

@@ -1,0 +1,183 @@
+%% 母题01 · 放缩圆（速度方向一定、大小不同）—— 选修二 / 磁场 磁场力 / 带电粒子圆周运动
+%% 内容来源：..\题目内容\母题01.md（原始素材放缩圆.docx）
+%% 编译：本目录 build.ps1（学生版 + 教师版），产物进 ..\build\
+\providecommand{\modimode}{student}
+\documentclass[\modimode]{modi-handout}
+
+\modisetup{
+  unit    = {选修二\quad 磁场 磁场力\quad 带电粒子圆周运动},
+  phone   = {134-8210-2204},
+  subject = {墨帝教育高中物理},
+  logo    = {assets/logo.png}}
+
+\begin{document}
+
+%%====================================================================
+%% 第 1 页：题干与选项
+%%====================================================================
+\moditypetitle{放缩圆法：速度方向一定，大小不同}
+
+\modisectionhead{例题}
+
+\begin{modistem}
+（多选）如图，垂直于纸面向里的匀强磁场分布在正方形 $abcd$ 区域内，$O$ 点是 $cd$ 边的中点\modinote{1}。一个带正电的粒子\textbf{仅}在磁场力的作用下，从 $O$ 点沿纸面以垂直于 $cd$ 边的速度射入正方形内\modinote{2}，经过时间 $t_0$ 刚好从 $c$ 点射出磁场\modinote{3}。现设法使该带电粒子从 $O$ 点沿纸面以与 $Od$ 成 $30^\circ$ 角的方向、以大小不同的速率射入正方形内\modinote{4}，粒子重力不计。下列说法中正确的是（\quad）
+\end{modistem}
+
+\modifigure[0.62]{assets/figure-square.png}
+
+\modioption{A}{若该带电粒子从 $ab$ 边射出，它经历的时间可能为 $t_0$}
+\modioption{B}{若该带电粒子从 $bc$ 边射出，它经历的时间可能为 $5t_0/4$}
+\modioption{C}{若该带电粒子从 $cd$ 边射出，它经历的时间为 $5t_0/3$}
+\modioption{D}{若该带电粒子从 $ad$ 边射出，它经历的时间可能为 $2t_0/3$}
+
+\newpage
+\vspace*{-23.5pt}
+
+%%====================================================================
+%% 第 2 页：审题 + 对照表（第一块：定周期、找圆心线）
+%%====================================================================
+\modisectionhead{审题：逐字细读题干，圈画特殊条件，“文字描述”转化物理条件}
+
+\begin{modinotes}
+  \noteline{1} 正方形四条边、$O$ 在 $cd$ 中点：$O$ 到 $c$、$O$ 到 $d$ 都是半条边，题里所有几何量都从这条半边长出来。
+  \noteline{2} “仅在磁场力作用下”：重力不计，只受洛伦兹力，做匀速圆周运动；洛伦兹力总垂直于速度，\textbf{圆心在过 $O$ 且垂直于初速度方向的直线上}。
+  \noteline{3} “经过 $t_0$ 刚好从 $c$ 射出”：弦 $Oc$ 与直径的关系给出半径，$t_0$ 与周期的比例给出 $T$，周期由此变成已知量。
+  \noteline{4} “同一点、同一方向、大小不同”：这是\textbf{放缩圆}——圆心共线，轨迹圆随速率放大或缩小；$T$ 不随速率变，剩下的就只是圆心角的比较。
+\end{modinotes}
+
+\noindent\hspace*{1.42em}审题总结：本题将包含
+\begin{modisummary}
+  \modisumitem{1}{\bfseries「认题型」}：入射点固定、初速度方向固定、只改变速率，圆心落在同一条直线上，圆以入射点为中心放大或缩小。
+  \modisumitem{2}{\bfseries「定不变量」}：同一粒子、同一磁场，$T=2\pi m/qB$ 与速率无关；又 $t=\theta T/360^\circ$，\textbf{比时间就是比圆心角}（圆心角等于速度偏向角）。
+  \modisumitem{3}{\bfseries「用原情景定 $T$」}：垂直 $cd$ 射入、从 $c$ 射出，弦与直径重合，由此得 $r$ 与 $T$。
+  \modisumitem{4}{\bfseries「按边求临界」}：逐条边列出“从该边射出”的圆心角区间，端点由\textbf{相切}或\textbf{过顶点}给出，再把选项的时间换成角度对区间。
+\end{modisummary}
+
+\vspace*{12pt}
+\modisectionhead{解题：明确问题问什么，根据题型选择合适方法，逐项判断不遗漏，避开埋坑和陷阱}
+\par\vspace*{1pt}
+
+\begin{modicmp}{}
+  思维过程 & 书写过程 \\
+  \cmpline{1} 垂直 $cd$ 射入、从 $c$ 射出这条轨迹，弦 $Oc$ 与直径是什么关系？半径怎么求？\par
+  \cmpline{2} 速率变了，半径跟着变，圆心受什么约束？圆心落在哪条直线上？\par
+  \cmpline{3} 速度与 $Od$ 成 $30^\circ$，垂直于速度的方向与 $Od$ 成多少度？\par
+  \cmpline{4} 粒子带正电、磁场向里，轨迹往哪边偏？圆心在速度的哪一侧？\par
+  \cmpline{5} 周期已定，时间与圆心角怎么换算？判时间是否就等价于判圆心角？%
+  &
+  \cmpwrite[8]{%
+    \textbf{设边长 $L$，用原情景定 $T$}\par
+    垂直 $cd$ 射入、从 $c$ 射出：轨迹为半圆，弦 $Oc=L/2$ 即直径，$2r=L/2$，$r=L/4$；又 $t_0=T/2$，得 \textbf{$T=2t_0$}。\par
+    \textbf{圆心线（放缩圆）}：$r=mv/qB$ 随 $v$ 变，圆心都在过 $O$、垂直初速度方向的直线上。\par
+    \textbf{时间换角度}：$t=\theta T/360^\circ=(\theta/180^\circ)t_0$；与 $Od$ 成 $30^\circ$ 射入 $\Rightarrow$ 速度与 $cd$ 边成 $60^\circ$、圆心线与 $Od$ 成 $120^\circ$。%
+  }\\
+\end{modicmp}
+
+\newpage
+\vspace*{-22pt}
+
+%%====================================================================
+%% 第 3 页：对照表（第二块：四条边的圆心角；第三块：选项判定）
+%%====================================================================
+\begin{modicmp}{}
+  思维过程 & 书写过程 \\
+  \cmpline{1} 从 $cd$ 边射出：轨迹要在正方形内走完再回到 $cd$ 边，半径再大一点会先撞上哪条边？\par
+  \cmpline{2} 从 $bc$ 边射出：哪条轨迹恰好擦过 $bc$ 边？此时圆心角取到极大还是极小？\par
+  \cmpline{3} 从 $ab$ 边射出：偏向角最多能转到多少度？极限位置在哪个顶点？\par
+  \cmpline{4} 从 $ad$ 边射出：与 $ad$ 相切的轨迹，半径和边长满足什么关系？%
+  &
+  \cmpwrite[8]{%
+    \textbf{四条边对应的圆心角（度）}\par
+    $cd$：$\theta=300^\circ$ 为\textbf{定值}，条件是 $r\le L/3$（轨迹不能先碰到 $bc$）。\par
+    $bc$：$176^\circ<\theta\le240^\circ$；$\theta=240^\circ$ 时轨迹\textbf{与 $bc$ 边相切}（$r=L/3$），$r$ 增大到约 $0.54L$ 时 $\theta\rightarrow176^\circ$。\par
+    $ab$：$72^\circ<\theta\le150^\circ$；最大偏向角 $60^\circ+90^\circ=150^\circ=5\pi/6$。\par
+    $ad$：$0<\theta\le60^\circ$；$\theta=60^\circ$ 时轨迹\textbf{与 $ad$ 边相切}（$r=L$）。\par
+    规律：四个 $\theta$ 区间互不重叠；$r$ 由小到大，射出边依次为 $cd\rightarrow bc\rightarrow ab\rightarrow ad$。%
+  }\\
+\end{modicmp}
+
+\vspace*{16pt}
+
+\begin{modicmpcont}{}
+  \cmpline{1} A：$t_0$ 对应多少度？$ab$ 边射出的最大圆心角是多少度？两者谁大？\par
+  \cmpline{2} B：$5t_0/4$ 对应多少度？落在 $bc$ 的区间内吗？\par
+  \cmpline{3} C：$cd$ 射出时圆心角随速率变不变？“一定为”要求什么？\par
+  \cmpline{4} D：$2t_0/3$ 对应多少度？$ad$ 边的圆心角上限是多少？%
+  &
+  \cmpwrite[8]{%
+    A：$t_0=T/2\Rightarrow\theta=180^\circ$，而 $ab$ 边 $\theta\le150^\circ<180^\circ$，\textbf{A 错}。\par
+    B：$5t_0/4=5T/8\Rightarrow\theta=225^\circ$，落在 $bc$ 的 $(176^\circ,240^\circ]$ 内，故\textbf{可能从 $bc$ 射出}，\textbf{B 对}。\par
+    C：从 $cd$ 射出时 $r\le L/3$，$\theta$ 恒为 $300^\circ=5\times360^\circ/6$，故 $t=5T/6=5t_0/3$，与速率无关，\textbf{C 对}。\par
+    D：$2t_0/3=T/3\Rightarrow\theta=120^\circ$，而 $ad$ 边 $\theta\le60^\circ$，\textbf{D 错}。\par
+    故选 \textbf{BC}。\par
+    校验：从 $cd$ 射出时偏向角 $300^\circ$，出射方向与边界夹角 $30^\circ$，与解析一致。%
+  }\\
+\end{modicmpcont}
+
+\vspace*{10pt}
+\begin{modistem}
+\textbf{易错提醒}：
+
+\par ① “与 $Od$ 成 $30^\circ$”说的是速度方向。圆心线与 $Od$ 差 $90^\circ$，不能把 $30^\circ$ 当成圆心线的角度。
+
+\par ② “时间为”要求圆心角是定值，“可能为”只要求落在区间内。
+
+\par ③ 用 $t=s/v$ 算不出结果：弧长 $s=r\theta$ 与速率成正比，比值不变，时间只由圆心角决定。
+
+\par ④ 区间的端点容易漏：与边相切的 $bc$、$ad$，偏向角取极值的 $ab$；少算一处，“可能”会被误判成“不可能”。
+\end{modistem}
+
+\newpage
+\vspace*{-22pt}
+
+%%====================================================================
+%% 第 4 页：题后归纳
+%%====================================================================
+\modisectionhead{题后归纳}
+
+\begin{modistem}
+\textbf{放缩圆三步法}：
+
+\par 第一步\ \textbf{认题型}：同一入射点、同一初速度方向、速率不同，圆心共线，按“放大缩小”作图找临界。
+
+\par 第二步\ \textbf{定不变量}：$T=2\pi m/qB$ 与速率无关，$t=\theta T/360^\circ$，比时间就是比速度偏向角；$T$ 另由已知情景定出。
+
+\par 第三步\ \textbf{逐边求临界}：每条边找两条临界轨迹（与边相切、过顶点或偏向角取极值），列出该边的 $\theta$ 区间，再把选项的时间换成角度。
+\end{modistem}
+
+\begin{modistem}
+\textbf{圆心为什么共线}：洛伦兹力垂直于速度，圆心必在过入射点、垂直初速度方向的直线上；$r=mv/qB$ 随 $v$ 增大，圆心沿这条直线外移，圆以入射点为中心放大。这条直线就是图中的 $PP'$。
+\end{modistem}
+
+\modifigure[0.46]{assets/figure-scale.png}
+
+\begin{modistem}
+\textbf{四条边的圆心角与时间对照}（$T=2t_0$）：
+\end{modistem}
+
+\noindent{\small
+\begin{tblr}{
+    width = \linewidth,
+    colspec = {X[0.75,l]X[1.15,l]X[1.0,l]X[1.35,l]},
+    hline{1,Z} = {0.6pt,modiblue},
+    hline{2} = {0.6pt,modiblue},
+    vline{1,Z} = {0.4pt,modiblue!45},
+    vline{2,3} = {0.4pt,modiblue!45},
+    row{1} = {font=\heiti, bg=modipaleblue},
+    rowsep = 3pt,
+  }
+  射出的边 & 圆心角 $\theta$ & 时间 $t$ & 临界轨迹 \\
+  $cd$ & $300^\circ$（定值） & $5t_0/3$ & 轨迹整体在正方形内，$r\le L/3$ \\
+  $bc$ & $176^\circ\sim240^\circ$ & $0.98t_0\sim1.33t_0$ & 与 $bc$ 相切时 $\theta$ 最大 \\
+  $ab$ & $72^\circ\sim150^\circ$ & $0.40t_0\sim0.83t_0$ & 偏向角上限 $5\pi/6$ \\
+  $ad$ & $0^\circ\sim60^\circ$ & $0\sim t_0/3$ & 与 $ad$ 相切时 $\theta$ 最大 \\
+\end{tblr}}
+
+\vspace*{8pt}
+\begin{modistem}
+\textbf{拓展思考}：把入射方向改成“与 $Od$ 成 $60^\circ$”，原情景给出的 $T=2t_0$ 还成立吗？C 项“从 $cd$ 边射出用时 $5t_0/3$”还成立吗？
+
+\par （提示：$T$ 只由 $q$、$B$、$m$ 决定，与初速度方向无关；但四条边的圆心角区间全部要重算，$5t_0/3$ 不再是 $cd$ 射出的时间。）
+\end{modistem}
+
+\end{document}

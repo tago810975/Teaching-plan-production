@@ -310,6 +310,17 @@
 .doc-table-para {
   text-indent: 0;
 }
+/* 彩色边框的表格（题型整理对照表）：边框颜色由 --table-border 给出，单元格留白与导出一致
+   （core/document/styles.ts 的 ROOMY_CELL_TWIP：上下 100、左右 160 twip，即 5pt / 8pt） */
+.doc-table--roomy td {
+  border: 0.75pt solid var(--table-border, #000);
+  padding: 5pt 8pt;
+}
+/* 学生版书写横线：固定行高的空行，下方虚线（RULE_LINE_TWIP / RULE_LINE_COLOR） */
+.doc-table-rule {
+  border-bottom: 0.75pt dotted;
+  box-sizing: border-box;
+}
 .doc-table .run-image {
   /* 图片比单元格宽时按比例缩小 */
   max-width: 100% !important;

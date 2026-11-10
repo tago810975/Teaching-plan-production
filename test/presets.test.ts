@@ -21,7 +21,7 @@ function styleEl(xml: string, name: string): string {
 
 describe('格式预设', () => {
   it('物理教学案 V1.0：可读取，找不到的 ID 回到默认预设', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0'])
+    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0', '物理题型整理 V1.0'])
     expect(getPreset('不存在').id).toBe('physics-v1')
     expect(createEmptyProject().presetId).toBe('physics-v1')
   })

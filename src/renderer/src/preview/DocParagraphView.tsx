@@ -4,7 +4,7 @@
 import { useContext, memo, type CSSProperties, type ReactNode, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { DocParagraph, DocRun, DocTable, InlineRef, OptionImageRef } from '@core/document/ir'
 import { TableResizeContext } from './table-resize'
-import { previewCss } from '@core/document/styles'
+import { previewCss, RULE_LINE_COLOR, RULE_LINE_TWIP } from '@core/document/styles'
 import { StylesContext } from './styles-context'
 import { A4_PAGE, contentWidthTwip, emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
@@ -101,8 +101,8 @@ export const DocParagraphView = memo(function DocParagraphView({
     lineHeight: css.lineHeight,
     paddingTop: css.marginTop,
     paddingBottom: css.marginBottom,
-    paddingLeft: css.paddingLeft,
-    textIndent: p.firstLineIndentTwip !== undefined ? `${twipToPt(p.firstLineIndentTwip)}pt` : css.textIndent
+    paddingLeft: p.indentLeftTwip !== undefined ? `${twipToPt(p.indentLeftTwip)}pt` : css.paddingLeft,
+    textIndent: p.firstLineIndentTwip !== undefined ? `${twipToPt(p.firstLineIndentTwip)}pt` : p.indentLeftTwip !== undefined ? '0pt' : css.textIndent
   }
 
   if (p.spacerTwip !== undefined) {
@@ -117,7 +117,7 @@ export const DocParagraphView = memo(function DocParagraphView({
     )
   }
 
-  const hasHanging = spec.hangingTwip > 0
+  const hasHanging = spec.hangingTwip > 0 && p.indentLeftTwip === undefined
   const label =
     p.label === undefined ? null : (
       <span
@@ -428,7 +428,13 @@ function TableView({
             />
           )
         })}
-      <table className="doc-table" style={{ width: `${twipToPt(total)}pt` }}>
+      <table
+        className={table.borderColor !== undefined ? 'doc-table doc-table--roomy' : 'doc-table'}
+        style={{
+          width: `${twipToPt(total)}pt`,
+          ...(table.borderColor !== undefined ? ({ '--table-border': `#${table.borderColor}` } as CSSProperties) : {})
+        }}
+      >
         <colgroup>
           {widths.map((w, i) => (
             <col key={i} style={{ width: `${twipToPt(w)}pt` }} />
@@ -442,9 +448,15 @@ function TableView({
                   key={j}
                   {...(c.colSpan !== undefined ? { colSpan: c.colSpan } : {})}
                   {...(c.rowSpan !== undefined ? { rowSpan: c.rowSpan } : {})}
-                  style={c.shading !== undefined ? { background: `#${c.shading}` } : undefined}
+                  style={{
+                    ...(c.shading !== undefined ? { background: `#${c.shading}` } : {}),
+                    ...(table.valign !== undefined ? { verticalAlign: table.valign } : {})
+                  }}
                 >
-                  {c.paragraphs.map((cp, k) => (
+                  {c.paragraphs.map((cp, k) =>
+                    cp.ruleLine === true ? (
+                      <div key={k} className="doc-table-rule" style={{ height: `${twipToPt(RULE_LINE_TWIP)}pt`, borderBottomColor: `#${RULE_LINE_COLOR}` }} />
+                    ) : (
                     <div
                       key={k}
                       className={cp.font !== undefined ? `doc-table-para font-${cp.font}` : 'doc-table-para'}
@@ -452,7 +464,8 @@ function TableView({
                     >
                       {cp.runs.length > 0 ? renderRuns(cp.runs, assetUrls, onEditMath) : '\u00a0'}
                     </div>
-                  ))}
+                    )
+                  )}
                 </td>
               ))}
             </tr>

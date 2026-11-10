@@ -2,3 +2,8 @@
 *.docx binary
 *.tplan binary
 *.png binary
+*.pdf binary
+*.tex text eol=crlf
+*.cls text eol=crlf
+*.sty text eol=crlf
+*.ps1 text eol=crlf

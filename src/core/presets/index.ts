@@ -12,6 +12,7 @@ import { DEFAULT_PRESET_ID } from '../model/factory'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
 import physicsV1 from './physics-v1.json'
 import physicsHandbookV1 from './physics-handbook-v1.json'
+import physicsTypeSummaryV1 from './physics-typesummary-v1.json'
 
 const heading = z.object({
   font: z.enum(['song', 'hei', 'kai', 'fang']),
@@ -31,9 +32,13 @@ const presetSchema = z.object({
   templateId: z.string(),
   /**
    * 文档类型。lesson：教学案（知识梳理、例题、练习……，识别题目）；
-   * handbook：知识点手册（只有大标题与知识点，导入时不识别题目）
+   * handbook：知识点手册（只有大标题与知识点，导入时不识别题目）；
+   * typeSummary：题型整理（一道母题配“审题 / 解题 / 题后归纳”，导入时按教学案识别题目，
+   * “添加”菜单有题型整理的预制模块：审题注释框、思维过程 / 书写过程对照表、整份骨架）
    */
-  kind: z.enum(['lesson', 'handbook']),
+  kind: z.enum(['lesson', 'handbook', 'typeSummary']),
+  /** 题干前是否显示题号（默认显示；题型整理一份只讲一道母题，不编号） */
+  numberQuestions: z.boolean().optional(),
   header: z.object({
     /** 页眉右侧是否加“(教案)”“(学案)” */
     variantSuffix: z.boolean(),
@@ -87,7 +92,7 @@ export type HeadingFormat = FormatPreset['headings']['title']
 export type HeadingKey = keyof FormatPreset['headings']
 
 /** 全部预设，按显示顺序 */
-export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1)]
+export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1), presetSchema.parse(physicsTypeSummaryV1)]
 
 export { DEFAULT_PRESET_ID }
 

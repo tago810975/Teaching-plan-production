@@ -81,6 +81,11 @@ export interface TableCell {
   rowSpan?: number
   /** 底纹颜色，十六进制，不含 # */
   shading?: string
+  /**
+   * 学生版中把这个单元格的内容换成若干行书写横线（虚线），供学生自己写；教师版照常显示内容。
+   * 用于题型整理“思维过程 / 书写过程”对照表的书写栏。不设或为 0 时两版相同。
+   */
+  studentLines?: number
 }
 
 export interface TableRow {
@@ -96,6 +101,10 @@ export interface TableInline {
   rows: TableRow[]
   /** 各列宽度（twip）；不设时平分栏宽 */
   colWidthsTwip?: number[]
+  /** 边框颜色，十六进制，不含 #；不设时为黑色细线 */
+  borderColor?: string
+  /** 单元格内容的垂直对齐；不设时居中（对照表这类长短不一的栏用 top 顶端对齐） */
+  valign?: 'top'
 }
 
 export type Inline = TextInline | MathInline | ImageInline | BlankInline | TableInline
@@ -271,6 +280,8 @@ export interface ParagraphBlock {
   content: RichText
   /** 仅在某一版本中出现；不填则两版都有 */
   onlyIn?: Variant
+  /** 整块加浅灰底纹（如题型整理的“审题”注释框） */
+  shaded?: boolean
 }
 
 export interface QuestionBlock {

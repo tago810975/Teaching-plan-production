@@ -79,12 +79,18 @@ const tableInline: z.ZodType<TableInline> = z.object({
           shading: z
             .string()
             .regex(/^[0-9A-Fa-f]{6}$/)
-            .optional()
+            .optional(),
+          studentLines: z.number().int().min(0).max(60).optional()
         })
       )
     })
   ),
-  colWidthsTwip: z.array(z.number().positive()).optional()
+  colWidthsTwip: z.array(z.number().positive()).optional(),
+  borderColor: z
+    .string()
+    .regex(/^[0-9A-Fa-f]{6}$/)
+    .optional(),
+  valign: z.literal('top').optional()
 })
 
 
@@ -164,7 +170,8 @@ const block = z.discriminatedUnion('type', [
     id: z.string(),
     type: z.literal('paragraph'),
     content: richText,
-    onlyIn: variant.optional()
+    onlyIn: variant.optional(),
+    shaded: z.boolean().optional()
   }),
   questionBlock,
   z.object({

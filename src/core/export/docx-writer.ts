@@ -12,7 +12,7 @@ import JSZip from 'jszip'
 import type { DocCellParagraph, DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from '../document/ir'
 import { layoutTable } from '../model/table'
 import { A4_PAGE, contentWidthTwip } from '../document/units'
-import { STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
+import { ROOMY_CELL_TWIP, RULE_LINE_COLOR, RULE_LINE_TWIP, STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
 import { applyHeadingStyles } from './heading-styles'
 import { applyMathMarks } from './math-marks'
@@ -138,15 +138,17 @@ class ExportContext {
     if (p.keepNext === true) pPr += '<w:keepNext/>'
     if (p.keepLines === true) pPr += '<w:keepLines/>'
     if (p.pageBreakBefore === true) pPr += '<w:pageBreakBefore/>'
-    const numPr = this.numPrFor(p.style)
+    // 不编号的题干：numId 0 取消“题目”样式自带的编号
+    const numPr = p.unnumbered === true ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr>' : this.numPrFor(p.style)
     if (numPr !== '') pPr += numPr
     if (p.shaded === true) pPr += `<w:shd w:val="clear" w:color="auto" w:fill="${TEACHER_SHADING}"/>`
     if (p.tabStopsTwip !== undefined) pPr += tabsXml(p.style, p.tabStopsTwip)
     if (p.spacerTwip !== undefined) {
       pPr += `<w:spacing w:before="0" w:after="0" w:line="${p.spacerTwip}" w:lineRule="exact"/>`
     }
-    if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined) {
-      const left = spec.directIndentTwip !== undefined ? ` w:left="${spec.directIndentTwip}"` : ''
+    if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined || p.indentLeftTwip !== undefined) {
+      const leftTwip = p.indentLeftTwip ?? spec.directIndentTwip
+      const left = leftTwip !== undefined ? ` w:left="${leftTwip}"` : ''
       pPr += `<w:ind${left} w:firstLine="${p.firstLineIndentTwip ?? 0}"/>`
     }
     if (p.align !== undefined) pPr += `<w:jc w:val="${p.align}"/>`
@@ -181,14 +183,23 @@ class ExportContext {
     const widths = t.colWidthsTwip.length === grid.cols ? t.colWidthsTwip : Array.from({ length: grid.cols }, () => Math.floor(contentWidthTwip(A4_PAGE) / Math.max(1, grid.cols)))
     const total = widths.reduce((a, b) => a + b, 0)
     const span = (c: number, n: number): number => widths.slice(c, c + n).reduce((a, b) => a + b, 0)
-    const border = (name: string): string => `<w:${name} w:val="single" w:sz="4" w:space="0" w:color="auto"/>`
+    const colored = t.borderColor !== undefined
+    const border = (name: string): string => `<w:${name} w:val="single" w:sz="${colored ? 6 : 4}" w:space="0" w:color="${t.borderColor ?? 'auto'}"/>`
     const bodyStyle = this.styleIds.get(STYLE_SPECS.body.wordStyleName)
+    // 书写横线：固定行高的空段落，下方虚线（相邻的几行边框相同，Word 会合成一组，所以同时写 between）
+    const ruleBorder = (name: string): string => `<w:${name} w:val="dotted" w:sz="6" w:space="1" w:color="${RULE_LINE_COLOR}"/>`
     const cellPara = (cp: DocCellParagraph | undefined): string =>
-      `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, cp?.font)).join('')}</w:p>`
+      cp?.ruleLine === true
+        ? `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:pBdr>${ruleBorder('bottom')}${ruleBorder('between')}</w:pBdr><w:spacing w:before="0" w:after="0" w:line="${RULE_LINE_TWIP}" w:lineRule="exact"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/></w:pPr></w:p>`
+        : `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, cp?.font)).join('')}</w:p>`
     let xml =
       `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:jc w:val="center"/>` +
       `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('')}</w:tblBorders>` +
-      `<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>` +
+      `<w:tblLayout w:type="fixed"/>` +
+      // 彩色边框的表格（题型整理对照表）单元格留白大一些，与样张一致；预览的 .doc-table--roomy 与此相同
+      (colored
+        ? `<w:tblCellMar><w:top w:w="${ROOMY_CELL_TWIP.top}" w:type="dxa"/><w:left w:w="${ROOMY_CELL_TWIP.side}" w:type="dxa"/><w:bottom w:w="${ROOMY_CELL_TWIP.top}" w:type="dxa"/><w:right w:w="${ROOMY_CELL_TWIP.side}" w:type="dxa"/></w:tblCellMar></w:tblPr>`
+        : `<w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>`) +
       `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`
     for (let r = 0; r < grid.rows; r++) {
       xml += '<w:tr>'
@@ -210,7 +221,7 @@ class ExportContext {
           const vMerge = owner.rowSpan > 1 ? '<w:vMerge w:val="restart"/>' : ''
           const shd = cell.shading !== undefined ? `<w:shd w:val="clear" w:color="auto" w:fill="${cell.shading}"/>` : ''
           const paras = cell.paragraphs.length > 0 ? cell.paragraphs.map(cellPara).join('') : cellPara(undefined)
-          xml += `<w:tc><w:tcPr>${w}${gridSpan}${vMerge}${shd}<w:vAlign w:val="center"/></w:tcPr>${paras}</w:tc>`
+          xml += `<w:tc><w:tcPr>${w}${gridSpan}${vMerge}${shd}<w:vAlign w:val="${t.valign ?? 'center'}"/></w:tcPr>${paras}</w:tc>`
         }
         c += owner.colSpan
       }

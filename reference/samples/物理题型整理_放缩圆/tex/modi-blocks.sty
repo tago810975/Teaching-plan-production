@@ -1,0 +1,191 @@
+%% modi-blocks.sty
+%% 墨帝教育 · 题型整理内容层组件（由 modi-handout.cls 自动加载）
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{modi-blocks}[2026/10/23 v1.0 content blocks]
+
+\RequirePackage{graphicx}
+\RequirePackage{enumitem}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{tabularray}
+\UseTblrLibrary{booktabs}
+
+%=====================================================================
+% 1. 标题与段落
+%=====================================================================
+
+%% 页面大标题（居中黑体，约 16pt）
+\newcommand{\moditypetitle}[1]{%
+  \par\begingroup
+    \centering\heiti\fontsize{17.3}{21}\selectfont #1\par
+  \endgroup
+  \vspace{2.5pt}}
+
+%% 段落小标题：例题 / 审题：… / 解题：…
+\newcommand{\modisectionhead}[1]{%
+  \par\addvspace{9pt}\noindent
+  {\heiti\fontsize{14.4}{17}\selectfont #1\par}%
+  \addvspace{7.5pt}}
+
+%% 题干正文（首行缩进 1.5em，两端对齐）
+\newenvironment{modistem}
+  {\par\begingroup\setlength{\parindent}{1.5em}}
+  {\par\endgroup}
+
+%%====================================================================
+%% 2. 圈注：题干中的 ①②③ 与注释框中的编号
+%%====================================================================
+\newcommand{\modicircled}[1]{%
+  \ifcase#1\or ①\or ②\or ③\or ④\or ⑤\or ⑥\or ⑦\or ⑧\or ⑨\or ⑩\fi}
+
+%% 正文中的上标圈注
+\newcommand{\modinote}[1]{%
+  \textsuperscript{\normalfont\fontsize{7.6}{7.6}\selectfont
+    \modicircled{#1}}}
+
+%% 注释框内的竖排圈号（与正文基线对齐）
+\newcommand{\modilabel}[1]{%
+  {\normalfont\fontsize{8}{9}\selectfont\modicircled{#1}}}
+
+%%====================================================================
+%% 3. 题干插图
+%%====================================================================
+\newcommand{\modifigure}[2][0.82]{%
+  \par\addvspace{4pt}%
+  \noindent\hspace*{\fill}%
+  \includegraphics[width=#1\linewidth]{#2}%
+  \hspace*{\fill}\par
+  \addvspace{4pt}}
+
+%%====================================================================
+%% 4. 选择题选项（A.–D. 逐行，悬挂缩进）
+%%====================================================================
+\newlength{\modi@optindent}
+\setlength{\modi@optindent}{2em}
+\newlength{\modi@optlabel}
+\setlength{\modi@optlabel}{1.55em}
+
+\newcommand{\modioption}[2]{%
+  \par\addvspace{5pt}%
+  \noindent\hspace*{\modi@optindent}%
+  \makebox[\modi@optlabel][l]{#1.}#2\par}
+
+%%====================================================================
+%% 5. 浅灰注释框（审题 ①②③ 条目）
+%%====================================================================
+\newtcolorbox{modinotebox}{%
+  enhanced,
+  colback   = modinotegray,
+  colframe  = modinotegray,
+  boxrule   = 0pt,
+  arc       = 0pt,
+  sharp corners,
+  left      = 5pt,
+  right     = 5pt,
+  top       = 6.5pt,
+  bottom    = 6.5pt,
+  before skip = 25pt,
+  after skip  = 12pt}
+
+\newenvironment{modinotes}
+  {\begin{modinotebox}%
+   \setlength{\parindent}{0pt}%
+   \setlength{\parskip}{0pt}}
+  {\end{modinotebox}}
+
+%% 注释框内的一条：\noteline{1} 正文（悬挂缩进 14pt）
+\newcommand{\noteline}[1]{%
+  \par\setlength{\hangindent}{14pt}\setlength{\hangafter}{1}%
+  \noindent\makebox[13.5pt][l]{\modilabel{#1}}\ignorespaces}
+
+%%====================================================================
+%% 6. 「审题总结」编号条目 (1)(2)…
+%%====================================================================
+\newenvironment{modisummary}
+  {\par\setlength{\parindent}{0pt}}
+  {\par}
+%% 一条：(1) 文本（首行 14.9pt，续行 46.3pt）
+\newcommand{\modisumitem}[1]{%
+  \par\vspace{1.5pt}%
+  \setlength{\hangindent}{46.3pt}\setlength{\hangafter}{1}%
+  \noindent\hspace*{14.9pt}（#1）\ignorespaces}
+
+%%====================================================================
+%% 7. 双栏对照表：思维过程 / 书写过程
+%%====================================================================
+\newlength{\modi@handline}
+\setlength{\modi@handline}{31.1pt}
+
+%% 学生版手写虚线网格（占满单元格高度）
+\newcommand{\modihandgrid}[1][6]{%
+  \begin{tikzpicture}[baseline=0pt]
+    \foreach \i in {1,...,#1}{%
+      \draw[densely dotted, line width=0.6pt, modiblue!45]
+        (0,{-\i*\modi@handline+27.9}) -- (\linewidth,{-\i*\modi@handline+27.9});}
+  \end{tikzpicture}}
+
+\NewTblrEnviron{modicmp}
+\SetTblrOuter[modicmp]{long, label=none, postsep=6pt}
+
+\SetTblrInner[modicmp]{
+  rowhead       = 1,
+  width         = \linewidth,
+  colspec       = {X[0.53,l,t]X[0.47,l,t]},
+  hline{1,Z}    = {0.6pt,modiblue},
+  hline{2}      = {0.6pt,modiblue},
+  vline{1,Z}    = {0.6pt,modiblue},
+  vline{2}      = {0.6pt,modiblue},
+  leftsep       = 9pt,
+  rightsep      = 9pt,
+  cell{1-Z}{1-Z} = {topsep=6pt, bottomsep=6pt},
+  stretch       = 1,
+  row{1}        = {bg=modiblue, fg=white, ht=25pt, valign=m, halign=c,
+                   font=\heiti\fontsize{11.5}{13}\selectfont},
+  cell{2-Z}{1}  = {bg=modipaleblue},
+  cell{2-Z}{2}  = {bg=modicream},
+}
+
+%% 续块：无重复表头（复刻样张第 3 页下半块）
+\NewTblrEnviron{modicmpcont}
+\SetTblrOuter[modicmpcont]{long, label=none, postsep=6pt}
+\SetTblrInner[modicmpcont]{
+  rowhead       = 0,
+  width         = \linewidth,
+  colspec       = {X[0.53,l,t]X[0.47,l,t]},
+  hline{1,Z}    = {0.6pt,modiblue},
+  hline{2}      = {0.6pt,modiblue},
+  vline{1,Z}    = {0.6pt,modiblue},
+  vline{2}      = {0.6pt,modiblue},
+  leftsep       = 9pt,
+  rightsep      = 9pt,
+  cell{1-Z}{1-Z} = {topsep=6pt, bottomsep=6pt},
+  stretch       = 1,
+  cell{1-Z}{1}  = {bg=modipaleblue},
+  cell{1-Z}{2}  = {bg=modicream},
+}
+
+%% 左栏内的圈号条目：\cmpline{1} 文字
+\newcommand{\cmpline}[1]{%
+  \par\noindent\makebox[13.5pt][l]{\modilabel{#1}}}
+
+%% 右栏书写格：\cmpwrite[虚线行数]{教师版内容}
+%% 注意：& 必须直接写在表格体内，不能用宏包装
+\newcommand{\cmpwrite}[2][6]{%
+  \ifmodi@teacher #2\else \modihandgrid[#1]\fi}
+
+%%====================================================================
+%% 8. 其他小工具
+%%====================================================================
+%% 教师版专用内容
+\newcommand{\moditeacher}[1]{\ifmodi@teacher #1\fi}
+%% 学生版专用内容
+\newcommand{\modistudent}[1]{\ifmodi@teacher\else #1\fi}
+%% 留白（学生版答题区）
+\newcommand{\modianswerblank}[1][3]{%
+  \par\noindent
+  \begin{tikzpicture}[baseline=0pt]
+    \foreach \i in {1,...,#1}{%
+      \draw[densely dotted, line width=0.6pt, black!35]
+        (0,-\i*24pt) -- (\linewidth,-\i*24pt);}
+  \end{tikzpicture}\par}
+
+\endinput

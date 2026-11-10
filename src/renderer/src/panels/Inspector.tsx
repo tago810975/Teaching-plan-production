@@ -153,6 +153,20 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
               rows={6}
               onChange={(content) => update((b) => ({ ...b, content }) as Block)}
             />
+            <label className="checkbox" title="整块加浅灰底纹，如题型整理的“审题”注释框">
+              <input
+                type="checkbox"
+                checked={block.shaded === true}
+                onChange={(e) =>
+                  update((b) => {
+                    if (b.type !== 'paragraph') return b
+                    const { shaded: _s, ...rest } = b
+                    return (e.target.checked ? { ...rest, shaded: true } : rest) as Block
+                  })
+                }
+              />
+              灰色底纹（注释框）
+            </label>
           </Field>
         ) : block.type === 'worksheet' ? (
           <>

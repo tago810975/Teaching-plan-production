@@ -3,6 +3,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createComposite, createKnowledge, createQuestion, newId } from '@core/model/factory'
+import { circledItems, createNoteBox, createThinkWriteTable, createTypeSummarySkeleton } from '@core/model/type-summary'
 import type { Block } from '@core/model/types'
 import type { FormatPreset } from '@core/presets'
 
@@ -80,7 +81,18 @@ export function createBlock(kind: Kind): Block {
   }
 }
 
-export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block) => void; preset: FormatPreset; projectTitle: string }) {
+/** 题型整理的预制模块：每项插入一个或几个块 */
+const TYPE_SUMMARY_MODULES: ReadonlyArray<readonly [string, (preset: FormatPreset) => Block[]]> = [
+  ['整份骨架（例题、审题、解题、易错提醒、题后归纳）', (preset) => createTypeSummarySkeleton(preset.sectionNames)],
+  ['审题注释框（灰色底纹，①②③ 条目）', () => [createNoteBox(circledItems(['……', '……', '……']))]],
+  [
+    '思维过程 / 书写过程对照表（学生版书写栏为虚线格）',
+    () => [createThinkWriteTable([{ think: circledItems(['……', '……', '……']), write: [{ inlines: [] }], lines: 8 }])]
+  ],
+  ['对照表续表（无表头）', () => [createThinkWriteTable([{ think: circledItems(['……', '……']), write: [{ inlines: [] }], lines: 6 }], false)]]
+]
+
+export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (blocks: Block | Block[]) => void; preset: FormatPreset; projectTitle: string }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -123,6 +135,40 @@ export function AddMenu({ onAdd, preset, projectTitle }: { onAdd: (block: Block)
                 {item[1]}
               </button>
             )
+          )}
+          {preset.kind === 'typeSummary' && (
+            <>
+              <div className="menu-divider" role="separator" />
+              <div className="menu-heading" role="presentation">
+                {preset.name} 预制模块
+              </div>
+              {TYPE_SUMMARY_MODULES.map(([label, make]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false)
+                    onAdd(make(preset))
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              {preset.sectionNames.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false)
+                    onAdd({ id: newId(), type: 'section', text: name })
+                  }}
+                >
+                  栏目标题：{name}
+                </button>
+              ))}
+            </>
           )}
           {preset.kind === 'lesson' && (
             <>

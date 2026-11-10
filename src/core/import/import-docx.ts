@@ -32,7 +32,7 @@ export async function importDocx(bytes: Uint8Array, options: DocxImportOptions =
   const read = await readDocx(bytes)
   const preset = getPreset(options.presetId)
   // 组卷网下载的题目：先按题组整理（见 zujuan.ts）
-  const zujuan = preset.kind === 'lesson' && isZujuan(read.paragraphs) ? prepareZujuan(read.paragraphs) : null
+  const zujuan = preset.kind !== 'handbook' && isZujuan(read.paragraphs) ? prepareZujuan(read.paragraphs) : null
   // 知识点手册只有大标题与知识点，不识别题目
   const recognized =
     preset.kind === 'handbook' ? recognizeHandbook(read.paragraphs) : recognize(zujuan !== null ? zujuan.paragraphs : read.paragraphs)
