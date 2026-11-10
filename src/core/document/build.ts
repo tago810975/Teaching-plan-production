@@ -689,7 +689,8 @@ function toDocTable(t: TableInline, base?: RefBase): DocTable {
       }))
     })),
     ...(t.borderColor !== undefined ? { borderColor: t.borderColor.toUpperCase() } : {}),
-    ...(t.valign !== undefined ? { valign: t.valign } : {})
+    ...(t.valign !== undefined ? { valign: t.valign } : {}),
+    ...(t.headerRow === true ? { headerRow: true } : {})
   }
 }
 

@@ -106,6 +106,8 @@ export interface DocTable {
   borderColor?: string
   /** 单元格垂直对齐；不设时居中 */
   valign?: 'top'
+  /** 第一行是表头（跨页时在续页重复） */
+  headerRow?: boolean
 }
 
 export interface DocParagraph {

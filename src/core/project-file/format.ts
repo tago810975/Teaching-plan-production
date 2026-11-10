@@ -38,6 +38,7 @@ export const CURRENT_FORMAT_VERSION = 13
  * 11 —— 大标题可从新的一页开始（title.pageBreakBefore）。无需迁移
  * 12 —— 栏目标题、题型分组也可从新的一页开始、题号重新开始（section / topic 的 pageBreakBefore、restartNumbering）。无需迁移
  * 13 —— 题型整理：表格单元格可在学生版换成书写横线（cell.studentLines）、表格边框颜色（table.borderColor）、
+ *        顶端对齐（table.valign）、表头行（table.headerRow）、
  *        正文段落块的浅灰底纹（paragraph.shaded）。无需迁移
  */
 

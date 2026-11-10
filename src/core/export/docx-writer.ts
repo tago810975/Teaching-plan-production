@@ -202,7 +202,8 @@ class ExportContext {
         : `<w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>`) +
       `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`
     for (let r = 0; r < grid.rows; r++) {
-      xml += '<w:tr>'
+      // 彩色边框的表格（题型整理对照表）：行不跨页、表头在续页重复，与样张一致
+      xml += colored ? `<w:tr><w:trPr><w:cantSplit/>${r === 0 && t.headerRow === true ? '<w:tblHeader/>' : ''}</w:trPr>` : '<w:tr>'
       for (let c = 0; c < grid.cols; ) {
         const owner = grid.owner[r]![c]
         if (owner === undefined) {

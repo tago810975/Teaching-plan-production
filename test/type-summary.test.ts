@@ -117,6 +117,9 @@ describe('物理题型整理 V1.0', () => {
       expect(xml).toContain(`w:fill="${TYPE_SUMMARY_COLORS.paleBlue}"`)
       expect(xml).toContain('<w:vAlign w:val="top"/>')
       expect(xml).toContain('w:fill="F2F2F2"')
+      // 对照表的行不跨页，表头在续页重复
+      expect(xml).toContain('<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>')
+      expect(xml).toContain('<w:trPr><w:cantSplit/></w:trPr>')
     }
     const rules = (xml: string): number => (xml.match(/<w:bottom w:val="dotted"/g) ?? []).length
     expect(rules(t)).toBe(0)

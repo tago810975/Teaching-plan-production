@@ -90,7 +90,8 @@ const tableInline: z.ZodType<TableInline> = z.object({
     .string()
     .regex(/^[0-9A-Fa-f]{6}$/)
     .optional(),
-  valign: z.literal('top').optional()
+  valign: z.literal('top').optional(),
+  headerRow: z.boolean().optional()
 })
 
 

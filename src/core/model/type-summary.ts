@@ -70,9 +70,11 @@ export function createThinkWriteTable(rows: ThinkWriteRow[], header = true): Par
     ],
     colWidthsTwip: [left, width - left],
     borderColor: TYPE_SUMMARY_COLORS.blue,
-    valign: 'top'
+    valign: 'top',
+    ...(header ? { headerRow: true } : {})
   }
-  return { id: newId(), type: 'paragraph', content: [{ inlines: [table] }] }
+  // 表后空一行，与下一张续表或易错提醒分开
+  return { id: newId(), type: 'paragraph', content: [{ inlines: [table], format: { spaceAfterLines: 1 } }] }
 }
 
 /** 审题注释框：浅灰底纹的正文段落块，每条以 ①②③ 开头 */

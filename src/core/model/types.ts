@@ -105,6 +105,8 @@ export interface TableInline {
   borderColor?: string
   /** 单元格内容的垂直对齐；不设时居中（对照表这类长短不一的栏用 top 顶端对齐） */
   valign?: 'top'
+  /** 第一行是表头：跨页时在续页重复 */
+  headerRow?: boolean
 }
 
 export type Inline = TextInline | MathInline | ImageInline | BlankInline | TableInline
