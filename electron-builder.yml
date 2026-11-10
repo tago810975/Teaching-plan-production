@@ -23,7 +23,10 @@ nsis:
   # 中文安装界面
   language: '2052'
 mac:
-  # macOS 移植阶段再补充签名与公证
+  # 没有 Apple 开发者证书：用临时签名（ad-hoc），Apple 芯片的 Mac 才能运行；
+  # 第一次打开需在“系统设置 → 隐私与安全性”中点“仍要打开”。有证书后改成证书名并打开 hardenedRuntime、公证
+  identity: '-'
+  hardenedRuntime: false
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -33,3 +36,5 @@ extraResources:
   # 模板（Word 样式、默认页眉图片），运行时从安装目录的 resources/resources 读取
   - from: resources
     to: resources
+dmg:
+  title: 教学案制作 ${version}
