@@ -89,3 +89,44 @@ export function moveQuestionTo(blocks: Block[], id: string, target: string | nul
   out = out.map((b) => (b.id === target && b.type === 'composite' ? withItems(b, [...b.items, q]) : b))
   return out
 }
+
+/** 拖放位置：顶层第 index 块之前，或某道综合题第 index 道小题之前（index 可等于小题数，即最后） */
+export type QuestionDrop = { kind: 'top'; index: number } | { kind: 'item'; compositeId: string; index: number }
+
+/**
+ * 把题目放到指定位置（大纲中拖放）：位置按移动前的顺序给出。
+ * 可在顶层与各综合题之间任意移动；放回原处时不变。
+ */
+export function moveQuestionAt(blocks: Block[], id: string, drop: QuestionDrop): Block[] {
+  const at = locate(blocks, id)
+  if (at === null) return blocks
+  const from = blocks[at.index]!
+  const q = (at.item !== undefined ? (from as CompositeBlock).items[at.item]! : from) as QuestionBlock
+
+  // 放回原处
+  if (at.item === undefined && drop.kind === 'top' && (drop.index === at.index || drop.index === at.index + 1)) return blocks
+  if (at.item !== undefined && drop.kind === 'item' && drop.compositeId === from.id && (drop.index === at.item || drop.index === at.item + 1)) return blocks
+  if (drop.kind === 'item' && blocks.find((b) => b.id === drop.compositeId)?.type !== 'composite') return blocks
+
+  // 先取出
+  let out: Block[] =
+    at.item !== undefined
+      ? blocks.map((b, i) => (i === at.index ? withItems(b as CompositeBlock, (b as CompositeBlock).items.filter((_, k) => k !== at.item)) : b))
+      : blocks.filter((_, i) => i !== at.index)
+  // 再放入（从顶层取出时，后面的顶层位置前移一位；从同一道综合题中取出时，后面的小题位置前移一位）
+  if (drop.kind === 'top') {
+    let index = drop.index
+    if (at.item === undefined && at.index < index) index -= 1
+    out.splice(Math.max(0, Math.min(index, out.length)), 0, q)
+  } else {
+    let index = drop.index
+    if (at.item !== undefined && from.id === drop.compositeId && at.item < index) index -= 1
+    out = out.map((b) => {
+      if (b.id !== drop.compositeId || b.type !== 'composite') return b
+      const items = b.items.slice()
+      items.splice(Math.max(0, Math.min(index, items.length)), 0, q)
+      return withItems(b, items)
+    })
+  }
+  return out
+}

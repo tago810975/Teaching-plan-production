@@ -10,7 +10,7 @@ import type { FigureRef, InlineRef } from '@core/document/ir'
 import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
-import { moveQuestion, moveQuestionTo } from '@core/model/move-question'
+import { moveQuestion, moveQuestionAt, moveQuestionTo, type QuestionDrop } from '@core/model/move-question'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -105,6 +105,8 @@ export type EditorAction =
   | { type: 'select'; blockId: string | null; focus?: Omit<FocusRequest, 'blockId' | 'nonce'> }
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
+  /** 大纲中拖放题目：放到顶层或某道综合题中的指定位置（按移动前的顺序） */
+  | { type: 'move-question-at'; blockId: string; drop: QuestionDrop }
   /** 把题目移到某道综合题的最后（compositeId），或移出综合题（null） */
   | { type: 'move-question-to'; blockId: string; compositeId: string | null }
   | { type: 'delete-block'; blockId: string }
@@ -287,6 +289,8 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       }
     case 'update-block':
       return withBlocks(state, (blocks) => mapBlockById(blocks, action.blockId, action.update))
+    case 'move-question-at':
+      return withBlocks(state, (blocks) => moveQuestionAt(blocks, action.blockId, action.drop))
     case 'move-question-to':
       return withBlocks(state, (blocks) => moveQuestionTo(blocks, action.blockId, action.compositeId))
     case 'move-block':

@@ -2077,3 +2077,8 @@ body.is-dragging-outline * {
 .quick-menu-note {
   margin: 2px 0 4px 3.3em;
 }
+
+/* 拖放题目进综合题时，插入线缩进到小题的位置 */
+.outline-drop-line.is-nested {
+  left: 30px;
+}

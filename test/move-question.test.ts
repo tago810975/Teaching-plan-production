@@ -59,3 +59,27 @@ describe('题目跨综合题移动', () => {
     expect(moveQuestionTo(s, 'a', null)).toBe(s)
   })
 })
+
+describe('大纲中拖放题目', async () => {
+  const { moveQuestionAt } = await import('@core/model/move-question')
+  it('拖进综合题的某个位置、拖出到顶层', () => {
+    expect(shape(moveQuestionAt(start(), 'a', { kind: 'item', compositeId: 'B', index: 1 }))).toBe('B[b1 a b2] c D[d1] s')
+    expect(shape(moveQuestionAt(start(), 'b1', { kind: 'top', index: 4 }))).toBe('a B[b2] c D[d1] b1 s')
+    expect(shape(moveQuestionAt(start(), 'b2', { kind: 'top', index: 0 }))).toBe('b2 a B[b1] c D[d1] s')
+  })
+
+  it('从一道综合题拖到另一道；在同一道综合题中调整顺序', () => {
+    expect(shape(moveQuestionAt(start(), 'b1', { kind: 'item', compositeId: 'D', index: 0 }))).toBe('a B[b2] c D[b1 d1] s')
+    expect(shape(moveQuestionAt(start(), 'b1', { kind: 'item', compositeId: 'B', index: 2 }))).toBe('a B[b2 b1] c D[d1] s')
+    expect(shape(moveQuestionAt(start(), 'b2', { kind: 'item', compositeId: 'B', index: 0 }))).toBe('a B[b2 b1] c D[d1] s')
+  })
+
+  it('顶层之间移动；放回原处不变；目标不是综合题时不变', () => {
+    expect(shape(moveQuestionAt(start(), 'a', { kind: 'top', index: 3 }))).toBe('B[b1 b2] c a D[d1] s')
+    const s = start()
+    expect(moveQuestionAt(s, 'a', { kind: 'top', index: 0 })).toBe(s)
+    expect(moveQuestionAt(s, 'a', { kind: 'top', index: 1 })).toBe(s)
+    expect(moveQuestionAt(s, 'b1', { kind: 'item', compositeId: 'B', index: 1 })).toBe(s)
+    expect(moveQuestionAt(s, 'a', { kind: 'item', compositeId: 'c', index: 0 })).toBe(s)
+  })
+})

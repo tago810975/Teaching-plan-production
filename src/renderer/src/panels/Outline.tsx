@@ -32,8 +32,9 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
   const siblings: Array<{ id: string }> = parent?.type === 'composite' ? parent.items : blocks
   const selectedIndex = siblings.findIndex((b) => b.id === selectedBlockId)
   const listRef = useRef<HTMLOListElement>(null)
-  const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(listRef, (blockId, toIndex) =>
-    dispatch({ type: 'move-block-to', blockId, toIndex })
+  const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(listRef, (blockId, target, isQuestion) =>
+    // 题目可进出综合题；其他内容只在顶层移动
+    isQuestion ? dispatch({ type: 'move-question-at', blockId, drop: target }) : target.kind === 'top' && dispatch({ type: 'move-block-to', blockId, toIndex: target.index })
   )
 
   return (
@@ -60,12 +61,17 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
       ) : (
         <ol className="outline-list" ref={listRef}>
           {blocks.flatMap((block, topIndex) => [
-            <li key={block.id} data-top-index={topIndex} className={drag?.blockId === block.id ? 'is-dragging' : undefined}>
+            <li
+              key={block.id}
+              data-top-index={topIndex}
+              {...(block.type === 'composite' ? { 'data-composite-id': block.id, 'data-item-count': block.items.length } : {})}
+              className={drag?.blockId === block.id ? 'is-dragging' : undefined}
+            >
               <button
                 type="button"
                 className={`outline-item outline-item--${block.type}${block.id === selectedBlockId ? ' is-selected' : ''}`}
                 title="点击选中；按住拖动可调整顺序；右键快捷设置"
-                onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block))}
+                onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block), block.type === 'question')}
                 onContextMenu={menu(block.id)}
                 onClick={() => {
                   if (consumeClick()) return
@@ -77,13 +83,20 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
                 {block.type === 'question' && <Difficulty {...difficultyOf(block.question, preset)} />}
               </button>
             </li>,
-            // 综合题的小题：缩进列在综合题之下，随综合题一起拖动
+            // 综合题的小题：缩进列在综合题之下；拖综合题时一起移动，也可单独拖进拖出
             ...(block.type === 'composite'
-              ? block.items.map((item) => (
-                  <li key={item.id} className={drag?.blockId === block.id ? 'outline-nested is-dragging' : 'outline-nested'}>
+              ? block.items.map((item, itemIndex) => (
+                  <li
+                    key={item.id}
+                    data-parent-id={block.id}
+                    data-item-index={itemIndex}
+                    className={drag?.blockId === block.id || drag?.blockId === item.id ? 'outline-nested is-dragging' : 'outline-nested'}
+                  >
                     <button
                       type="button"
                       className={`outline-item outline-item--question outline-item--nested${item.id === selectedBlockId ? ' is-selected' : ''}`}
+                      title="点击选中；按住拖动可移到别处（可拖出或拖进综合题）；右键快捷设置"
+                      onPointerDown={(e) => onItemPointerDown(e, item.id, describe(item), true)}
                       onContextMenu={menu(item.id)}
                       onClick={() => {
                         if (consumeClick()) return
@@ -98,20 +111,19 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
                 ))
               : [])
           ])}
-          {drag !== null && <div className="outline-drop-line" style={{ top: `${drag.lineTop}px` }} aria-hidden="true" />}
+          {drag !== null && <div className={drag.nested ? 'outline-drop-line is-nested' : 'outline-drop-line'} style={{ top: `${drag.lineTop}px` }} aria-hidden="true" />}
         </ol>
       )}
       {drag !== null && (
         <div className="outline-ghost" style={{ left: drag.ghostX + 12, top: drag.ghostY - 12 }} aria-hidden="true">
           {(() => {
-            const b = blocks.find((x) => x.id === drag.blockId)
-            const no = b?.type === 'question' ? questionNumbers.get(b.id) : undefined
+            const no = questionNumbers.get(drag.blockId)
             return `${no !== undefined ? `${no} ` : ''}${drag.label}`
           })()}
         </div>
       )}
       <p className="visually-hidden" role="status" aria-live="polite">
-        {drag !== null ? `正在移动“${drag.label}”，松开放到插入线处，按 Esc 取消` : ''}
+        {drag !== null ? `正在移动“${drag.label}”，松开放到插入线处${drag.nested ? '（放进综合题）' : ''}，按 Esc 取消` : ''}
       </p>
 
       <div className="outline-actions">
