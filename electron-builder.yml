@@ -12,10 +12,11 @@ fileAssociations:
     description: 教学案工程文件
     role: Editor
 win:
+  # GitHub Release 会去掉文件名中的中文，安装包文件名用英文
   target:
     - target: nsis
       arch: [x64]
-  artifactName: 教学案制作-${version}-setup.${ext}
+  artifactName: TeachingPlan-${version}-Windows-setup.${ext}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -31,7 +32,7 @@ mac:
     - target: dmg
       arch: [x64, arm64]
   category: public.app-category.education
-  artifactName: 教学案制作-${version}-${arch}.${ext}
+  artifactName: TeachingPlan-${version}-Mac-${arch}.${ext}
 extraResources:
   # 模板（Word 样式、默认页眉图片），运行时从安装目录的 resources/resources 读取
   - from: resources
