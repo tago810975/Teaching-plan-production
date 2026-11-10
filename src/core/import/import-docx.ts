@@ -10,6 +10,7 @@ import { normalizeFonts } from './normalize-fonts'
 import { applyPresetRules } from './preset-rules'
 import { getPreset } from '../presets'
 import { recognize } from './recognize'
+import { gradeOfCoefficient, isZujuan, prepareZujuan } from './zujuan'
 import { recognizeHandbook } from './recognize-handbook'
 
 export interface DocxImportResult {
@@ -30,8 +31,15 @@ export interface DocxImportOptions {
 export async function importDocx(bytes: Uint8Array, options: DocxImportOptions = {}): Promise<DocxImportResult> {
   const read = await readDocx(bytes)
   const preset = getPreset(options.presetId)
+  // 组卷网下载的题目：先按题组整理（见 zujuan.ts）
+  const zujuan = preset.kind === 'lesson' && isZujuan(read.paragraphs) ? prepareZujuan(read.paragraphs) : null
   // 知识点手册只有大标题与知识点，不识别题目
-  const recognized = preset.kind === 'handbook' ? recognizeHandbook(read.paragraphs) : recognize(read.paragraphs)
+  const recognized =
+    preset.kind === 'handbook' ? recognizeHandbook(read.paragraphs) : recognize(zujuan !== null ? zujuan.paragraphs : read.paragraphs)
+  if (zujuan !== null) {
+    applyZujuanDifficulty(recognized.blocks, zujuan.difficulty)
+    distributeZujuanKnowledge(recognized.blocks)
+  }
   const { questionCount, firstTitle } = recognized
   // 去掉与样式相同的字体，整段同一字体时提升为段落字体；再按预设整理作业单、难度星级与解析
   const blocks = applyPresetRules(normalizeFonts(recognized.blocks), preset)
@@ -42,6 +50,9 @@ export async function importDocx(bytes: Uint8Array, options: DocxImportOptions =
   for (const id of refs) if (read.assets[id] !== undefined) assets[id] = read.assets[id]
 
   const warnings = [...read.warnings]
+  if (zujuan !== null) {
+    warnings.unshift(`识别为组卷网下载的题目：${zujuan.groups} 组，带材料或多道小题的组做成综合题（共用答案与解析）；难度按组卷网难度系数换算（0.7 以上为 A，0.5～0.7 为 B，低于 0.5 为 C）。`)
+  }
   const unknown = new Set<string>()
   visitMath(blocks, (omml) => ommlToMathml(omml).unknown.forEach((u) => unknown.add(u)))
   if (unknown.size > 0) warnings.push(`部分公式含有暂不支持的结构（${[...unknown].join('、')}），预览中只显示其中的文字。`)
@@ -56,5 +67,44 @@ function visitMath(value: unknown, fn: (omml: string) => void): void {
     const obj = value as Record<string, unknown>
     if (obj.type === 'math' && typeof obj.omml === 'string') fn(obj.omml)
     else Object.values(obj).forEach((v) => visitMath(v, fn))
+  }
+}
+
+/** 按全卷题号给题目写上组卷网换算来的难度等级（已有等级的不改） */
+function applyZujuanDifficulty(blocks: Block[], difficulty: Map<number, number>): void {
+  let no = 0
+  const visit = (q: { difficulty?: string }): void => {
+    no += 1
+    const c = difficulty.get(no)
+    if (c !== undefined && (q.difficulty === undefined || q.difficulty === '')) q.difficulty = gradeOfCoefficient(c)
+  }
+  for (const b of blocks) {
+    if (b.type === 'question') visit(b.question)
+    else if (b.type === 'composite') b.items.forEach((it) => visit(it.question))
+  }
+}
+
+/**
+ * 组卷网题组的【知识点】在共用解析的开头：取出来分给组中的每道小题（已有知识点的不改），并从解析中去掉
+ */
+function distributeZujuanKnowledge(blocks: Block[]): void {
+  const LABEL = /^\s*【\s*(知识点|考点)\s*】\s*/
+  for (const b of blocks) {
+    if (b.type !== 'composite') continue
+    const keep = []
+    for (const p of b.analysis) {
+      const text = p.inlines.map((i) => (i.type === 'text' ? i.text : '')).join('')
+      if (!LABEL.test(text)) {
+        keep.push(p)
+        continue
+      }
+      const points = text
+        .replace(LABEL, '')
+        .split(/[、，,；;]/)
+        .map((s) => s.trim())
+        .filter((s) => s !== '')
+      for (const it of b.items) if (it.question.knowledgePoints.length === 0) it.question.knowledgePoints = points.slice()
+    }
+    b.analysis = keep
   }
 }

@@ -20,6 +20,7 @@ import type {
   RichParagraph
 } from '../model/types'
 import type { DocxImage, ReadParagraph } from './docx-reader'
+import { GROUP_START_STYLE, IN_ANSWER_STYLE } from './zujuan'
 
 type Role =
   | 'title'
@@ -127,6 +128,15 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
   for (let index = 0; index < paragraphs.length; index++) {
     const para = paragraphs[index]!
     const text = textOf(para)
+    // 组卷网题组的开始（见 zujuan.ts）：新建综合题，文字为短标题（可为空）
+    if (para.styleName === GROUP_START_STYLE) {
+      finishQuestion()
+      closeOpen()
+      const c = createComposite({ title: text.trim() })
+      composite = c
+      blocks.push(c)
+      continue
+    }
     if (isBlank(para)) continue
     const role = styleRole(para.styleName)
 
@@ -171,7 +181,8 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
 
     // ---------- 新题目 ----------
     const startsByStyle = role === 'question'
-    const startsByNumber = !usesStyles && !inKnowledgeSection && QUESTION_NUMBER.test(text) && !OPTION_START.test(text)
+    // 组卷网的答案区中“N．”开头的是分题解析，不是新题（见 zujuan.ts）
+    const startsByNumber = !usesStyles && !inKnowledgeSection && para.styleName !== IN_ANSWER_STYLE && QUESTION_NUMBER.test(text) && !OPTION_START.test(text)
     if (startsByStyle || startsByNumber) {
       finishQuestion()
       // 综合题仍在收集小题时继续收集；共用答案出现后，下一题已在综合题之外
@@ -489,7 +500,8 @@ export function splitOptions(inlines: Inline[], startIndex = 0): ChoiceOption[] 
 
 /** 答案中出现两个以上的题号（如“1.横波 2. 1.8 3.A”）：综合题的共用答案 */
 function isSharedAnswer(text: string): boolean {
-  return (text.match(/(^|[\s　])\d{1,2}\s*[.．、]/g) ?? []).length >= 2
+  // 题号前可以是行首、空白或“】”（组卷网写作“【答案】42．C 43．…”）；“1.8”这样的小数不算
+  return (text.match(/(^|[\s　】])\d{1,2}\s*[.．、](?!\d)/g) ?? []).length >= 2
 }
 
 /** 带上原段落的格式（首行缩进、对齐） */
