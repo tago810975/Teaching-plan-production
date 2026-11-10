@@ -135,7 +135,7 @@ export const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 export function parsePreset(json: unknown): { ok: true; preset: FormatPreset } | { ok: false; error: string } {
   const r = presetSchema.safeParse(json)
   if (!r.success) {
-    const issues = r.error.issues.slice(0, 5).map((i) => `${i.path.join('.') || '（整个文件）'}：${i.message}`)
+    const issues = r.error.issues.slice(0, 5).map((i) => `${i.path.join('.') || '（整个文件）'}${issueText(i)}`)
     return { ok: false, error: `preset.json 的内容不正确——${issues.join('；')}` }
   }
   if (!PRESET_ID_PATTERN.test(r.data.id)) return { ok: false, error: `preset.json 的 id“${r.data.id}”只能用小写字母、数字和连字符` }
@@ -197,3 +197,25 @@ export function resolveLineSpacing(layout: Pick<ProjectLayout, 'lineSpacing'>, p
   const pick = (k: keyof LineSpacing): number => layout.lineSpacing?.[k] ?? preset.lineSpacing?.[k] ?? 1
   return { heading: pick('heading'), question: pick('question'), knowledge: pick('knowledge'), body: pick('body') }
 }
+
+/** zod 校验问题的中文说明（老师照着改 preset.json） */
+function issueText(i: z.core.$ZodIssue): string {
+  switch (i.code) {
+    case 'invalid_type':
+      return i.input === undefined ? ' 缺少这一项' : ` 类型不对（应为 ${TYPE_NAMES[i.expected] ?? i.expected}）`
+    case 'invalid_value':
+      return ` 只能是 ${i.values.map((v) => JSON.stringify(v)).join(' / ')}`
+    case 'too_small':
+      return ` 太小（至少 ${String(i.minimum)}）`
+    case 'too_big':
+      return ` 太大（至多 ${String(i.maximum)}）`
+    case 'invalid_format':
+      return ' 格式不对（颜色写 6 位十六进制，如 C00000）'
+    case 'unrecognized_keys':
+      return ` 有无法识别的字段：${i.keys.join('、')}`
+    default:
+      return `：${i.message}`
+  }
+}
+
+const TYPE_NAMES: Record<string, string> = { string: '文字', number: '数字', boolean: 'true / false', object: '对象 {…}', array: '数组 […]' }

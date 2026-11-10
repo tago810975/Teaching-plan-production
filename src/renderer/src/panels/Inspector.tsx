@@ -3,7 +3,7 @@
  *
  * 过渡期用“文字 + $公式$”的文本框编辑；接入 TipTap + MathLive 后替换各个 MarkupField。
  */
-import { useContext, useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
+import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
 import { useFieldFocus } from './fieldFocus'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
@@ -71,7 +71,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
       <aside className="panel inspector" aria-label="属性">
         <h2 className="panel-title">版式设置</h2>
         <div className="inspector-body">
-          <LayoutForm layout={layout} dispatch={dispatch} />
+          <LayoutForm layout={layout} dispatch={dispatch} preset={preset} />
         </div>
       </aside>
     )
@@ -257,7 +257,7 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
 
 // ---------------- 版式设置 ----------------
 
-function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction> }) {
+function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction>; preset: FormatPreset }) {
   type Key = 'keepQuestionTogether' | 'keepKnowledgeTogether'
   const set = (key: Key, variant: Variant, value: boolean): void =>
     dispatch({ type: 'update-layout', layout: { ...layout, [key]: { ...layout[key], [variant]: value } } })
@@ -290,7 +290,7 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
         {row('keepKnowledgeTogether', 'teacher', '教案', '整块同页')}
         {row('keepKnowledgeTogether', 'student', '学案', '整块同页')}
       </fieldset>
-      <LineSpacingFields layout={layout} dispatch={dispatch} />
+      <LineSpacingFields layout={layout} dispatch={dispatch} preset={preset} />
       <fieldset className="group">
         <legend>难度显示</legend>
         <p className="field-hint">题干开头的难度标记。左侧大纲中始终显示等级和星级，方便浏览。</p>
@@ -316,8 +316,8 @@ function LayoutForm({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dis
 }
 
 /** 行距：标题、题目、知识点、正文段落分别设置（倍数）；没改过的项显示格式预设的默认值 */
-function LineSpacingFields({ layout, dispatch }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction> }) {
-  const preset = useContext(PresetContext)
+// 版式设置在 PresetContext 之外渲染，预设由参数传入
+function LineSpacingFields({ layout, dispatch, preset }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction>; preset: FormatPreset }) {
   const effective = resolveLineSpacing(layout, preset)
   const presetValue = resolveLineSpacing({}, preset)
   const items: ReadonlyArray<readonly [keyof LineSpacing, string]> = [
