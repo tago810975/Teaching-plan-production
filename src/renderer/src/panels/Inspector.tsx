@@ -17,6 +17,7 @@ import { createTable } from '@core/model/table'
 import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
+import { AnswerPlacementControl } from './AnswerPlacementControl'
 import { difficultyOf, getPreset, type FormatPreset } from '@core/presets'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
@@ -59,9 +60,11 @@ interface Props {
   projectLayout?: ProjectLayout
   /** 工程的格式预设（难度等级、知识梳理的强调格式等） */
   preset?: FormatPreset
+  /** 各题在全卷中的题号（综合题答案集中到最后时使用） */
+  questionNumbers?: ReadonlyMap<string, string>
 }
 
-export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout, preset = getPreset(undefined) }: Props) {
+export function Inspector({ block, header, layout, assetUrls, dispatch, revision, linkOptionImages = false, projectLayout, preset = getPreset(undefined), questionNumbers = new Map() }: Props) {
   const format = useFormatTargets()
   if (layout !== null) {
     return (
@@ -130,6 +133,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             update={update as (fn: (b: CompositeBlock) => CompositeBlock) => void}
             assetUrls={assetUrls}
             dispatch={dispatch}
+            questionNumbers={questionNumbers}
           />
         ) : block.type === 'paragraph' ? (
           <Field
@@ -323,12 +327,14 @@ function CompositeForm({
   block,
   update,
   assetUrls,
-  dispatch
+  dispatch,
+  questionNumbers
 }: {
   block: CompositeBlock
   update: (fn: (b: CompositeBlock) => CompositeBlock) => void
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
+  questionNumbers: ReadonlyMap<string, string>
 }) {
   const set = (patch: Partial<CompositeBlock>): void => update((b) => ({ ...b, ...patch }))
   const setLayout = (patch: Partial<BlockLayout>): void => update((b) => ({ ...b, layout: { ...b.layout, ...patch } }))
@@ -382,7 +388,10 @@ function CompositeForm({
         </div>
       </fieldset>
       <fieldset className="group group--teacher">
-        <legend>仅教师版：共用的答案与详解</legend>
+        <legend>仅教师版：答案与解析</legend>
+        <Field label="位置" hint="集中在整道综合题最后，或分到每道小题后面（按题号拆开 / 合并，可撤销）">
+          <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
+        </Field>
         <Field
           label="答案"
           hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写"

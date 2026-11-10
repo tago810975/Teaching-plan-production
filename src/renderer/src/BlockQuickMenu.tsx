@@ -12,11 +12,14 @@ import { difficultyOf, type FormatPreset } from '@core/presets'
 import { plainText } from '@core/model/factory'
 import type { Block, KeepTogether, OptionColumns, QuestionLayout } from '@core/model/types'
 import type { EditorAction } from './state/store'
+import { AnswerPlacementControl } from './panels/AnswerPlacementControl'
 
 interface Props {
   block: Block
   /** 题号（题目才有） */
   number?: string
+  /** 各题在全卷中的题号（综合题答案集中到最后时使用） */
+  questionNumbers?: ReadonlyMap<string, string>
   x: number
   y: number
   preset: FormatPreset
@@ -26,7 +29,7 @@ interface Props {
 
 type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pick<QuestionLayout, 'optionColumns'>>
 
-export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose }: Props) {
+export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, y, preset, dispatch, onClose }: Props) {
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -95,6 +98,11 @@ export function BlockQuickMenu({ block, number, x, y, preset, dispatch, onClose 
             从新的一页开始
           </label>
         </>
+      )}
+      {block.type === 'composite' && block.items.length > 0 && (
+        <Row label="答案">
+          <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
+        </Row>
       )}
       {(block.type === 'title' || block.type === 'section' || block.type === 'topic') && (
         <>

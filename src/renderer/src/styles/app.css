@@ -2065,3 +2065,11 @@ body.is-dragging-outline * {
   padding: 2px 8px;
   font-size: 12px;
 }
+
+.answer-placement .segmented button {
+  white-space: nowrap;
+}
+.answer-placement .segmented button:disabled.is-active {
+  opacity: 1;
+  cursor: default;
+}

@@ -330,6 +330,7 @@ function EditorBody({
           key={quickMenu.blockId}
           block={quickBlock}
           {...(questionNumbers.get(quickBlock.id) !== undefined ? { number: questionNumbers.get(quickBlock.id)! } : {})}
+          questionNumbers={questionNumbers}
           x={quickMenu.x}
           y={quickMenu.y}
           preset={preset}
@@ -387,6 +388,7 @@ function EditorBody({
           linkOptionImages={state.linkOptionImages}
           projectLayout={project.layout}
           preset={preset}
+          questionNumbers={questionNumbers}
           header={headerSelected ? project.header : null}
           layout={state.selectedBlockId === LAYOUT_SELECTION ? project.layout : null}
           assetUrls={assetUrls}
