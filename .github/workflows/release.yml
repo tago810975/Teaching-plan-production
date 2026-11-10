@@ -23,16 +23,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        exclude:
-          - os: ${{ inputs.mac_only && 'windows-latest' || 'none' }}
-        os: [windows-latest, macos-15]
-        include:
-          - os: windows-latest
-            target: --win
-            files: release/*/*.exe
-          - os: macos-15
-            target: --mac
-            files: release/*/*.dmg
+        # 手动运行勾选“只打包 Mac”时只留 Mac
+        include: ${{ fromJSON(inputs.mac_only && '[{"os":"macos-15","target":"--mac","files":"release/*/*.dmg"}]' || '[{"os":"windows-latest","target":"--win","files":"release/*/*.exe"},{"os":"macos-15","target":"--mac","files":"release/*/*.dmg"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
