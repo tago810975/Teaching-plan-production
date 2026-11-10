@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 14
+export const CURRENT_FORMAT_VERSION = 15
 
 /*
  * 版本记录：
@@ -42,6 +42,8 @@ export const CURRENT_FORMAT_VERSION = 14
  *        正文段落块的浅灰底纹（paragraph.shaded）。无需迁移
  * 14 —— 行距 project.layout.lineSpacing（标题 / 题目 / 知识点 / 正文段落的倍数，可只设其中几项）。
  *        不设时用格式预设的行距（预设 lineSpacing），都没有时为单倍，旧工程排版不变。无需迁移
+ * 15 —— 变式题 question.numberStyle = 'variant'（题号 a. b. c.，接在上一道编号题之后）；
+ *        来源 question.source.moan（从墨案导入的条目 id 与标记）。只增加可选字段，无需迁移
  */
 
 export interface Manifest {

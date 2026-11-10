@@ -15,6 +15,7 @@ import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document
 import physicsV1 from './physics-v1.json'
 import physicsHandbookV1 from './physics-handbook-v1.json'
 import physicsTypeSummaryV1 from './physics-typesummary-v1.json'
+import mathV1 from './math-v1.json'
 
 const heading = z.object({
   font: z.enum(['song', 'hei', 'kai', 'fang']),
@@ -96,7 +97,7 @@ export type HeadingFormat = FormatPreset['headings']['title']
 export type HeadingKey = keyof FormatPreset['headings']
 
 /** 内置预设（随软件发布，只读），按显示顺序 */
-export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1), presetSchema.parse(physicsTypeSummaryV1)]
+export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1), presetSchema.parse(physicsTypeSummaryV1), presetSchema.parse(mathV1)]
 
 export { DEFAULT_PRESET_ID }
 

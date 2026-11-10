@@ -231,12 +231,19 @@ export interface Question {
   difficultPoint?: string
   /** 详解，包括【详解】【点睛】等段落 */
   analysis: RichText
+  /**
+   * 题号样式。不设时按 1. 2. 3. 依次编号；variant（变式题）编为 a. b. c.，接在上一道编号题之后，
+   * 不占用数字题号（墨案教案的例题与变式）。
+   */
+  numberStyle?: 'variant'
   /** 来源信息，便于去重与溯源 */
   source?: {
     /** 题库导出的题目标识，样例图片替代文字中的 @@@<uuid> */
     bankId?: string
     /** 导入时的源文件名 */
     fileName?: string
+    /** 从墨案（老教学案系统）导入：教案中的条目 id、题库题目 id，以及墨案中的标记 */
+    moan?: { itemId: number; exerciseId?: number; important?: boolean; questionTypeId?: number }
   }
   layout: QuestionLayout
 }

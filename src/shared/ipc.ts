@@ -18,6 +18,8 @@ export const IPC = {
   saveProject: 'project:save',
   getStartupFile: 'app:get-startup-file',
   getAppInfo: 'app:get-info',
+  /** 打开墨案窗口（从墨案导入） */
+  openMoanImport: 'moan:open-import',
   getTemplateDefaults: 'template:get-defaults',
   listProjects: 'library:list',
   chooseLibraryDir: 'library:choose-dir',
@@ -179,6 +181,8 @@ export interface AppInfo {
 /** 预加载脚本暴露给渲染进程的 API：window.api */
 export interface RendererApi {
   getAppInfo(): Promise<AppInfo>
+  /** 打开墨案窗口，登录后导入老教学案系统中的教案 */
+  openMoanImport(): void
   /** 读取模板的默认页眉（Logo、电话、水印等） */
   getTemplateDefaults(templateId: string): Promise<Result<TemplateDefaults>>
   /** 弹出“打开”对话框；用户取消时返回 null */

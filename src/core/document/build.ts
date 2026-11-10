@@ -36,6 +36,18 @@ const VARIANT_SUFFIX: Record<Variant, string> = { teacher: '(教案)', student: 
 export function buildDocument(project: Project, variant: Variant): DocIR {
   const out: DocParagraph[] = []
   let questionNo = 0
+  /** 当前编号题之后的第几道变式题（a、b、c……） */
+  let variantNo = 0
+  /** 下一道题的题号文字：普通题 1. 2. 3.，变式题 a. b. c.（文档开头就是变式题时按普通题编号） */
+  const nextLabel = (q: Question): string => {
+    if (q.numberStyle === 'variant' && questionNo > 0) {
+      variantNo += 1
+      return `${variantLetters(variantNo)}.`
+    }
+    questionNo += 1
+    variantNo = 0
+    return `${questionNo}.`
+  }
   const preset = getPreset(project.presetId)
   const spacing = resolveLineSpacing(project.layout, preset)
   /** 各类块用哪一项行距 */
@@ -65,7 +77,10 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
       case 'section':
       case 'topic':
         // 大标题、栏目标题、题型分组：可从新的一页开始（文档开头的不另起一页，免得出现空白页）、题号重新开始
-        if (block.restartNumbering === true) questionNo = 0
+        if (block.restartNumbering === true) {
+          questionNo = 0
+          variantNo = 0
+        }
         out.push({
           ...textPara(block.id, block.type, block.text),
           ...(block.restartNumbering === true ? { restartNumbering: true } : {}),
@@ -74,6 +89,7 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
         break
       case 'worksheet':
         questionNo = 0
+        variantNo = 0
         out.push(...buildWorksheet(block, preset))
         break
       case 'paragraph':
@@ -99,16 +115,14 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
       case 'composite': {
         const kt = project.layout.keepQuestionTogether[variant]
         out.push(
-          ...buildComposite(block, variant, (item) => {
-            questionNo += 1
-            return buildQuestion(item.id, item.question, questionNo, variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay)
-          })
+          ...buildComposite(block, variant, (item) =>
+            buildQuestion(item.id, item.question, nextLabel(item.question), variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay)
+          )
         )
         break
       }
       case 'question':
-        questionNo += 1
-        out.push(...buildQuestion(block.id, block.question, questionNo, variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset, project.layout.difficultyDisplay))
+        out.push(...buildQuestion(block.id, block.question, nextLabel(block.question), variant, project.layout.keepQuestionTogether[variant], project.layout.optionStops, preset, project.layout.difficultyDisplay))
         break
     }
   }
@@ -259,10 +273,18 @@ function buildWorksheet(w: WorksheetBlock, preset: FormatPreset): DocParagraph[]
 
 // ---------------- 题目 ----------------
 
+/** 变式题字母：1 → a，26 → z，27 → aa */
+export function variantLetters(n: number): string {
+  let out = ''
+  for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) out = String.fromCharCode(97 + ((k - 1) % 26)) + out
+  return out
+}
+
 function buildQuestion(
   blockId: string,
   q: Question,
-  no: number,
+  /** 题号文字，如“3.”“a.” */
+  label: string,
   variant: Variant,
   keepTogetherByDefault: boolean,
   projectStops: OptionStops = DEFAULT_OPTION_STOPS,
@@ -295,7 +317,7 @@ function buildQuestion(
       anchorIndex: i,
       editTarget: { field: 'stem', paragraph: i },
       style: i === 0 ? 'question' : 'questionContinued',
-      ...(i === 0 && numbered ? { label: `${no}.` } : {}),
+      ...(i === 0 && numbered ? { label, ...(/^\d/.test(label) ? {} : { manualLabel: true }) } : {}),
       ...(numbered ? {} : { ...(i === 0 ? { unnumbered: true } : {}), indentLeftTwip: 0, firstLineIndentTwip: UNNUMBERED_STEM_INDENT_TWIP }),
       ...fontProp(p),
       runs

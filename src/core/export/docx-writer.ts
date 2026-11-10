@@ -139,7 +139,7 @@ class ExportContext {
     if (p.keepLines === true) pPr += '<w:keepLines/>'
     if (p.pageBreakBefore === true) pPr += '<w:pageBreakBefore/>'
     // 不编号的题干：numId 0 取消“题目”样式自带的编号
-    const numPr = p.unnumbered === true ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr>' : this.numPrFor(p.style)
+    const numPr = p.unnumbered === true || p.manualLabel === true ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr>' : this.numPrFor(p.style)
     if (numPr !== '') pPr += numPr
     if (p.shaded === true) pPr += `<w:shd w:val="clear" w:color="auto" w:fill="${TEACHER_SHADING}"/>`
     if (p.tabStopsTwip !== undefined) pPr += tabsXml(p.style, p.tabStopsTwip)
@@ -149,7 +149,10 @@ class ExportContext {
       // 版式设置中的行距：只改行距，段前段后随样式
       pPr += `<w:spacing w:line="${p.lineAuto}" w:lineRule="auto"/>`
     }
-    if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined || p.indentLeftTwip !== undefined) {
+    if (p.manualLabel === true && p.indentLeftTwip === undefined) {
+      // 取消了自动编号：悬挂缩进照样式（题号与题干之间的制表符落在左缩进处）
+      pPr += `<w:ind w:left="${spec.indentLeftTwip ?? 0}" w:hanging="${spec.hangingTwip ?? 0}"/>`
+    } else if (spec.directIndentTwip !== undefined || p.firstLineIndentTwip !== undefined || p.indentLeftTwip !== undefined) {
       const leftTwip = p.indentLeftTwip ?? spec.directIndentTwip
       const left = leftTwip !== undefined ? ` w:left="${leftTwip}"` : ''
       pPr += `<w:ind${left} w:firstLine="${p.firstLineIndentTwip ?? 0}"/>`
@@ -158,7 +161,8 @@ class ExportContext {
 
     let runs = ''
     for (const f of p.floatingImages ?? []) runs += this.drawing(f, 'anchor', f)
-    if (p.label !== undefined && spec.autoNumbered !== true) runs += textRun(p.label, undefined)
+    if (p.label !== undefined && p.manualLabel === true) runs += textRun(p.label, undefined) + '<w:r><w:tab/></w:r>'
+    else if (p.label !== undefined && spec.autoNumbered !== true) runs += textRun(p.label, undefined)
     for (const run of p.runs) runs += this.run(run, p.font)
     return `<w:p><w:pPr>${pPr}</w:pPr>${runs}</w:p>`
   }

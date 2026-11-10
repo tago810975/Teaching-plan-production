@@ -38,6 +38,9 @@ export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateF
         <button type="button" onClick={onCreateFromDocx} title="识别 Word 文档中的题目，生成一份新的教学案">
           从 Word 文档新建…
         </button>
+        <button type="button" onClick={() => window.api.openMoanImport()} title="登录墨案（老教学案系统），把其中的教案导入成教学案">
+          从墨案导入…
+        </button>
         <button type="button" onClick={onOpenOther}>
           打开…
         </button>

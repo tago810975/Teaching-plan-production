@@ -138,8 +138,15 @@ const question = z.object({
   keyPoint: z.string().optional(),
   difficultPoint: z.string().optional(),
   analysis: richText,
+  numberStyle: z.literal('variant').optional(),
   source: z
-    .object({ bankId: z.string().optional(), fileName: z.string().optional() })
+    .object({
+      bankId: z.string().optional(),
+      fileName: z.string().optional(),
+      moan: z
+        .object({ itemId: z.number(), exerciseId: z.number().optional(), important: z.boolean().optional(), questionTypeId: z.number().optional() })
+        .optional()
+    })
     .optional(),
   layout: z.object({
     studentSpaceLines: z.number().min(0),

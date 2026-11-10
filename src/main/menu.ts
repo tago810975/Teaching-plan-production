@@ -6,8 +6,8 @@ import type { MenuCommand } from '@shared/ipc'
 
 /** 由主进程自己处理、不经过界面的菜单动作 */
 export interface MainMenuActions {
-  /** 打开墨案（老教学案系统）数据采集窗口 */
-  moanCapture: () => void
+  /** 打开墨案（老教学案系统）窗口，登录后导入教案 */
+  moanImport: () => void
 }
 
 export function buildAppMenu(send: (command: MenuCommand) => void, actions: MainMenuActions): Menu {
@@ -25,7 +25,7 @@ export function buildAppMenu(send: (command: MenuCommand) => void, actions: Main
       { type: 'separator' },
       { label: '导出 Word…', accelerator: 'CmdOrCtrl+E', click: () => send('export-word') },
       { type: 'separator' },
-      { label: '从墨案采集数据…', click: () => actions.moanCapture() },
+      { label: '从墨案导入…', click: () => actions.moanImport() },
       { type: 'separator' },
       { label: '关闭当前标签页', accelerator: 'CmdOrCtrl+W', click: () => send('close') },
       ...(isMac ? [] : [{ type: 'separator' } as const, { label: '退出', role: 'quit' } as const])

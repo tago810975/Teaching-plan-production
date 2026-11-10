@@ -151,6 +151,11 @@ export interface DocParagraph {
   indentLeftTwip?: number
   /** 不编号：题目样式的段落不显示题号（Word 中写 numId 0 取消样式自带的编号） */
   unnumbered?: boolean
+  /**
+   * 题号由导出直接写成文字（如变式题的“a.”），不用 Word 的自动编号：段落取消样式自带的编号，
+   * 开头写 label 和一个制表符，悬挂缩进与自动编号的题目相同。
+   */
+  manualLabel?: boolean
   /** 对齐方式，覆盖样式中的对齐 */
   align?: 'center' | 'right'
   /** 整段字体大类，覆盖样式中的字体（文字自身的 marks.font 优先） */

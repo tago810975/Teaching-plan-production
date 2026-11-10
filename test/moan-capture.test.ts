@@ -42,6 +42,15 @@ describe('墨案采集：隐去凭证', () => {
     expect(JSON.parse(redactBody('{"mobile":"13800000000","title":"直线方程"}'))).toEqual({ mobile: REDACTED, title: '直线方程' })
   })
 
+  it('socket.io 帧按 JSON 隐去凭证（墨案用 socket.io 传数据）', () => {
+    const frame = '42/moan-teaching-plan,3["show",{"id":"3829","token":"N2YwNTk1MGU%3D"}]'
+    expect(redactBody(frame)).toBe(`42/moan-teaching-plan,3["show",{"id":"3829","token":"${REDACTED}"}]`)
+    expect(redactBody('43/common,0[{"code":"0000","content":{"name":"直线"}}]')).toBe('43/common,0[{"code":"0000","content":{"name":"直线"}}]')
+    expect(redactBody('2')).toBe('2')
+    // 截断的帧不是合法 JSON：仍隐去 "token":"…"
+    expect(redactBody('42/user,0["list",{"token":"abc","name":"x"')).toBe(`42/user,0["list",{"token":"${REDACTED}","name":"x"`)
+  })
+
   it('普通文本中的 JWT 长串替换掉', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.SflKxwRJSMeKKF2QT4fwpM'
     expect(redactBody(`token is ${jwt}`)).toBe(`token is ${REDACTED}`)

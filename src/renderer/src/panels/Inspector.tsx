@@ -672,6 +672,14 @@ function QuestionForm({
         levels={preset.difficulty.levels}
         onChange={(difficulty) => set({ difficulty, stars: undefined })}
       />
+      <label className="checkbox" title="变式题的题号为 a. b. c.，接在上一道题之后，不占用数字题号">
+        <input
+          type="checkbox"
+          checked={q.numberStyle === 'variant'}
+          onChange={(e) => update((b) => ({ ...b, question: withNumberStyle(b.question, e.target.checked) }))}
+        />
+        变式题（题号 a. b. c.）
+      </label>
       <Field
         label="题干"
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
@@ -1143,4 +1151,11 @@ function Segmented<T extends string | number>({
       ))}
     </div>
   )
+}
+
+/** 设为变式题或取消（取消时去掉字段，不留 undefined） */
+function withNumberStyle(q: Question, variant: boolean): Question {
+  if (variant) return { ...q, numberStyle: 'variant' }
+  const { numberStyle: _drop, ...rest } = q
+  return rest
 }

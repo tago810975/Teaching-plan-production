@@ -18,6 +18,7 @@ function subscribe<T extends unknown[]>(
 
 const api: RendererApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
+  openMoanImport: () => ipcRenderer.send(IPC.openMoanImport),
   getTemplateDefaults: (templateId) => ipcRenderer.invoke(IPC.getTemplateDefaults, templateId),
   listTemplates: () => ipcRenderer.invoke(IPC.listTemplates),
   reloadTemplates: () => ipcRenderer.invoke(IPC.reloadTemplates),

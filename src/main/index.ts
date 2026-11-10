@@ -14,7 +14,7 @@ import { IPC, type FolderListing, type LocalPlace, type MenuCommand, type Opened
 import type { ProjectBundle } from '@core/model/types'
 import { listDrives, listFolder, listSubfolders, renameEntry } from './files'
 import { buildAppMenu } from './menu'
-import { openMoanCapture } from './moan-capture'
+import { openMoanWindow } from './moan-window'
 import { readTemplateDefaults } from './template-io'
 import { currentCatalog, deleteTemplateFolder, duplicateTemplate, exportTemplate, importTemplate, loadUserTemplates, userTemplateDir } from './user-templates'
 import { importDocxFiles } from './import-io'
@@ -118,7 +118,7 @@ function createWindow(): void {
 
   Menu.setApplicationMenu(
     buildAppMenu((command: MenuCommand) => win.webContents.send(IPC.menuCommand, command), {
-      moanCapture: () => openMoanCapture(win)
+      moanImport: () => openMoan(win)
     })
   )
 
@@ -164,10 +164,29 @@ function createWindow(): void {
   }
 }
 
+/** 墨案窗口：导入完成后在主窗口打开 */
+function openMoan(win: BrowserWindow): void {
+  openMoanWindow(win, {
+    openInMain: (filePath) => {
+      if (!win.isDestroyed()) win.webContents.send(IPC.openFileRequest, filePath)
+    },
+    focusMain: () => {
+      if (win.isDestroyed()) return
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+}
+
 // ---------- IPC ----------
 
 function registerIpc(): void {
   ipcMain.handle(IPC.getAppInfo, () => ({ version: app.getVersion(), platform: process.platform }))
+
+  ipcMain.on(IPC.openMoanImport, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win !== null) openMoan(win)
+  })
 
   ipcMain.handle(IPC.getTemplateDefaults, async (_event, templateId: string) => {
     try {

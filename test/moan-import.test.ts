@@ -1,0 +1,217 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { collectMoanImageUrls, convertMoanPlan, extractOptions, headingText, splitPlanName, type MoanPlanShow } from '@core/import/moan/convert'
+import { htmlPlainText, htmlToRich, parseColor, splitMath } from '@core/import/moan/html'
+import { readImageInfo } from '@core/import/moan/image-size'
+import { createMoanSession, observeMoanFrame, parseSocketFrame, teachingPlanIdFromUrl } from '@core/import/moan/session'
+import { buildDocument, variantLetters } from '@core/document/build'
+import { createEmptyProject, plainText } from '@core/model/factory'
+import { getPreset } from '@core/presets'
+import type { Block, QuestionBlock } from '@core/model/types'
+
+const SECTIONS = getPreset('math-v1').sectionNames
+const show = (): MoanPlanShow => JSON.parse(readFileSync('test/fixtures/moan/show-3829.json', 'utf8')) as MoanPlanShow
+
+describe('墨案 HTML → 富文本', () => {
+  it('按 <p> 分段，$…$ 为公式（实体先解码）', () => {
+    const r = htmlToRich('<p>已知 $0^{\\circ} \\leq \\alpha&lt;180^{\\circ}$ 。</p><p>第二段</p>')
+    expect(r).toHaveLength(2)
+    expect(r[0]!.inlines).toEqual([
+      { type: 'text', text: '已知 ' },
+      { type: 'math', latex: '0^{\\circ} \\leq \\alpha<180^{\\circ}' },
+      { type: 'text', text: ' 。' }
+    ])
+    expect(plainText(r[1]!)).toBe('第二段')
+  })
+
+  it('$$…$$、\\[…\\] 为行间公式，\\(…\\) 为行内公式', () => {
+    expect(splitMath('a $$x^2$$ b \\(y\\) c \\[z\\]')).toEqual([
+      { text: 'a ' },
+      { latex: 'x^2', display: true },
+      { text: ' b ' },
+      { latex: 'y', display: false },
+      { text: ' c ' },
+      { latex: 'z', display: true }
+    ])
+  })
+
+  it('加粗、颜色、上下标；接近黑色的字色不算颜色', () => {
+    const r = htmlToRich('<p><strong>重</strong><span style="color: rgb(255, 0, 0);">红</span><span style="color: rgb(17, 31, 44);">黑</span>H<sub>2</sub>O</p>')
+    expect(r[0]!.inlines).toEqual([
+      { type: 'text', text: '重', marks: { bold: true } },
+      { type: 'text', text: '红', marks: { color: 'FF0000' } },
+      { type: 'text', text: '黑H' },
+      { type: 'text', text: '2', marks: { script: 'sub' } },
+      { type: 'text', text: 'O' }
+    ])
+    expect(parseColor('#c00000')).toBe('C00000')
+    expect(parseColor('rgb(0,0,0)')).toBeUndefined()
+  })
+
+  it('首尾空段落去掉，中间的保留；<br> 另起一段；居中保留', () => {
+    const r = htmlToRich('<p><br></p><p>审题</p><p><br></p><p style="text-align: center;">讲解</p><p><br></p>')
+    expect(r.map((p) => plainText(p))).toEqual(['审题', '', '讲解'])
+    expect(r[2]!.format).toEqual({ align: 'center' })
+    expect(htmlToRich('<p>甲<br>乙</p>').map((p) => plainText(p))).toEqual(['甲', '乙'])
+  })
+
+  it('表格：合并单元格、表头加粗', () => {
+    const r = htmlToRich('<table><tbody><tr><th colspan="2">表头</th></tr><tr><td>$a$</td><td>b</td></tr></tbody></table>')
+    const t = r[0]!.inlines[0]!
+    expect(t.type).toBe('table')
+    if (t.type !== 'table') return
+    expect(t.rows[0]!.cells[0]!.colSpan).toBe(2)
+    expect(t.rows[0]!.cells[0]!.content[0]!.inlines[0]).toEqual({ type: 'text', text: '表头', marks: { bold: true } })
+    expect(t.rows[1]!.cells[0]!.content[0]!.inlines[0]).toEqual({ type: 'math', latex: 'a' })
+  })
+
+  it('图片由调用方给出资源，取不到时记提示', () => {
+    const warns: string[] = []
+    const r = htmlToRich('<p><img src="https://x/a.png" alt=""></p><p><img src="https://x/b.png"></p>', {
+      image: (src) => (src.endsWith('a.png') ? { type: 'image', assetId: 'A', widthEmu: 1, heightEmu: 1 } : null),
+      warn: (m) => warns.push(m)
+    })
+    expect(r[0]!.inlines).toEqual([{ type: 'image', assetId: 'A', widthEmu: 1, heightEmu: 1 }])
+    expect(warns).toEqual(['图片未能导入：https://x/b.png'])
+  })
+
+  it('纯文字', () => {
+    expect(htmlPlainText('<p><span style="font-size: 22px;"><strong>知识梳理</strong></span></p>')).toBe('知识梳理')
+  })
+})
+
+describe('墨案教案 → 教学案', () => {
+  it('教案名拆成标题与页眉', () => {
+    expect(splitPlanName('2026高二数学解析几何第1讲：直线方程')).toEqual({ title: '直线方程', headerRight: '2026高二数学解析几何第1讲' })
+    expect(splitPlanName('直线方程')).toEqual({ title: '直线方程', headerRight: '直线方程' })
+  })
+
+  it('栏目标题：加粗大字或预设中的栏目名', () => {
+    expect(headingText('<p><span style="font-size: 22px;"><strong>例题精讲</strong></span></p>', SECTIONS)).toBe('例题精讲')
+    expect(headingText('<p>课后练习</p>', SECTIONS)).toBe('课后练习')
+    expect(headingText('<p>本节课的主要内容为直线方程，直线是高中非常重要的板块</p>', SECTIONS)).toBeNull()
+  })
+
+  it('选项：题干末尾依次以 A. B. C. D. 开头的段落', () => {
+    const { stem, options } = extractOptions(htmlToRich('<p>直线方程是</p><p>A. $x$</p><p>B. $y$</p><p>C. 1</p><p>D. 2</p>'))
+    expect(stem.map((p) => plainText(p))).toEqual(['直线方程是'])
+    expect(options.map((o) => [o.label, plainText(o.content)])).toEqual([
+      ['A', '$x$'],
+      ['B', '$y$'],
+      ['C', '1'],
+      ['D', '2']
+    ])
+  })
+
+  it('真实教案“直线方程”：栏目、知识点、19 道题与 16 道变式题', () => {
+    const data = show()
+    const urls = collectMoanImageUrls(data)
+    expect(urls).toHaveLength(2)
+    const images = new Map(urls.map((u, i) => [u, { assetId: `img${i}`, width: 400, height: 300 }]))
+    const r = convertMoanPlan(data, images, SECTIONS)
+    expect(r.title).toBe('直线方程')
+    expect(r.headerRight).toBe('2026高二数学解析几何第1讲')
+    expect(r.questionCount).toBe(35)
+    expect(r.warnings).toEqual([])
+
+    const kinds = r.blocks.map((b) => b.type)
+    expect(kinds[0]).toBe('title')
+    const sections = r.blocks.filter((b): b is Extract<Block, { type: 'section' }> => b.type === 'section')
+    expect(sections.map((s) => [s.text, s.pageBreakBefore === true])).toEqual([
+      ['知识梳理', false],
+      ['例题精讲', true],
+      ['课堂总结', true],
+      ['课后练习', true]
+    ])
+    // 知识梳理中的三张卡片都是知识点（“5. 两条直线的位置关系”是文字卡片，也按知识点导入）
+    expect(r.blocks.filter((b) => b.type === 'knowledge')).toHaveLength(3)
+
+    const qs = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
+    expect(qs).toHaveLength(35)
+    expect(qs.filter((q) => q.numberStyle !== 'variant')).toHaveLength(19)
+    const first = qs[0]!
+    expect(plainText(first.stem)).toBe('已知直线 $l$ 的方程为 $2 x+y+1=0$, 则直线 $l$ 的倾斜角为___________')
+    expect(first.kind).toBe('fill-blank')
+    expect(first.stars).toBe(5)
+    expect(first.layout.studentSpaceLines).toBe(5)
+    expect(plainText(first.answer)).toBe('标准答案: $\\pi-\\arctan 2$')
+    expect(plainText(first.analysis).startsWith('【解析】审题: 倾斜角与斜率')).toBe(true)
+    expect(first.source?.moan).toEqual({ itemId: 102417, exerciseId: 249, questionTypeId: 1 })
+    // 第 19 题是选择题
+    const last = qs[qs.length - 1]!
+    expect(last.kind).toBe('single-choice')
+    expect(last.options.map((o) => o.label)).toEqual(['A', 'B', 'C', 'D'])
+    expect(plainText(last.answer)).toBe('A')
+    // 8b 的题图排在题干下方
+    const withFigure = qs.filter((q) => q.figures.length > 0)
+    expect(withFigure).toHaveLength(1)
+    expect(withFigure[0]!.figures[0]).toMatchObject({ assetId: 'img1', placement: 'below', widthEmu: 400 * 9525 })
+    // “≠”保留为 LaTeX（PDF 文字层里会变成“=”）
+    const k = r.blocks.find((b) => b.type === 'knowledge' && plainText(b.content).includes('两条直线的位置关系'))
+    expect(k !== undefined && plainText((k as Extract<Block, { type: 'knowledge' }>).content).includes('c_1 \\neq \\lambda c_2')).toBe(true)
+  })
+
+  it('题号：1. a. b. 2. a. …，与墨案一致', () => {
+    const r = convertMoanPlan(show(), new Map(), SECTIONS)
+    const project = { ...createEmptyProject(), presetId: 'math-v1', blocks: r.blocks }
+    const labels = buildDocument(project, 'teacher')
+      .paragraphs.filter((p) => p.style === 'question' && p.label !== undefined)
+      .map((p) => p.label)
+    expect(labels.slice(0, 9)).toEqual(['1.', 'a.', 'b.', '2.', 'a.', 'b.', '3.', 'a.', 'b.'])
+    expect(labels.filter((l) => /^\d/.test(l!))).toHaveLength(19)
+    expect(labels[labels.length - 1]).toBe('19.')
+  })
+})
+
+describe('变式题题号', () => {
+  it('字母：a～z，之后 aa', () => {
+    expect([1, 2, 26, 27].map(variantLetters)).toEqual(['a', 'b', 'z', 'aa'])
+  })
+
+  it('文档开头的变式题按普通题编号；变式题的题号由导出写成文字', () => {
+    const r = convertMoanPlan(show(), new Map(), SECTIONS)
+    const qs = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').slice(1, 3)
+    const ir = buildDocument({ ...createEmptyProject(), blocks: qs }, 'student')
+    const heads = ir.paragraphs.filter((p) => p.style === 'question')
+    expect(heads.map((p) => [p.label, p.manualLabel === true])).toEqual([
+      ['1.', false],
+      ['a.', true]
+    ])
+  })
+})
+
+describe('墨案会话', () => {
+  it('解析 socket.io 帧', () => {
+    expect(parseSocketFrame('42/moan-teaching-plan,3["show",{"id":"3829"}]')).toEqual({ type: '42', namespace: 'moan-teaching-plan', ackId: 3, data: ['show', { id: '3829' }] })
+    expect(parseSocketFrame('2')).toBeNull()
+  })
+
+  it('从网页发出的帧中得到服务器地址、令牌与当前文件夹；从回应中得到文件夹名称', () => {
+    const s = createMoanSession()
+    const url = 'wss://server.modijiaoyu.com/socket.io/?EIO=3&transport=websocket'
+    observeMoanFrame(s, 'send', url, '40/user,')
+    expect(s.token).toBeUndefined()
+    observeMoanFrame(s, 'send', url, '42/moan-teaching-plan,2["list",{"folder_id":544,"hadChild":1,"user_id":"","token":"T%3D"}]')
+    observeMoanFrame(s, 'receive', url, '43/teaching-plan,0[{"code":"0000","content":{"folders":[{"id":544,"name":"解析几何"}]}}]')
+    expect(s).toMatchObject({ wsUrl: url, token: 'T%3D', folderId: 544 })
+    expect(s.folderNames.get(544)).toBe('解析几何')
+  })
+
+  it('教案编辑页的地址', () => {
+    expect(teachingPlanIdFromUrl('https://moan.modijiaoyu.com/#/teach/edit_teachingPlan/3829?type=teachingPlan')).toBe(3829)
+    expect(teachingPlanIdFromUrl('https://moan.modijiaoyu.com/#/teach/standard_content')).toBeNull()
+  })
+})
+
+describe('图片尺寸', () => {
+  it('PNG、GIF、JPEG', () => {
+    const png = new Uint8Array(24)
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 1, 44, 0, 0, 0, 200])
+    expect(readImageInfo(png)).toEqual({ mime: 'image/png', width: 300, height: 200 })
+    const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 10, 0, 20, 0])
+    expect(readImageInfo(gif)).toEqual({ mime: 'image/gif', width: 10, height: 20 })
+    const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, 0, 50, 0, 80, 3, 0, 0, 0])
+    expect(readImageInfo(jpg)).toEqual({ mime: 'image/jpeg', width: 80, height: 50 })
+    expect(readImageInfo(new Uint8Array([1, 2, 3]))).toBeNull()
+  })
+})

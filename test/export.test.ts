@@ -145,3 +145,21 @@ describe('LaTeX → OMML', () => {
     expect(() => latexToOmml('\\frac{1}{')).toThrow()
   })
 })
+
+describe('导出：变式题题号', () => {
+  it('变式题取消自动编号，题号“a.”写成文字加制表符；普通题仍用自动编号', async () => {
+    const bundle = createEmptyBundle()
+    bundle.project.blocks = [
+      { id: newId(), type: 'question', question: createQuestion({ kind: 'solve', stem: [para('例题')] }) },
+      { id: newId(), type: 'question', question: createQuestion({ kind: 'solve', stem: [para('变式一')], numberStyle: 'variant' }) }
+    ]
+    const { doc } = await exportParts(bundle, 'student')
+    const paras = doc.split('<w:p>').filter((p) => p.includes('例题') || p.includes('变式一'))
+    expect(paras).toHaveLength(2)
+    expect(paras[0]).not.toContain('<w:t xml:space="preserve">1.</w:t>')
+    expect(paras[0]).not.toContain('w:numId w:val="0"')
+    expect(paras[1]).toContain('<w:numId w:val="0"/>')
+    expect(paras[1]).toMatch(/<w:t[^>]*>a\.<\/w:t><\/w:r><w:r><w:tab\/><\/w:r>/)
+    expect(paras[1]).toContain('<w:ind w:left="333" w:hanging="394"/>')
+  })
+})

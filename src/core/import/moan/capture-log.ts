@@ -150,6 +150,15 @@ export function redactJsonValue(value: unknown): unknown {
  */
 export function redactBody(body: string): string {
   const trimmed = body.trim()
+  // socket.io 帧：类型数字 + 可选的 /命名空间, + 可选的确认号 + JSON，如 42/moan-teaching-plan,3["show",{"token":"…"}]
+  const sio = /^(\d+(?:\/[^,\[{]*,)?\d*)([\[{][\s\S]*)$/.exec(trimmed)
+  if (sio !== null && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    try {
+      return sio[1] + JSON.stringify(redactJsonValue(JSON.parse(sio[2]!)))
+    } catch {
+      // 不是合法 JSON，按普通文本处理
+    }
+  }
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       return JSON.stringify(redactJsonValue(JSON.parse(trimmed)))
@@ -167,7 +176,14 @@ export function redactBody(body: string): string {
       })
       .join('&')
   }
-  return body.replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/g, REDACTED)
+  return redactLooseText(body)
+}
+
+/** 普通文本里的凭证：像 JWT 的长串、"token":"…" 一类的键值 */
+function redactLooseText(text: string): string {
+  return text
+    .replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/g, REDACTED)
+    .replace(/("(?:[\w-]*(?:token|password|passwd|pwd|ticket|session|secret)[\w-]*)"\s*:\s*)"[^"]*"/gi, `$1"${REDACTED}"`)
 }
 
 // ---------- 筛选 ----------

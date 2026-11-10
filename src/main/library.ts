@@ -13,7 +13,7 @@ import { createEmptyBundle } from '@core/model/factory'
 import { decodeSummary } from '@core/project-file/codec'
 import { PROJECT_FILE_EXTENSION } from '@core/project-file/format'
 import { withTemplateDefaults } from '@core/template/defaults'
-import type { Asset, Block } from '@core/model/types'
+import type { ProjectBundle, Asset, Block } from '@core/model/types'
 import type { LibraryListing, OpenedProject, ProjectListItem } from '@shared/ipc'
 import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project-io'
 import { readTemplateDefaults } from './template-io'
@@ -181,7 +181,9 @@ export async function createProject(
   dir: string | null,
   templateId: string,
   content?: { blocks: Block[]; assets: Record<string, Asset> },
-  presetId?: string
+  presetId?: string,
+  /** 写入前再调整（如从墨案导入时设置页眉右侧文字与难度显示） */
+  adjust?: (bundle: ProjectBundle) => void
 ): Promise<OpenedProject> {
   const targetDir = dir ?? (await getLibraryDir())
   await mkdir(targetDir, { recursive: true })
@@ -199,6 +201,7 @@ export async function createProject(
     bundle.project.blocks = content.blocks
     bundle.assets = { ...bundle.assets, ...content.assets }
   }
+  adjust?.(bundle)
 
   await writeProjectFile(filePath, bundle, app.getVersion())
   await addRecent(filePath)
