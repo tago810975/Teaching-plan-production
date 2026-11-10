@@ -364,12 +364,12 @@ function TableView({
     e.preventDefault()
     e.stopPropagation()
     const handle = e.currentTarget
-    handle.setPointerCapture(e.pointerId)
     const zoom = previewZoom(handle)
     const startX = e.clientX
     const start = table.colWidthsTwip.slice()
     const sum = start.reduce((a, b) => a + b, 0)
     let current = start
+    // 在窗口上监听：拖动中表格可能因变高被排到下一页而重新创建，挂在手柄上的监听会随之失效
     const move = (ev: PointerEvent): void => {
       const d = ((ev.clientX - startX) / zoom) * 20 // 1pt = 20twip
       const next = start.slice()
@@ -384,15 +384,17 @@ function TableView({
       setDraft(current)
     }
     const up = (): void => {
-      handle.removeEventListener('pointermove', move)
-      handle.removeEventListener('pointerup', up)
-      handle.removeEventListener('pointercancel', up)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      document.body.classList.remove('is-resizing')
       setDraft(null)
       if (current.some((w, k) => w !== start[k])) onResize(tableRef, current)
     }
-    handle.addEventListener('pointermove', move)
-    handle.addEventListener('pointerup', up)
-    handle.addEventListener('pointercancel', up)
+    document.body.classList.add('is-resizing')
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
 
   let x = 0
