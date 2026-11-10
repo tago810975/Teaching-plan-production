@@ -6,6 +6,7 @@ import {
   REDACTED,
   captureFileName,
   isTextMime,
+  shouldRecord,
   redactBody,
   redactHeaders,
   redactPageHtml,
@@ -98,6 +99,38 @@ describe('墨案采集：记录器', () => {
     r.pageVisited('https://a/#/x')
     r.pageVisited('https://a/#/y')
     expect(r.finish('t').pages.map((p) => p.url)).toEqual(['https://a/#/x', 'https://a/#/y'])
+  })
+})
+
+describe('墨案采集：记录哪些请求', () => {
+  it('接口请求都记，静态资源不记', () => {
+    expect(shouldRecord('XHR', 'https://a/api/x')).toBe(true)
+    expect(shouldRecord('Fetch', 'https://a/api/x')).toBe(true)
+    expect(shouldRecord('EventSource', 'https://a/sse')).toBe(true)
+    expect(shouldRecord('Other', 'https://a/api/x')).toBe(true)
+    expect(shouldRecord('Image', 'https://a/x.png')).toBe(false)
+    expect(shouldRecord('Stylesheet', 'https://a/x.css')).toBe(false)
+    expect(shouldRecord('Document', 'https://a/')).toBe(false)
+  })
+
+  it('脚本只记 JSONP 之类的动态请求', () => {
+    expect(shouldRecord('Script', 'https://a/js/chunk-vendors.c8c910de.js')).toBe(false)
+    expect(shouldRecord('Script', 'https://a/api/plan?id=1&callback=jsonp_1')).toBe(true)
+    expect(shouldRecord('Script', 'https://a/api/plan?id=1')).toBe(true)
+  })
+
+  it('WebSocket 每一帧记一条', () => {
+    const r = new CaptureRecorder('s')
+    r.webSocketCreated({ requestId: 'w', url: 'wss://a/ws?token=1' })
+    r.webSocketFrame({ requestId: 'w', response: { opcode: 1, payloadData: '{"cmd":"getPlan","id":3829}' } }, 'send')
+    r.webSocketFrame({ requestId: 'w', response: { opcode: 1, payloadData: '{"token":"t","stem":"已知"}' } }, 'receive')
+    const f = r.finish('t')
+    expect(f.entries.map((e) => [e.method, e.url])).toEqual([
+      ['WS-SEND', `wss://a/ws?token=${REDACTED}`],
+      ['WS-RECV', `wss://a/ws?token=${REDACTED}`]
+    ])
+    expect(JSON.parse(f.entries[1]!.responseBody!)).toEqual({ token: REDACTED, stem: '已知' })
+    expect(f.diagnostics.cdpTypeCounts['WebSocket']).toBe(1)
   })
 })
 

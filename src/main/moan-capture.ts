@@ -72,7 +72,6 @@ export function openMoanCapture(parent: BrowserWindow | null): void {
     width: 1360,
     height: 880,
     title: baseTitle,
-    autoHideMenuBar: true,
     ...(parent !== null ? { parent } : {}),
     webPreferences: {
       partition: MOAN_PARTITION,
@@ -89,7 +88,11 @@ export function openMoanCapture(parent: BrowserWindow | null): void {
   let status = ''
   const updateTitle = (): void => {
     if (win.isDestroyed()) return
-    win.setTitle(status !== '' ? `${baseTitle} — ${status}` : `${baseTitle}（已记录 ${recorder.count} 条；打开教案后点“采集 → 一键采集本教案”）`)
+    win.setTitle(
+      status !== ''
+        ? `${baseTitle} — ${status}`
+        : `${baseTitle}（接口 ${recorder.count} 条 · 页面内 ${recorder.pageRequestTotal} · 协议 ${recorder.cdpRequestTotal}；打开教案后点菜单“采集 → 一键采集本教案”）`
+    )
   }
   refreshTitle.set(wcId, updateTitle)
   const setStatus = (text: string): void => {
@@ -130,10 +133,36 @@ export function openMoanCapture(parent: BrowserWindow | null): void {
     else if (target.startsWith('https://') || target.startsWith('http://')) void shell.openExternal(target)
     return { action: 'deny' }
   })
-  wc.on('did-navigate', (_e, u) => recorder.pageVisited(u))
-  wc.on('did-navigate-in-page', (_e, u) => recorder.pageVisited(u))
+  // 进入教案编辑页时询问是否一键采集（每份教案只问一次）
+  const asked = new Set<string>()
+  const onPage = (u: string): void => {
+    if (u.startsWith('about:')) return
+    recorder.pageVisited(u)
+    updateTitle()
+    const id = /#\/teach\/edit_teachingPlan\/(\d+)/.exec(u)?.[1]
+    if (id === undefined || asked.has(id) || session.busy) return
+    asked.add(id)
+    // 等页面内容加载出来再问
+    setTimeout(() => {
+      if (win.isDestroyed() || session.busy || !isTeachingPlanEditUrl(wc.getURL())) return
+      void dialog
+        .showMessageBox(win, {
+          type: 'question',
+          buttons: ['开始一键采集', '稍后'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
+          message: '已打开教案，现在一键采集吗？',
+          detail: '软件会自动点开每道题的“详情”和“预览教案”，大约一两分钟，完成后自动保存并关闭窗口。期间请不要操作窗口。\n\n以后也可以从窗口顶部菜单“采集 → 一键采集本教案”（Ctrl+Shift+A）开始。'
+        })
+        .then(({ response }) => {
+          if (response === 0) void runOneClick(win, session, setStatus)
+        })
+    }, 2500)
+  }
+  wc.on('did-navigate', (_e, u) => onPage(u))
+  wc.on('did-navigate-in-page', (_e, u) => onPage(u))
 
-  attachNetworkRecorder(wc, recorder, updateTitle)
   updateTitle()
 
   let saving = false
@@ -159,7 +188,18 @@ export function openMoanCapture(parent: BrowserWindow | null): void {
     ;(globalThis as Record<string, unknown>)['__moanOneClick'] = () => runOneClick(win, session, setStatus)
   }
 
-  void wc.loadURL(url)
+  // 先打开空白页，让页面进程起来，才能启用 Network；启用后再打开墨案，最早的请求也能记到
+  void wc
+    .loadURL('about:blank')
+    .catch(() => undefined)
+    .then(() => (win.isDestroyed() ? undefined : withTimeout(attachNetworkRecorder(wc, recorder, updateTitle), 3000)))
+    .then(() => {
+      if (!win.isDestroyed()) void wc.loadURL(url)
+    })
+}
+
+function withTimeout(p: Promise<void>, ms: number): Promise<void> {
+  return Promise.race([p, new Promise<void>((resolve) => setTimeout(resolve, ms))])
 }
 
 function sameSite(target: string, base: string): boolean {
@@ -170,29 +210,28 @@ function sameSite(target: string, base: string): boolean {
   }
 }
 
-function attachNetworkRecorder(wc: WebContents, recorder: CaptureRecorder, onChange: () => void): void {
+/** 连接开发者协议并启用 Network；返回的 Promise 在启用后（或失败后）完成，再加载页面，免得漏掉最早的请求 */
+function attachNetworkRecorder(wc: WebContents, recorder: CaptureRecorder, onChange: () => void): Promise<void> {
   const dbg = wc.debugger
   try {
     dbg.attach('1.3')
     recorder.note('开发者协议：已连接')
   } catch (err) {
     recorder.note(`开发者协议：连接失败（${String(err)}），只靠页面内记录`)
-    return
+    return Promise.resolve()
   }
   dbg.on('detach', (_event, reason: string) => recorder.note(`开发者协议：已断开（${reason}）`))
-  dbg
+  const enabled = dbg
     .sendCommand('Network.enable', { maxTotalBufferSize: 200_000_000, maxResourceBufferSize: 20_000_000 })
     .then(() => recorder.note('开发者协议：Network 已启用'))
     .catch((err: unknown) => recorder.note(`开发者协议：Network 启用失败（${String(err)}）`))
 
   dbg.on('message', (_event, method: string, params: Record<string, unknown>) => {
     switch (method) {
-      case 'Network.requestWillBeSent': {
-        const before = recorder.count
+      case 'Network.requestWillBeSent':
         recorder.requestWillBeSent(params as Parameters<CaptureRecorder['requestWillBeSent']>[0])
-        if (recorder.count !== before) onChange()
+        onChange()
         break
-      }
       case 'Network.requestWillBeSentExtraInfo':
         recorder.requestExtraInfo(params as Parameters<CaptureRecorder['requestExtraInfo']>[0])
         break
@@ -211,11 +250,21 @@ function attachNetworkRecorder(wc: WebContents, recorder: CaptureRecorder, onCha
           .catch((err: unknown) => recorder.fail(requestId, `读取正文失败：${String(err)}`))
         break
       }
+      case 'Network.webSocketCreated':
+        recorder.webSocketCreated(params as Parameters<CaptureRecorder['webSocketCreated']>[0])
+        onChange()
+        break
+      case 'Network.webSocketFrameSent':
+      case 'Network.webSocketFrameReceived':
+        recorder.webSocketFrame(params as Parameters<CaptureRecorder['webSocketFrame']>[0], method.endsWith('Sent') ? 'send' : 'receive')
+        onChange()
+        break
       case 'Network.loadingFailed':
         recorder.fail(params['requestId'] as string, `请求失败：${String(params['errorText'] ?? '')}`)
         break
     }
   })
+  return enabled
 }
 
 /** 在页面里执行脚本并解析返回的 JSON */

@@ -45,7 +45,7 @@ export interface CaptureEntry {
 
 /** 页面内记录到的一次接口请求（由采集窗口的预加载脚本送来） */
 export interface PageRequest {
-  kind: 'xhr' | 'fetch'
+  kind: 'xhr' | 'fetch' | 'ws'
   method: string
   url: string
   requestBody?: string
@@ -172,9 +172,21 @@ export function redactBody(body: string): string {
 
 // ---------- 筛选 ----------
 
-/** 只记录网页脚本发出的接口请求（XHR / Fetch），不记录图片、样式、脚本文件 */
-export function shouldRecord(resourceType: string | undefined): boolean {
-  return resourceType === 'XHR' || resourceType === 'Fetch'
+/** 静态资源类型：不记录 */
+const STATIC_TYPES = new Set(['Document', 'Stylesheet', 'Image', 'Media', 'Font', 'Manifest', 'TextTrack', 'Prefetch', 'CSPViolationReport'])
+
+/**
+ * 是否记录这个请求：接口请求（XHR / Fetch / EventSource 等）都记；脚本只记“动态”的
+ * （JSONP 之类：地址带 callback 参数或不以 .js 结尾），普通 .js 文件、图片、样式不记。
+ */
+export function shouldRecord(resourceType: string | undefined, url = ''): boolean {
+  if (resourceType === undefined) return true
+  if (STATIC_TYPES.has(resourceType)) return false
+  if (resourceType === 'Script') {
+    const path = url.split(/[?#]/)[0] ?? ''
+    return /[?&](callback|jsonp|cb)=/i.test(url) || !/\.js$/i.test(path)
+  }
+  return !url.startsWith('data:') && !url.startsWith('blob:')
 }
 
 /** 响应是否为文本（JSON、HTML、纯文本等），二进制不读正文 */
@@ -238,7 +250,7 @@ export class CaptureRecorder {
       time: this.now().toISOString(),
       method: String(req.method || 'GET').toUpperCase(),
       url: redactUrl(String(req.url)),
-      resourceType: req.kind === 'fetch' ? 'Fetch' : 'XHR',
+      resourceType: req.kind === 'fetch' ? 'Fetch' : req.kind === 'ws' ? 'WebSocket' : 'XHR',
       requestHeaders: {},
       pageUrl: this.currentPage,
       source: 'page'
@@ -269,7 +281,7 @@ export class CaptureRecorder {
   }): void {
     const type = params.type ?? '(无类型)'
     this.cdpTypeCounts[type] = (this.cdpTypeCounts[type] ?? 0) + 1
-    if (!shouldRecord(params.type)) return
+    if (!shouldRecord(params.type, params.request.url)) return
     if (!this.hasRoom()) return
     const req = params.request
     const entry: CaptureEntry = {
@@ -285,6 +297,45 @@ export class CaptureRecorder {
     if (req.postData !== undefined) entry.requestBody = redactBody(req.postData)
     this.entries.push(entry)
     this.pending.set(params.requestId, { entry })
+  }
+
+  /** 开发者协议看到的请求总数（含静态资源），用来判断开发者协议是否在工作 */
+  get cdpRequestTotal(): number {
+    return Object.values(this.cdpTypeCounts).reduce((a, b) => a + b, 0)
+  }
+
+  /** 页面内记录到的请求数 */
+  get pageRequestTotal(): number {
+    return this.pageHookRequests
+  }
+
+  private readonly sockets = new Map<string, string>()
+
+  /** Network.webSocketCreated */
+  webSocketCreated(params: { requestId: string; url: string }): void {
+    this.cdpTypeCounts['WebSocket'] = (this.cdpTypeCounts['WebSocket'] ?? 0) + 1
+    this.sockets.set(params.requestId, redactUrl(params.url))
+  }
+
+  /** Network.webSocketFrameSent / webSocketFrameReceived：每一帧记一条 */
+  webSocketFrame(params: { requestId: string; response?: { opcode?: number; payloadData?: string } }, direction: 'send' | 'receive'): void {
+    if (!this.hasRoom()) return
+    const payload = params.response?.payloadData ?? ''
+    const text = params.response?.opcode === 2 ? '[二进制帧]' : payload
+    const entry: CaptureEntry = {
+      seq: ++this.seq,
+      time: this.now().toISOString(),
+      method: direction === 'send' ? 'WS-SEND' : 'WS-RECV',
+      url: this.sockets.get(params.requestId) ?? '(WebSocket)',
+      resourceType: 'WebSocket',
+      requestHeaders: {},
+      pageUrl: this.currentPage,
+      source: 'cdp'
+    }
+    const body = text.length > MAX_BODY_CHARS ? undefined : redactBody(text)
+    if (direction === 'send') entry.requestBody = body ?? '[过长未记录]'
+    else entry.responseBody = body ?? '[过长未记录]'
+    this.entries.push(entry)
   }
 
   /** Network.requestWillBeSentExtraInfo：带有浏览器自动加上的请求头（Cookie 等），只为看出鉴权方式 */

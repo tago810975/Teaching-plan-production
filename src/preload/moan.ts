@@ -89,6 +89,32 @@ function installHook(sink: (entry: unknown) => void): void {
     return origSend.call(this, body)
   }
 
+  // ---- WebSocket（有的系统用它传数据）----
+  const OrigWS = window.WebSocket
+  if (typeof OrigWS === 'function') {
+    const Wrapped = function (this: unknown, url: string | URL, protocols?: string | string[]) {
+      const ws = protocols === undefined ? new OrigWS(url) : new OrigWS(url, protocols)
+      const u = absolute(url)
+      ws.addEventListener('message', (e: MessageEvent) => {
+        report({ kind: 'ws', method: 'WS-RECV', url: u, responseBody: typeof e.data === 'string' ? e.data.slice(0, MAX) : '[二进制帧]' })
+      })
+      const origWsSend = ws.send
+      ws.send = function (data: Parameters<WebSocket['send']>[0]) {
+        report({ kind: 'ws', method: 'WS-SEND', url: u, requestBody: typeof data === 'string' ? data.slice(0, MAX) : '[二进制帧]' })
+        return origWsSend.call(ws, data)
+      }
+      return ws
+    } as unknown as typeof WebSocket
+    Object.defineProperties(Wrapped, {
+      prototype: { value: OrigWS.prototype },
+      CONNECTING: { value: OrigWS.CONNECTING },
+      OPEN: { value: OrigWS.OPEN },
+      CLOSING: { value: OrigWS.CLOSING },
+      CLOSED: { value: OrigWS.CLOSED }
+    })
+    window.WebSocket = Wrapped
+  }
+
   // ---- fetch ----
   const origFetch = window.fetch
   if (typeof origFetch === 'function') {
@@ -120,6 +146,7 @@ function installHook(sink: (entry: unknown) => void): void {
 
 try {
   contextBridge.executeInMainWorld({ func: installHook, args: [send] })
+  send({ note: `页面内记录：已安装（${location.href}）` })
 } catch (err) {
   send({ note: `页面内记录安装失败：${String(err)}` })
 }
