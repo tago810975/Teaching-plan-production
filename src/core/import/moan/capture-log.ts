@@ -13,7 +13,7 @@ export const MOAN_START_URL = `${MOAN_ORIGIN}/#/teach/standard_content`
 export const REDACTED = '[已隐去]'
 
 /** 采集文件的格式版本 */
-export const CAPTURE_FORMAT = 'moan-capture/1'
+export const CAPTURE_FORMAT = 'moan-capture/2'
 
 /** 单条响应正文的上限（字符）。教案详情一般只有几十 KB，超过的多半是静态资源 */
 export const MAX_BODY_CHARS = 5_000_000
@@ -39,6 +39,41 @@ export interface CaptureEntry {
   note?: string
   /** 请求发出时页面所在的地址（可看出是在哪个页面上点了什么） */
   pageUrl?: string
+  /** 记录来源：cdp 为浏览器开发者协议，page 为页面内对 XHR / fetch 的记录（两者互为备份，可能重复） */
+  source?: 'cdp' | 'page'
+}
+
+/** 页面内记录到的一次接口请求（由采集窗口的预加载脚本送来） */
+export interface PageRequest {
+  kind: 'xhr' | 'fetch'
+  method: string
+  url: string
+  requestBody?: string
+  status?: number
+  mimeType?: string
+  responseBody?: string
+  error?: string
+}
+
+/** 题目“详情”对话框的内容（自动点开得到） */
+export interface DetailExtract {
+  /** 第几个“详情”按钮，从 0 开始，按页面顺序 */
+  index: number
+  /** 这道题在编辑页上的文字开头，用来对应题目 */
+  label: string
+  /** 对话框正文的 HTML（公式带 LaTeX 源码） */
+  html: string
+  note?: string
+}
+
+export interface CaptureExtracts {
+  /** 页面 Vue 组件与 Vuex 中的数据（教案在内存里的原始结构） */
+  vueState?: unknown
+  details?: DetailExtract[]
+  /** “预览教案”对话框的 HTML */
+  preview?: string
+  /** 自动采集过程中的提示 */
+  log?: string[]
 }
 
 export interface CaptureFile {
@@ -52,6 +87,10 @@ export interface CaptureFile {
   entries: CaptureEntry[]
   /** 关闭窗口时页面的完整 HTML（含已展开的详情） */
   finalPage?: { url: string; html: string }
+  /** 一键采集时从页面直接提取的内容 */
+  extracts?: CaptureExtracts
+  /** 诊断信息：开发者协议是否连上、各类请求的数量等，用来排查“记录为 0 条” */
+  diagnostics: { cdpTypeCounts: Record<string, number>; pageHookRequests: number }
   /** 记录被截断等提示 */
   notes: string[]
 }
@@ -162,6 +201,8 @@ export class CaptureRecorder {
   private seq = 0
   private currentPage = ''
   private truncated = false
+  private readonly cdpTypeCounts: Record<string, number> = {}
+  private pageHookRequests = 0
   readonly startedAt: string
 
   constructor(
@@ -173,6 +214,44 @@ export class CaptureRecorder {
 
   get count(): number {
     return this.entries.length
+  }
+
+  note(text: string): void {
+    this.notes.push(text)
+  }
+
+  private hasRoom(): boolean {
+    if (this.entries.length < MAX_ENTRIES) return true
+    if (!this.truncated) {
+      this.truncated = true
+      this.notes.push(`记录已达 ${MAX_ENTRIES} 条上限，之后的请求未记录`)
+    }
+    return false
+  }
+
+  /** 页面内记录到的请求（已完成，含响应） */
+  addPageRequest(req: PageRequest): void {
+    this.pageHookRequests++
+    if (!this.hasRoom()) return
+    const entry: CaptureEntry = {
+      seq: ++this.seq,
+      time: this.now().toISOString(),
+      method: String(req.method || 'GET').toUpperCase(),
+      url: redactUrl(String(req.url)),
+      resourceType: req.kind === 'fetch' ? 'Fetch' : 'XHR',
+      requestHeaders: {},
+      pageUrl: this.currentPage,
+      source: 'page'
+    }
+    if (typeof req.requestBody === 'string') entry.requestBody = redactBody(req.requestBody)
+    if (typeof req.status === 'number') entry.status = req.status
+    if (typeof req.mimeType === 'string') entry.mimeType = req.mimeType
+    if (typeof req.responseBody === 'string') {
+      if (req.responseBody.length > MAX_BODY_CHARS) entry.note = `响应正文 ${req.responseBody.length} 字符，超过上限未记录`
+      else entry.responseBody = redactBody(req.responseBody)
+    }
+    if (typeof req.error === 'string') entry.note = req.error
+    this.entries.push(entry)
   }
 
   pageVisited(url: string): void {
@@ -188,14 +267,10 @@ export class CaptureRecorder {
     type?: string
     request: { url: string; method: string; headers?: Record<string, unknown>; postData?: string }
   }): void {
+    const type = params.type ?? '(无类型)'
+    this.cdpTypeCounts[type] = (this.cdpTypeCounts[type] ?? 0) + 1
     if (!shouldRecord(params.type)) return
-    if (this.entries.length >= MAX_ENTRIES) {
-      if (!this.truncated) {
-        this.truncated = true
-        this.notes.push(`记录已达 ${MAX_ENTRIES} 条上限，之后的请求未记录`)
-      }
-      return
-    }
+    if (!this.hasRoom()) return
     const req = params.request
     const entry: CaptureEntry = {
       seq: ++this.seq,
@@ -204,7 +279,8 @@ export class CaptureRecorder {
       url: redactUrl(req.url),
       resourceType: params.type ?? '',
       requestHeaders: redactHeaders(req.headers),
-      pageUrl: this.currentPage
+      pageUrl: this.currentPage,
+      source: 'cdp'
     }
     if (req.postData !== undefined) entry.requestBody = redactBody(req.postData)
     this.entries.push(entry)
@@ -258,7 +334,7 @@ export class CaptureRecorder {
     p.entry.note = reason
   }
 
-  finish(app: string, finalPage?: { url: string; html: string }): CaptureFile {
+  finish(app: string, finalPage?: { url: string; html: string }, extracts?: CaptureExtracts): CaptureFile {
     for (const p of this.pending.values()) p.entry.note ??= '窗口关闭时尚未收到响应'
     this.pending.clear()
     const file: CaptureFile = {
@@ -269,7 +345,16 @@ export class CaptureRecorder {
       startUrl: this.startUrl,
       pages: [...this.pages],
       entries: [...this.entries],
+      diagnostics: { cdpTypeCounts: { ...this.cdpTypeCounts }, pageHookRequests: this.pageHookRequests },
       notes: [...this.notes]
+    }
+    if (extracts !== undefined) {
+      const clean: CaptureExtracts = {}
+      if (extracts.vueState !== undefined) clean.vueState = redactJsonValue(extracts.vueState)
+      if (extracts.details !== undefined) clean.details = extracts.details.map((d) => ({ ...d, html: redactPageHtml(d.html) }))
+      if (extracts.preview !== undefined) clean.preview = redactPageHtml(extracts.preview)
+      if (extracts.log !== undefined) clean.log = [...extracts.log]
+      file.extracts = clean
     }
     if (finalPage !== undefined) file.finalPage = { url: redactUrl(finalPage.url), html: redactPageHtml(finalPage.html) }
     return file

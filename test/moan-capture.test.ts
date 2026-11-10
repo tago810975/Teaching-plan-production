@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { MOAN_CAPTURE_CHANNEL } from '@shared/ipc'
 import {
   CaptureRecorder,
   REDACTED,
@@ -110,5 +112,14 @@ describe('墨案采集：其他', () => {
 
   it('文件名带日期时间', () => {
     expect(captureFileName(new Date(2026, 10, 10, 12, 8, 5))).toBe('墨案采集_20261110-120805.json')
+  })
+})
+
+describe('墨案采集：预加载脚本', () => {
+  it('通道名与 shared/ipc.ts 一致，且不 import 其他模块（沙箱预加载只能 require electron）', () => {
+    const src = readFileSync('src/preload/moan.ts', 'utf8')
+    expect(src).toContain(`const MOAN_CAPTURE_CHANNEL = '${MOAN_CAPTURE_CHANNEL}'`)
+    const imports = [...src.matchAll(/^import .* from '([^']+)'/gm)].map((m) => m[1])
+    expect(imports).toEqual(['electron'])
   })
 })

@@ -9,6 +9,9 @@ import type { ProjectSummary } from '@core/project-file/codec'
 import type { TemplateDefaults } from '@core/template/defaults'
 import type { FormatPreset } from '@core/presets'
 
+/** 墨案采集窗口的预加载脚本向主进程报告页面内记录到的请求（{ request } 或 { note }） */
+export const MOAN_CAPTURE_CHANNEL = 'moan-capture:report'
+
 export const IPC = {
   openProject: 'project:open',
   openProjectAt: 'project:open-at',

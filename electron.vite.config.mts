@@ -13,7 +13,16 @@ export default defineConfig({
     resolve: { alias }
   },
   preload: {
-    resolve: { alias }
+    resolve: { alias },
+    // index：主窗口；moan：墨案采集窗口（在页面里记录接口请求）
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(import.meta.dirname, 'src/preload/index.ts'),
+          moan: resolve(import.meta.dirname, 'src/preload/moan.ts')
+        }
+      }
+    }
   },
   renderer: {
     resolve: {
