@@ -199,6 +199,11 @@ describe('预览分页', () => {
     expect(idx(paginate([h(40), h(40), h(40)], 100))).toEqual([[0, 1], [2]])
   })
 
+  it('段前分页优先于“与下段同页”：标题紧跟在另一个标题后时也从新的一页开始', () => {
+    // 栏目标题（与下段同页）→ 题型分组（与下段同页、段前分页）→ 题目
+    expect(idx(paginate([h(20), h(10, { keepNext: true }), h(10, { keepNext: true, pageBreakBefore: true }), h(20)], 100))).toEqual([[0, 1], [2, 3]])
+  })
+
   it('与下段同页的一组放不下时整组移到下一页', () => {
     expect(idx(paginate([h(50), h(30, { keepNext: true }), h(30, { keepLines: true })], 100))).toEqual([[0], [1, 2]])
   })

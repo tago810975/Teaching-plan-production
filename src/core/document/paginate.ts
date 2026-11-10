@@ -85,7 +85,8 @@ export function paginate(items: readonly MeasuredParagraph[], pageHeight: number
   while (i < items.length) {
     // “与下段同页”串起来的一组段落
     let end = i
-    while (items[end]!.keepNext === true && end + 1 < items.length) end += 1
+    // “与下段同页”连成一组；遇到段前分页的段落就截止，让它从新的一页开始（与 Word 一致：段前分页优先）
+    while (items[end]!.keepNext === true && end + 1 < items.length && items[end + 1]!.pageBreakBefore !== true) end += 1
 
     if (items[i]!.pageBreakBefore === true) newPage()
 
