@@ -15,3 +15,8 @@ export function sanitizeFileName(name: string): string {
 export function exportFileName(baseName: string, variant: Variant): string {
   return `${VARIANT_PREFIX[variant]}${sanitizeFileName(baseName)}.docx`
 }
+
+/** 知识点重点难点汇总的文件名，与样张一致：“(T)名称(知识点重点难点).docx” */
+export function pointsFileName(baseName: string): string {
+  return `${VARIANT_PREFIX.teacher}${sanitizeFileName(baseName)}(知识点重点难点).docx`
+}

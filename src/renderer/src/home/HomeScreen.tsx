@@ -10,6 +10,7 @@ import { ExportDialog, ExportDoneNotice } from '../export/ExportDialog'
 import { FileTable, stem, type FileActions, type FileItem } from './FileTable'
 import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
 import { TemplatesDialog } from './TemplatesDialog'
+import { SettingsDialog } from './SettingsDialog'
 import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
@@ -31,6 +32,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
   const [query, setQuery] = useState('')
   const [exporting, setExporting] = useState<{ bundle: ProjectBundle; path: string } | null>(null)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   /** 模板列表变了：预设下拉框（导入时默认格式预设）重新读取 */
   const [templatesRevision, setTemplatesRevision] = useState(0)
   const [exported, setExported] = useState<string[] | null>(null)
@@ -158,6 +160,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
         onCreateFromDocx={() => onCreateFromDocx()}
         onOpenOther={onOpenOther}
         onTemplates={() => setTemplatesOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
       />
 
       <main className="home-main">
@@ -236,6 +239,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
       </main>
 
       {exported !== null && <ExportDoneNotice files={exported} onDismiss={() => setExported(null)} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {templatesOpen && <TemplatesDialog onClose={() => setTemplatesOpen(false)} onChanged={() => setTemplatesRevision((n) => n + 1)} />}
       {exporting !== null && (
         <ExportDialog

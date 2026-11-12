@@ -28,6 +28,8 @@ interface Settings {
   libraryDir?: string
   /** 导入（从 Word 新建）时默认使用的格式预设 */
   defaultPresetId?: string
+  /** 导出 Word 时是否默认勾选“知识点重点难点汇总” */
+  exportPointsByDefault?: boolean
   /** 用户保存的选项间距方案 */
   optionStopSchemes?: unknown
 }
@@ -231,4 +233,15 @@ function normalize(p: string): string {
 function isInside(filePath: string, dir: string): boolean {
   const rel = relative(normalize(dir), normalize(filePath))
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+/** 导出 Word 时是否默认勾选“知识点重点难点汇总”（默认不勾） */
+export async function getExportPointsDefault(): Promise<boolean> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  return settings.exportPointsByDefault === true
+}
+
+export async function setExportPointsDefault(on: boolean): Promise<void> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, exportPointsByDefault: on }, null, 2))
 }

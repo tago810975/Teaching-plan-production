@@ -7,16 +7,17 @@ import { buildDocument } from '@core/document/build'
 import { writeDocx } from '@core/export/docx-writer'
 import type { Variant } from '@core/model/types'
 import type { ExportRequest, ExportResult } from '@shared/ipc'
-import { exportFileName } from '@shared/export-name'
+import { exportFileName, pointsFileName } from '@shared/export-name'
+import { buildPointsDocument } from '@core/document/points'
 import { templateDir } from './template-io'
 
 export { exportFileName }
 
 /** 返回目标位置已存在的文件名，用于询问是否覆盖 */
-export async function existingExportFiles(dir: string, baseName: string, variants: Variant[]): Promise<string[]> {
+export async function existingExportFiles(dir: string, baseName: string, variants: Variant[], points = false): Promise<string[]> {
   const out: string[] = []
-  for (const v of variants) {
-    const name = exportFileName(baseName, v)
+  const names = [...variants.map((v) => exportFileName(baseName, v)), ...(points ? [pointsFileName(baseName)] : [])]
+  for (const name of names) {
     try {
       await stat(join(dir, name))
       out.push(name)
@@ -32,20 +33,20 @@ export async function exportWord(req: ExportRequest): Promise<ExportResult> {
   const template = new Uint8Array(await readFile(join(templateDir(project.templateId), 'template.docx')))
   const assets = { ...req.bundle.assets, ...req.replacementAssets }
   const files: string[] = []
-  for (const variant of req.variants) {
-    const bytes = await writeDocx({
-      ir: buildDocument(project, variant),
-      assets,
-      title: project.meta.title,
-      template
-    })
-    const path = join(req.dir, exportFileName(req.baseName, variant))
+  const jobs = [
+    ...req.variants.map((variant) => ({ name: exportFileName(req.baseName, variant), ir: () => buildDocument(project, variant) })),
+    // 知识点重点难点汇总
+    ...(req.points === true ? [{ name: pointsFileName(req.baseName), ir: () => buildPointsDocument(project) }] : [])
+  ]
+  for (const job of jobs) {
+    const bytes = await writeDocx({ ir: job.ir(), assets, title: project.meta.title, template })
+    const path = join(req.dir, job.name)
     try {
       await writeFile(path, bytes)
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code
       if (code === 'EBUSY' || code === 'EPERM') {
-        throw new Error(`“${exportFileName(req.baseName, variant)}”正在 Word 中打开，请先关闭它再导出。`)
+        throw new Error(`“${job.name}”正在 Word 中打开，请先关闭它再导出。`)
       }
       throw err
     }

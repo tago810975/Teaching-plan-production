@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProjectBundle, Variant } from '@core/model/types'
 import { rasterizeForWord } from './rasterize'
-import { exportFileName } from '@shared/export-name'
+import { exportFileName, pointsFileName } from '@shared/export-name'
 
 interface Props {
   bundle: ProjectBundle
@@ -21,6 +21,8 @@ const VERSIONS: ReadonlyArray<readonly [Variant, string, string]> = [
 export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [variants, setVariants] = useState<Variant[]>(['teacher', 'student'])
+  // 知识点重点难点汇总：默认是否勾选由设置决定（默认不勾）
+  const [points, setPoints] = useState(false)
   const [dir, setDir] = useState<string>('')
   const [baseName, setBaseName] = useState(bundle.project.meta.title)
   const [busy, setBusy] = useState(false)
@@ -29,20 +31,21 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
   useEffect(() => {
     dialogRef.current?.showModal()
     void window.api.defaultExportDir(projectPath).then(setDir)
+    void window.api.getExportPointsDefault().then(setPoints)
   }, [projectPath])
 
   const toggle = (v: Variant): void =>
     setVariants((cur) => (cur.includes(v) ? cur.filter((x) => x !== v) : VERSIONS.map(([x]) => x).filter((x) => x === v || cur.includes(x))))
 
   const submit = async (): Promise<void> => {
-    if (variants.length === 0 || dir === '' || baseName.trim() === '' || busy) return
+    if ((variants.length === 0 && !points) || dir === '' || baseName.trim() === '' || busy) return
     setError(null)
-    const existing = await window.api.exportCheck(dir, baseName.trim(), variants)
+    const existing = await window.api.exportCheck(dir, baseName.trim(), variants, points)
     if (existing.length > 0 && !window.confirm(`以下文件已存在，要覆盖吗？\n\n${existing.join('\n')}`)) return
     setBusy(true)
     try {
       const replacementAssets = await rasterizeForWord(bundle)
-      const result = await window.api.exportWord({ bundle, variants, dir, baseName: baseName.trim(), replacementAssets })
+      const result = await window.api.exportWord({ bundle, variants, points, dir, baseName: baseName.trim(), replacementAssets })
       if (result.ok) onDone(result.value.files)
       else setError(result.error)
     } catch (err) {
@@ -75,6 +78,13 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
             </span>
           </label>
         ))}
+        <label className="checkbox export-version">
+          <input type="checkbox" checked={points} onChange={(e) => setPoints(e.target.checked)} />
+          <span>
+            知识点重点难点汇总
+            <span className="field-hint export-version-hint">按栏目列出每道题的知识点、重点、难点与审题（是否默认勾选可在首页“设置”中修改）</span>
+          </span>
+        </label>
       </div>
 
       <div className="field">
@@ -83,9 +93,9 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
         </label>
         <input id="export-name" type="text" value={baseName} onChange={(e) => setBaseName(e.target.value)} />
         <p className="field-hint">
-          {variants.length === 0
+          {variants.length === 0 && !points
             ? '请至少选择一个版本'
-            : variants.map((v) => exportFileName(baseName.trim() || '…', v)).join('、')}
+            : [...variants.map((v) => exportFileName(baseName.trim() || '…', v)), ...(points ? [pointsFileName(baseName.trim() || '…')] : [])].join('、')}
         </p>
       </div>
 
@@ -114,7 +124,7 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
         <button
           type="button"
           className="primary"
-          disabled={busy || variants.length === 0 || baseName.trim() === '' || dir === ''}
+          disabled={busy || (variants.length === 0 && !points) || baseName.trim() === '' || dir === ''}
           onClick={() => void submit()}
         >
           {busy ? '正在导出…' : '导出'}

@@ -41,6 +41,8 @@ export const IPC = {
   setOptionStopSchemes: 'settings:set-option-stop-schemes',
   setDefaultPreset: 'settings:set-default-preset',
   exportCheck: 'export:check',
+  getExportPointsDefault: 'settings:get-export-points-default',
+  setExportPointsDefault: 'settings:set-export-points-default',
   exportWord: 'export:word',
   defaultExportDir: 'export:default-dir',
   openPath: 'shell:open-path',
@@ -93,6 +95,8 @@ export interface ImportedContent {
 export interface ExportRequest {
   bundle: ProjectBundle
   variants: Variant[]
+  /** 同时导出知识点重点难点汇总（“(T)名称(知识点重点难点).docx”） */
+  points?: boolean
   dir: string
   /** 文件名主体，如“动态圆专题”，实际文件名为“(T)动态圆专题.docx”“(S)动态圆专题.docx” */
   baseName: string
@@ -222,7 +226,10 @@ export interface RendererApi {
   /** 导出的默认位置：工程文件所在文件夹，未保存时为教学案库 */
   defaultExportDir(projectPath: string | null): Promise<string>
   /** 目标位置已存在的同名文件 */
-  exportCheck(dir: string, baseName: string, variants: Variant[]): Promise<string[]>
+  exportCheck(dir: string, baseName: string, variants: Variant[], points?: boolean): Promise<string[]>
+  /** 设置：导出 Word 时是否默认勾选“知识点重点难点汇总”（默认不勾） */
+  getExportPointsDefault(): Promise<boolean>
+  setExportPointsDefault(on: boolean): Promise<void>
   exportWord(request: ExportRequest): Promise<Result<ExportResult>>
   /** 用系统默认程序打开文件（如 Word） */
   openPath(path: string): Promise<string | null>

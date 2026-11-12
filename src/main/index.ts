@@ -32,6 +32,8 @@ import {
   addRecent,
   createProject,
   getDefaultPresetId,
+  getExportPointsDefault,
+  setExportPointsDefault,
   getOptionStopSchemes,
   getLibraryDir,
   listProjects,
@@ -276,9 +278,11 @@ function registerIpc(): void {
     projectPath === null ? getLibraryDir() : dirname(projectPath)
   )
 
-  ipcMain.handle(IPC.exportCheck, (_event, dir: string, baseName: string, variants: Variant[]) =>
-    existingExportFiles(dir, baseName, variants)
+  ipcMain.handle(IPC.exportCheck, (_event, dir: string, baseName: string, variants: Variant[], points?: boolean) =>
+    existingExportFiles(dir, baseName, variants, points === true)
   )
+  ipcMain.handle(IPC.getExportPointsDefault, () => getExportPointsDefault())
+  ipcMain.handle(IPC.setExportPointsDefault, (_event, on: boolean) => setExportPointsDefault(on === true))
 
   ipcMain.handle(IPC.exportWord, async (_event, req: ExportRequest) => {
     try {
