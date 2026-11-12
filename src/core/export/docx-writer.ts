@@ -136,7 +136,9 @@ class ExportContext {
 
     let pPr = `<w:pStyle w:val="${this.styleIds.get(spec.wordStyleName)!}"/>`
     if (p.keepNext === true) pPr += '<w:keepNext/>'
-    if (p.keepLines === true) pPr += '<w:keepLines/>'
+    // 含浮动图片的段落不写“段中不分页”：WPS 遇到这种段落会把图片排在段落上方、文字不环绕
+    // （用户用 WPS 对照测试确认：只有“与下段同页”或都不设时正常）。“与下段同页”保留，整题仍连在一起
+    if (p.keepLines === true && (p.floatingImages ?? []).length === 0) pPr += '<w:keepLines/>'
     if (p.pageBreakBefore === true) pPr += '<w:pageBreakBefore/>'
     // 不编号的题干：numId 0 取消“题目”样式自带的编号
     const numPr = p.unnumbered === true || p.manualLabel === true ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr>' : this.numPrFor(p.style)

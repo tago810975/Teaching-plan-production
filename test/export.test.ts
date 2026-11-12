@@ -9,6 +9,7 @@ import { ommlToMathml } from '@core/math/omml-to-mathml'
 import { createEmptyBundle, createQuestion, newId, para } from '@core/model/factory'
 import type { ProjectBundle, Variant } from '@core/model/types'
 import { createAsset } from '@core/project-file/codec'
+import { A4_PAGE } from '@core/document/units'
 
 const template = new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
 const PNG = new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png'))
@@ -166,5 +167,30 @@ describe('导出：变式题题号', () => {
     expect(paras[1]).toContain('<w:numId w:val="0"/>')
     expect(paras[1]).toMatch(/<w:t[^>]*>a\.<\/w:t><\/w:r><w:r><w:tab\/><\/w:r>/)
     expect(paras[1]).toContain('<w:ind w:left="333" w:hanging="394"/>')
+  })
+})
+
+describe('WPS 兼容：含浮动图片的段落不写“段中不分页”', async () => {
+  const { writeDocx } = await import('@core/export/docx-writer')
+  it('整题同页时，浮动图片所在段落只有“与下段同页”，其他段落照常', async () => {
+    const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/logo.png')), 'image/png')
+    const ir = {
+      variant: 'student' as const,
+      page: A4_PAGE,
+      header: { left: '', phone: '', right: '' },
+      bodyTopTwip: 0,
+      paragraphs: [
+        { key: 'a', sourceBlockId: 'q', style: 'question' as const, keepNext: true, keepLines: true, runs: [{ kind: 'text' as const, text: '题干' }], floatingImages: [{ assetId: png.id, widthEmu: 100, heightEmu: 100, side: 'right' as const, edgeEmu: 0, offsetYEmu: 0, movable: 'vertical' as const }] },
+        { key: 'b', sourceBlockId: 'q', style: 'option' as const, keepNext: true, keepLines: true, runs: [{ kind: 'text' as const, text: 'A．选项' }] }
+      ]
+    }
+    const bytes = await writeDocx({ ir: ir as never, assets: { [png.id]: png }, title: 't', template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx')) })
+    const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
+    const paras = doc.match(/<w:p>.*?<\/w:p>/gs) ?? []
+    const withImage = paras.find((p) => p.includes('<wp:anchor'))!
+    const option = paras.find((p) => p.includes('A．选项'))!
+    expect(withImage).toContain('<w:keepNext/>')
+    expect(withImage).not.toContain('<w:keepLines/>')
+    expect(option).toContain('<w:keepLines/>')
   })
 })
