@@ -140,7 +140,7 @@ describe('导出自由位置的图片', () => {
       template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
     })
     const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
-    expect(doc).toContain('<wp:wrapSquare wrapText="right"/>')
+    expect(doc).toContain('<wp:wrapSquare wrapText="bothSides"/>')
     expect(doc).toContain('<wp:positionH relativeFrom="column"><wp:posOffset>1234</wp:posOffset></wp:positionH>')
     expect(doc).toContain('<wp:positionV relativeFrom="paragraph"><wp:posOffset>5678</wp:posOffset></wp:positionV>')
   })

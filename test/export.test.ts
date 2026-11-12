@@ -99,7 +99,12 @@ describe('导出 Word', () => {
       { assetId: fig.id, widthEmu: 1800000, heightEmu: 900000, placement: 'below' }
     ]
     const { doc, rels, zip } = await exportParts(bundle, 'student')
-    expect(doc).toContain('<wp:wrapSquare wrapText="left"/>')
+    // 与用户在 WPS 中正常显示的文档写法一致：两侧环绕、水平位置用数值、允许重叠（WPS 不认 wrapText="left"）
+    expect(doc).toContain('<wp:wrapSquare wrapText="bothSides"/>')
+    expect(doc).not.toContain('<wp:align>')
+    expect(doc).toMatch(/<wp:anchor [^>]*distL="114300" distR="114300"[^>]*allowOverlap="1">/)
+    // 贴右边：距栏左侧 = 栏宽 − 图宽
+    expect(doc).toContain(`<wp:positionH relativeFrom="column"><wp:posOffset>${10466 * 635 - 1800000}</wp:posOffset></wp:positionH>`)
     expect(doc).toContain('<wp:inline')
     expect(rels.match(/rIdTp\d+/g)).toHaveLength(1) // 同一张图只存一份
     const types = await zip.file('[Content_Types].xml')!.async('string')

@@ -196,6 +196,9 @@ export const UNNUMBERED_STEM_INDENT_TWIP = 420
 /** 正文单倍行高的近似值（twip），用于把“留白行数”换算为间距 */
 export const BODY_LINE_HEIGHT_TWIP = 312
 
+/** 浮动图片与环绕文字之间的距离（EMU）：9 磅，与用户在 Word / WPS 中排好的文档一致；预览用同一数值 */
+export const FLOAT_GAP_EMU = 114300
+
 /** 模板的文档网格：每行 312 twip（15.6 磅，五号字的网格行距），见 template.docx 的 <w:docGrid w:linePitch="312"> */
 export const DOC_GRID_PITCH_TWIP = 312
 

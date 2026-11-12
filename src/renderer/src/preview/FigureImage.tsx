@@ -11,6 +11,7 @@
 import { useContext, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import type { FigureRef, OptionImageRef, FloatingImage } from '@core/document/ir'
 import { emuToPt } from '@core/document/units'
+import { FLOAT_GAP_EMU } from '@core/document/styles'
 import { ImageMenuContext, type ImageTarget } from './image-menu'
 
 export interface FigurePatch {
@@ -121,7 +122,8 @@ export function FigureImage(props: Props) {
           float: float.side,
           clear: float.side,
           [float.side === 'right' ? 'marginRight' : 'marginLeft']: `${emuToPt(float.edgeEmu)}pt`,
-          [float.side === 'right' ? 'marginLeft' : 'marginRight']: '6pt'
+          // 与导出的 distL / distR 一致
+          [float.side === 'right' ? 'marginLeft' : 'marginRight']: `${emuToPt(FLOAT_GAP_EMU)}pt`
         }
       : {}),
     ...(draft?.dx !== undefined || draft?.dy !== undefined ? { transform: `translate(${draft.dx ?? 0}px, ${draft.dy ?? 0}px)` } : {})

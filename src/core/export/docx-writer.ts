@@ -12,7 +12,7 @@ import JSZip from 'jszip'
 import type { DocCellParagraph, DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from '../document/ir'
 import { layoutTable } from '../model/table'
 import { A4_PAGE, contentWidthTwip } from '../document/units'
-import { ROOMY_CELL_TWIP, RULE_LINE_COLOR, RULE_LINE_TWIP, STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
+import { FLOAT_GAP_EMU, ROOMY_CELL_TWIP, RULE_LINE_COLOR, RULE_LINE_TWIP, STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
 import { applyHeadingStyles } from './heading-styles'
 import { applyMathMarks } from './math-marks'
@@ -312,21 +312,19 @@ class ExportContext {
         `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${graphic}</wp:inline></w:drawing></w:r>`
       )
     }
-    // 浮动图：四周型环绕。贴右边的图用右对齐，其余按距栏左侧的距离定位；垂直方向相对所在段落
+    // 浮动图：四周型环绕，垂直方向相对所在段落。写法与用户在 Word / WPS 中排好的文档完全一致——
+    // 水平位置用距栏左侧的数值（不用 <wp:align>）、wrapText="bothSides"、allowOverlap="1"、左右间距 FLOAT_GAP_EMU。
+    // 曾写成 wrapText="left"（文字只在左侧）+ 右对齐 + allowOverlap="0"：Word 正常，但 WPS 把图排到段落上方、
+    // 文字不环绕。图片贴着栏的一侧，另一侧放不下文字，bothSides 与只在一侧环绕效果相同。
     const f = float!
     const columnEmu = contentWidthTwip(A4_PAGE) * 635
-    const positionH =
-      f.side === 'right' && f.edgeEmu === 0
-        ? '<wp:positionH relativeFrom="column"><wp:align>right</wp:align></wp:positionH>'
-        : `<wp:positionH relativeFrom="column"><wp:posOffset>${Math.round(f.side === 'right' ? columnEmu - f.edgeEmu - cx : f.edgeEmu)}</wp:posOffset></wp:positionH>`
-    const distL = f.side === 'right' ? 114300 : 0
-    const distR = f.side === 'left' ? 114300 : 0
+    const x = Math.max(0, Math.round(f.side === 'right' ? columnEmu - f.edgeEmu - cx : f.edgeEmu))
     return (
-      `<w:r><w:drawing><wp:anchor distT="0" distB="45720" distL="${distL}" distR="${distR}" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="0">` +
-      `<wp:simplePos x="0" y="0"/>${positionH}` +
+      `<w:r><w:drawing><wp:anchor distT="0" distB="45720" distL="${FLOAT_GAP_EMU}" distR="${FLOAT_GAP_EMU}" simplePos="0" relativeHeight="${251659264 + id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">` +
+      `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>${x}</wp:posOffset></wp:positionH>` +
       `<wp:positionV relativeFrom="paragraph"><wp:posOffset>${Math.round(f.offsetYEmu)}</wp:posOffset></wp:positionV>` +
       `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>` +
-      `<wp:wrapSquare wrapText="${f.side === 'right' ? 'left' : 'right'}"/>${graphic}</wp:anchor></w:drawing></w:r>`
+      `<wp:wrapSquare wrapText="bothSides"/>${graphic}</wp:anchor></w:drawing></w:r>`
     )
   }
 
