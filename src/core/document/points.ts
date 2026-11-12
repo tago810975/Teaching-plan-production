@@ -7,8 +7,8 @@
  *     第 N 题
  *     【知识点】…  【重点】…  【难点】…  【审题】…
  *
- * 栏目中有“重点题”（题目标记为重点题，或写了【重点】）或“难点题”（写了【难点】）时，这一栏目只列出这两类题，
- * 分成【重点题】【难点题】两组（样张中的课堂练习）；否则列出栏目中所有写了要点的题。
+ * 栏目中有“重点题”（题目标记为重点题，或写了【重点】）或“难点题”（写了【难点】）时，分成【重点题】【难点题】
+ * 两组（样张中的课堂练习），其余写了要点的题放在最后的【其他题】组，一道都不丢；否则依次列出栏目中所有写了要点的题。
  * 题号与教案中一致（取自教案的排版结果，变式题 a. b. c. 也一样）。
  */
 import type { Block, Question, RichText } from '../model/types'
@@ -86,14 +86,12 @@ export function buildPointsDocument(project: Parameters<typeof buildDocument>[0]
     const important = listed.filter((e) => isImportant(e.q))
     const difficult = listed.filter((e) => !isImportant(e.q) && isDifficult(e.q))
     if (important.length + difficult.length > 0) {
-      // 有重点题、难点题的栏目：只列这两类，分组（样张中的课堂练习）
-      if (important.length > 0) {
-        para('topic', [text('【重点题】')], { keepNext: true })
-        important.forEach(entryParas)
-      }
-      if (difficult.length > 0) {
-        para('topic', [text('【难点题】')], { keepNext: true })
-        difficult.forEach(entryParas)
+      // 有重点题、难点题的栏目：分组（样张中的课堂练习）；其余的放在【其他题】
+      const others = listed.filter((e) => !important.includes(e) && !difficult.includes(e))
+      for (const [label, group] of [['【重点题】', important], ['【难点题】', difficult], ['【其他题】', others]] as const) {
+        if (group.length === 0) continue
+        para('topic', [text(label)], { keepNext: true })
+        group.forEach(entryParas)
       }
     } else listed.forEach(entryParas)
   }

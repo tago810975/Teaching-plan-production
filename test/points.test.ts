@@ -15,7 +15,7 @@ const lines = (blocks: Block[], fields = { review: true, important: true }): str
 }
 
 describe('知识点重点难点汇总', () => {
-  it('仿照样张：栏目、第 N 题、知识点；有重点题 / 难点题的栏目只列这两类并分组', () => {
+  it('仿照样张：栏目、第 N 题、知识点；有重点题 / 难点题的栏目分组，其余放在【其他题】', () => {
     const out = lines([
       sec('例题精讲'),
       q('a', { knowledgePoints: ['半径、周期公式'] }),
@@ -46,6 +46,10 @@ describe('知识点重点难点汇总', () => {
       'body|第6题',
       'body|【知识点】圆形磁场内运动',
       'body|【难点】不沿半径射入，图形难画',
+      // 其余写了要点的题不丢
+      'topic|【其他题】',
+      'body|第3题',
+      'body|【知识点】只有知识点',
       'section|课后练习',
       'body|第7题',
       'body|【知识点】直边界磁场'
