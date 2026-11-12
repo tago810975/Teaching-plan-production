@@ -4,7 +4,7 @@
 import { useContext, memo, type CSSProperties, type ReactNode, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { DocParagraph, DocRun, DocTable, InlineRef, OptionImageRef } from '@core/document/ir'
 import { TableResizeContext } from './table-resize'
-import { previewCss, RULE_LINE_COLOR, RULE_LINE_TWIP } from '@core/document/styles'
+import { lineHeightFor, previewCss, RULE_LINE_COLOR, RULE_LINE_TWIP } from '@core/document/styles'
 import { StylesContext } from './styles-context'
 import { A4_PAGE, contentWidthTwip, emuToPt, twipToPt } from '@core/document/units'
 import { MathView } from './MathView'
@@ -98,8 +98,8 @@ export const DocParagraphView = memo(function DocParagraphView({
     fontWeight: css.fontWeight,
     color: css.color,
     textAlign: p.align ?? css.textAlign,
-    // 版式设置中的行距（与 previewCss 的换算相同：单倍约为字号的 1.3 倍）
-    lineHeight: p.lineAuto !== undefined ? 1.3 * (p.lineAuto / 240) : css.lineHeight,
+    // 版式设置中的行距（与 previewCss 的换算相同：单倍约为字号的 1.3 倍，对齐网格的样式按网格行距）
+    lineHeight: p.lineAuto !== undefined ? lineHeightFor(spec, p.lineAuto) : css.lineHeight,
     paddingTop: css.marginTop,
     paddingBottom: css.marginBottom,
     paddingLeft: p.indentLeftTwip !== undefined ? `${twipToPt(p.indentLeftTwip)}pt` : css.paddingLeft,

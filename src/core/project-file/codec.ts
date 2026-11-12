@@ -183,6 +183,7 @@ function migrate(raw: unknown, fromVersion: number): unknown {
   if (fromVersion < 6) data = migrateV5toV6(data)
   if (fromVersion < 7) data = migrateV6toV7(data)
   if (fromVersion < 8) data = migrateV7toV8(data)
+  if (fromVersion < 17) data = migrateV16toV17(data)
   return data
 }
 
@@ -249,4 +250,32 @@ function migrateV2toV3(raw: unknown): unknown {
   layout.keepKnowledgeTogether ??= { teacher: false, student: false }
   project.layout = layout
   return project
+}
+
+/**
+ * v16 → v17：预览中题干首段的行高改为与 Word 一致（对齐文档网格，15.6 磅，原为 13.65 磅）。
+ * 锚定在题干首段的右侧图、自由位置图的上下偏移乘以 8/7，图片相对题干文字的位置保持不变。
+ */
+export const GRID_LINE_FACTOR = 15.6 / 13.65
+
+function migrateV16toV17(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const project = raw as { blocks?: unknown[] }
+  const fixQuestion = (q: unknown): void => {
+    const figures = (q as { figures?: Array<Record<string, unknown>> } | null)?.figures
+    if (!Array.isArray(figures)) return
+    for (const f of figures) {
+      const onStem = (f.anchorParagraph ?? 0) === 0
+      const offset = f.offsetYEmu
+      if ((f.placement === 'right' || f.placement === 'free') && onStem && typeof offset === 'number' && offset > 0) {
+        f.offsetYEmu = Math.round(offset * GRID_LINE_FACTOR)
+      }
+    }
+  }
+  for (const b of project.blocks ?? []) {
+    const block = b as { type?: string; question?: unknown; items?: Array<{ question?: unknown }> }
+    if (block.type === 'question') fixQuestion(block.question)
+    if (block.type === 'composite') for (const it of block.items ?? []) fixQuestion(it.question)
+  }
+  return raw
 }

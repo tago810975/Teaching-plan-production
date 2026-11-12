@@ -137,3 +137,51 @@ describe('工程文件编解码', () => {
     expect(v7.project.layout.optionStops).toEqual(custom)
   })
 })
+
+describe('第 17 版：题干对齐文档网格，旧工程右侧图的偏移按行高换算', () => {
+  const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+  let assetId = ''
+  const fig = (placement: string, offsetYEmu: number, anchorParagraph?: number) => ({ assetId, widthEmu: 100, heightEmu: 100, placement, offsetYEmu, ...(anchorParagraph !== undefined ? { anchorParagraph } : {}) })
+  async function withAsset(): Promise<ReturnType<typeof createEmptyBundle>> {
+    const b = createEmptyBundle()
+    const asset = await createAsset(PNG, 'image/png')
+    b.assets[asset.id] = asset
+    assetId = asset.id
+    return b
+  }
+  async function v16(figures: () => object[], compositeFigures: () => object[] = () => []): Promise<Uint8Array> {
+    const b = await withAsset()
+    b.project.blocks = [
+      { id: 'q', type: 'question', question: createQuestion({ stem: [{ inlines: [{ type: 'text', text: '题' }] }, { inlines: [{ type: 'text', text: '续' }] }], figures: figures() as never }) },
+      { id: 'c', type: 'composite', title: '', background: [], figures: [], answer: [], analysis: [], layout: { keepTogether: 'auto', teacherSpaceLines: 0, studentSpaceLines: 0, pageBreakBefore: false }, items: [{ id: 'i', type: 'question', question: createQuestion({ stem: [{ inlines: [{ type: 'text', text: '小题' }] }], figures: compositeFigures() as never }) }] }
+    ] as never
+    // 保存为当前版本后把版本号改回 16，模拟旧工程
+    const zip = await JSZip.loadAsync(await encodeBundle(b, { appVersion: '0.1.0' } as never))
+    const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'))
+    manifest.formatVersion = 16
+    zip.file('manifest.json', JSON.stringify(manifest))
+    return zip.generateAsync({ type: 'uint8array' })
+  }
+
+  it('锚定在题干首段的右侧图、自由图偏移乘以 8/7；其他不变', async () => {
+    const r = await decodeBundle(
+      await v16(
+        () => [fig('right', 700000), fig('free', 350000, 0), fig('right', 700000, 1), fig('below', 700000), fig('right-items', 700000), fig('right', 0)],
+        () => [fig('right', 70000)]
+      )
+    )
+    const q = r.project.blocks[0]
+    const offsets = q?.type === 'question' ? q.question.figures.map((f) => f.offsetYEmu) : []
+    expect(offsets).toEqual([800000, 400000, 700000, 700000, 700000, 0])
+    const c = r.project.blocks[1]
+    expect(c?.type === 'composite' && c.items[0]!.question.figures[0]!.offsetYEmu).toBe(80000)
+  })
+
+  it('当前版本的工程不再换算', async () => {
+    const b = await withAsset()
+    b.project.blocks = [{ id: 'q', type: 'question', question: createQuestion({ stem: [{ inlines: [{ type: 'text', text: '题' }] }], figures: [fig('right', 700000) as never] }) }]
+    const back = await decodeBundle(await encodeBundle(b, { appVersion: '0.1.0' } as never))
+    const q = back.project.blocks[0]
+    expect(q?.type === 'question' && q.question.figures[0]!.offsetYEmu).toBe(700000)
+  })
+})

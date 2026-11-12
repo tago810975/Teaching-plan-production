@@ -48,6 +48,12 @@ export interface ParagraphStyleSpec {
   spaceAfterTwip: number
   /** 行距，240 = 单倍行距；与 Word 的 lineRule="auto" 一致 */
   lineAuto: number
+  /**
+   * 段落对齐文档网格（模板的 docGrid 为每行 DOC_GRID_PITCH_TWIP）：Word 中每行的高度取网格行距的整数倍，
+   * 比自然行高（约字号的 1.3 倍）高。模板中只有“物理排版 题目”没有关闭对齐网格（Word 默认对齐）。
+   * 须与模板一致（test/fonts.test.ts 对照），否则预览中题干的行比 Word 矮，锚定在题干上的右侧图片在 Word 中位置偏上。
+   */
+  snapToGrid?: boolean
   indentLeftTwip: number
   /** 悬挂缩进（编号悬挂在左侧） */
   hangingTwip: number
@@ -124,6 +130,7 @@ export const STYLE_SPECS: Readonly<Record<StyleKey, ParagraphStyleSpec>> = {
   question: {
     ...base,
     wordStyleName: '物理排版 题目',
+    snapToGrid: true,
     spaceBeforeTwip: 160,
     spaceAfterTwip: 120,
     indentLeftTwip: 333,
@@ -189,6 +196,25 @@ export const UNNUMBERED_STEM_INDENT_TWIP = 420
 /** 正文单倍行高的近似值（twip），用于把“留白行数”换算为间距 */
 export const BODY_LINE_HEIGHT_TWIP = 312
 
+/** 模板的文档网格：每行 312 twip（15.6 磅，五号字的网格行距），见 template.docx 的 <w:docGrid w:linePitch="312"> */
+export const DOC_GRID_PITCH_TWIP = 312
+
+/**
+ * 预览中的行高（相对字号的倍数）。lineAuto：240 为单倍。
+ * - 不对齐网格：约为字号的 1.3 倍乘以行距（Word 中宋体单倍行距的近似值）；
+ * - 对齐网格：网格行距乘以行距倍数；自然行高超过它时取网格行距的整数倍（与 Word 一致）。
+ *   行中有比这更高的公式时，Word 会再多占一格，预览中按内容撑高（不再取整），这一点仍有差别。
+ */
+export function lineHeightFor(spec: ParagraphStyleSpec, lineAuto: number = spec.lineAuto): number {
+  const fontPt = halfPtToPt(spec.sizeHalfPt)
+  const naturalPt = 1.3 * fontPt * (lineAuto / 240)
+  if (spec.snapToGrid !== true) return naturalPt / fontPt
+  const pitchPt = twipToPt(DOC_GRID_PITCH_TWIP)
+  const gridPt = pitchPt * (lineAuto / 240)
+  const linePt = naturalPt <= gridPt ? gridPt : Math.ceil(naturalPt / pitchPt) * pitchPt
+  return linePt / fontPt
+}
+
 /** 预览用的 CSS 数值（不含字体族，字体族由预览样式表统一定义） */
 export interface PreviewCss {
   fontSize: CSSLength
@@ -210,8 +236,8 @@ export function previewCss(spec: ParagraphStyleSpec): PreviewCss {
     textAlign: spec.align === 'both' ? 'justify' : spec.align,
     marginTop: `${twipToPt(spec.spaceBeforeTwip)}pt`,
     marginBottom: `${twipToPt(spec.spaceAfterTwip)}pt`,
-    // Word 单倍行距约为字号的 1.3 倍（宋体）
-    lineHeight: 1.3 * (spec.lineAuto / 240),
+    // Word 单倍行距约为字号的 1.3 倍（宋体）；对齐文档网格的样式按网格行距
+    lineHeight: lineHeightFor(spec),
     paddingLeft: `${twipToPt(spec.indentLeftTwip)}pt`,
     textIndent: `${-twipToPt(spec.hangingTwip)}pt`
   }

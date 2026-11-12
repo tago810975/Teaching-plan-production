@@ -97,6 +97,42 @@ describe('字体大类', () => {
   })
 })
 
+describe('预览样式表的“对齐文档网格”与模板一致', () => {
+  it('逐个对照模板 styles.xml（含 basedOn 继承，未设置时 Word 默认对齐）；模板网格行距与程序一致', async () => {
+    const { DOC_GRID_PITCH_TWIP, lineHeightFor } = await import('@core/document/styles')
+    const zip = await JSZip.loadAsync(readFileSync('resources/templates/physics-default/template.docx'))
+    const xml = await zip.file('word/styles.xml')!.async('string')
+    const doc = await zip.file('word/document.xml')!.async('string')
+    expect(Number(/<w:docGrid[^>]*w:linePitch="(\d+)"/.exec(doc)?.[1])).toBe(DOC_GRID_PITCH_TWIP)
+    const styles = new Map<string, { name: string; basedOn?: string; snap?: boolean }>()
+    for (const m of xml.matchAll(/<w:style\b[^>]*w:styleId="([^"]+)"[^>]*>([\s\S]*?)<\/w:style>/g)) {
+      const body = m[2]!
+      const snap = /<w:snapToGrid(?: w:val="(\w+)")?\/>/.exec(body)
+      styles.set(m[1]!, {
+        name: /<w:name w:val="([^"]+)"/.exec(body)?.[1] ?? m[1]!,
+        ...(/<w:basedOn w:val="([^"]+)"/.exec(body) !== null ? { basedOn: /<w:basedOn w:val="([^"]+)"/.exec(body)![1]! } : {}),
+        ...(snap !== null ? { snap: !['0', 'false', 'off'].includes(snap[1] ?? '') } : {})
+      })
+    }
+    const snapOf = (name: string): boolean => {
+      let cur = [...styles.values()].find((x) => x.name === name)
+      for (let i = 0; cur !== undefined && i < 10; i++) {
+        if (cur.snap !== undefined) return cur.snap
+        cur = cur.basedOn === undefined ? undefined : styles.get(cur.basedOn)
+      }
+      return true
+    }
+    const mismatches = Object.entries(STYLE_SPECS)
+      .filter(([, spec]) => snapOf(spec.wordStyleName) !== (spec.snapToGrid === true))
+      .map(([key, spec]) => `${key}（${spec.wordStyleName}）：模板${snapOf(spec.wordStyleName) ? '对齐' : '不对齐'}网格`)
+    expect(mismatches).toEqual([])
+    // 题干（对齐网格）每行 15.6 磅，正文（不对齐）约 1.3 倍字号
+    expect(lineHeightFor(STYLE_SPECS.question) * 10.5).toBeCloseTo(15.6, 5)
+    expect(lineHeightFor(STYLE_SPECS.question, 360) * 10.5).toBeCloseTo(23.4, 5)
+    expect(lineHeightFor(STYLE_SPECS.body)).toBeCloseTo(1.3, 5)
+  })
+})
+
 describe('预览样式表的颜色与模板一致', () => {
   it('逐个对照模板 styles.xml（含 basedOn 继承）：如“难点”基于“重点”，同为红色', async () => {
     const colors = await templateColors()
