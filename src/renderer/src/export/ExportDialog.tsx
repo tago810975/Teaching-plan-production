@@ -134,11 +134,60 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
   )
 }
 
-/** 导出完成提示：可直接用 Word 打开或打开所在文件夹 */
+/** 导出完成后提示自动关闭的时间 */
+const DONE_NOTICE_MS = 8000
+/** 淡出动画时长，与 app.css 中 --dur 一致 */
+const DONE_NOTICE_FADE_MS = 180
+
+/**
+ * 导出完成提示：可直接用 Word 打开或打开所在文件夹。
+ * 8 秒后自动淡出关闭；鼠标停在提示上或焦点在提示内时暂停计时，离开后重新计时；
+ * 打开文件出错时不自动关闭，留给用户看清原因。
+ */
 export function ExportDoneNotice({ files, onDismiss }: { files: string[]; onDismiss: () => void }) {
   const [openError, setOpenError] = useState<string | null>(null)
+  const [hold, setHold] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const dismissRef = useRef(onDismiss)
+  dismissRef.current = onDismiss
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // 又导出了一次：重新开始
+  useEffect(() => {
+    setLeaving(false)
+    setOpenError(null)
+  }, [files])
+
+  useEffect(() => {
+    if (hold || openError !== null || leaving) return
+    const t = window.setTimeout(() => setLeaving(true), DONE_NOTICE_MS)
+    return () => window.clearTimeout(t)
+  }, [hold, openError, leaving, files])
+
+  useEffect(() => {
+    if (!leaving) return
+    const t = window.setTimeout(() => dismissRef.current(), DONE_NOTICE_FADE_MS)
+    return () => window.clearTimeout(t)
+  }, [leaving])
+
   return (
-    <div className="notice notice--success" role="status">
+    <div
+      ref={rootRef}
+      className={leaving ? 'notice notice--success is-leaving' : 'notice notice--success'}
+      role="status"
+      onMouseEnter={() => {
+        setHold(true)
+        setLeaving(false)
+      }}
+      onMouseLeave={() => setHold(rootRef.current?.contains(document.activeElement) ?? false)}
+      onFocus={() => {
+        setHold(true)
+        setLeaving(false)
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !e.currentTarget.matches(':hover')) setHold(false)
+      }}
+    >
       <div>
         <p className="notice-title">已导出 {files.length} 个 Word 文档。</p>
         <ul className="notice-files">

@@ -2332,6 +2332,11 @@ body.is-dragging-outline * {
     transform: translateY(-4px);
   }
 }
+/* 导出完成提示到时自动关闭：先淡出再移除 */
+.notice.is-leaving {
+  opacity: 0;
+  transform: translateY(-4px);
+}
 
 /* ---------- 减弱动态效果：系统设置或 data-reduce-motion 任一开启即生效 ---------- */
 @media (prefers-reduced-motion: reduce) {
