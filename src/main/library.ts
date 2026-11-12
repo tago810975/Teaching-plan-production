@@ -19,6 +19,7 @@ import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project
 import { readTemplateDefaults } from './template-io'
 import { getPreset } from '@core/presets'
 import { sanitizeSchemes, type OptionStopScheme } from '@core/model/option-stop-schemes'
+import { DEFAULT_THEME, isThemeId, type ThemeId } from '@shared/themes'
 
 const MAX_RECENT = 30
 /** 扫描库目录时的最大子目录深度（库目录本身为 0） */
@@ -32,6 +33,8 @@ interface Settings {
   exportPointsByDefault?: boolean
   /** 用户保存的选项间距方案 */
   optionStopSchemes?: unknown
+  /** 界面配色主题 */
+  theme?: string
 }
 
 interface RecentEntry {
@@ -244,4 +247,16 @@ export async function getExportPointsDefault(): Promise<boolean> {
 export async function setExportPointsDefault(on: boolean): Promise<void> {
   const settings = await readJsonFile<Settings>(settingsPath(), {})
   await writeFile(settingsPath(), JSON.stringify({ ...settings, exportPointsByDefault: on }, null, 2))
+}
+
+/** 界面配色主题（未设置或已不存在时为默认主题） */
+export async function getTheme(): Promise<ThemeId> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  return isThemeId(settings.theme) ? settings.theme : DEFAULT_THEME
+}
+
+export async function setTheme(id: ThemeId): Promise<void> {
+  if (!isThemeId(id)) return
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, theme: id }, null, 2))
 }

@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { LocalPlace } from '@shared/ipc'
+import { ThemePicker } from './ThemePicker'
 
 export type HomeView = { kind: 'recent' } | { kind: 'folder'; path: string; title?: string }
 
@@ -85,6 +86,8 @@ export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateF
           <FolderNode key={p.path} name={p.label} path={p.path} icon={ICONS[p.kind]} depth={0} current={p.path === scope ? current : null} onOpen={(path, name) => onView({ kind: 'folder', path, ...(path === p.path ? { title: p.label } : { title: name }) })} />
         ))}
       </ul>
+
+      <ThemePicker />
     </nav>
   )
 }

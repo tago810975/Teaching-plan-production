@@ -3,6 +3,7 @@
  *
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
+import type { ThemeId } from './themes'
 import type { Asset, Block, ProjectBundle, Variant } from '@core/model/types'
 import type { OptionStopScheme } from '@core/model/option-stop-schemes'
 import type { ProjectSummary } from '@core/project-file/codec'
@@ -43,6 +44,8 @@ export const IPC = {
   exportCheck: 'export:check',
   getExportPointsDefault: 'settings:get-export-points-default',
   setExportPointsDefault: 'settings:set-export-points-default',
+  getTheme: 'settings:get-theme',
+  setTheme: 'settings:set-theme',
   exportWord: 'export:word',
   defaultExportDir: 'export:default-dir',
   openPath: 'shell:open-path',
@@ -230,6 +233,9 @@ export interface RendererApi {
   /** 设置：导出 Word 时是否默认勾选“知识点重点难点汇总”（默认不勾） */
   getExportPointsDefault(): Promise<boolean>
   setExportPointsDefault(on: boolean): Promise<void>
+  /** 设置：界面配色主题 */
+  getTheme(): Promise<ThemeId>
+  setTheme(id: ThemeId): Promise<void>
   exportWord(request: ExportRequest): Promise<Result<ExportResult>>
   /** 用系统默认程序打开文件（如 Word） */
   openPath(path: string): Promise<string | null>

@@ -8,6 +8,9 @@ import './styles/app.css'
 import './styles/page.css'
 
 import { setUserPresets } from '@core/presets'
+import { initTheme } from './theme/theme'
+
+initTheme()
 
 // 先登记用户模板的预设（主进程启动时已读取“教学案库\模板”），再显示界面：
 // 打开用自制模板做的教学案时才找得到它的预设

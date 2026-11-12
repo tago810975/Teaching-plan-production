@@ -14,6 +14,7 @@ import { IPC, type FolderListing, type LocalPlace, type MenuCommand, type Opened
 import type { ProjectBundle } from '@core/model/types'
 import { listDrives, listFolder, listSubfolders, renameEntry } from './files'
 import { buildAppMenu } from './menu'
+import { isThemeId, themeInfo } from '@shared/themes'
 import { openMoanWindow } from './moan-window'
 import { readTemplateDefaults } from './template-io'
 import { currentCatalog, deleteTemplateFolder, duplicateTemplate, exportTemplate, importTemplate, loadUserTemplates, userTemplateDir } from './user-templates'
@@ -34,6 +35,8 @@ import {
   getDefaultPresetId,
   getExportPointsDefault,
   setExportPointsDefault,
+  getTheme,
+  setTheme,
   getOptionStopSchemes,
   getLibraryDir,
   listProjects,
@@ -84,9 +87,9 @@ if (!app.requestSingleInstanceLock()) {
     } catch (err) {
       console.error('读取用户模板失败', err)
     }
-    createWindow()
+    void createWindow()
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow()
     })
   })
 
@@ -97,9 +100,11 @@ if (!app.requestSingleInstanceLock()) {
 
 // ---------- 窗口 ----------
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   windowDirty = false
   closeConfirmed = false
+  // 先读出配色主题：窗口底色与界面一致，打开时不闪；主题通过地址参数交给界面，首帧就是对的颜色
+  const theme = await getTheme()
 
   const win = new BrowserWindow({
     width: 1440,
@@ -108,7 +113,7 @@ function createWindow(): void {
     minHeight: 680,
     title: APP_DISPLAY_NAME,
     show: false,
-    backgroundColor: '#e9ecef',
+    backgroundColor: themeInfo(theme).windowBackground,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -160,9 +165,11 @@ function createWindow(): void {
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (!app.isPackaged && devUrl !== undefined) {
-    void win.loadURL(devUrl)
+    const url = new URL(devUrl)
+    url.searchParams.set('theme', theme)
+    void win.loadURL(url.toString())
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme } })
   }
 }
 
@@ -283,6 +290,12 @@ function registerIpc(): void {
   )
   ipcMain.handle(IPC.getExportPointsDefault, () => getExportPointsDefault())
   ipcMain.handle(IPC.setExportPointsDefault, (_event, on: boolean) => setExportPointsDefault(on === true))
+  ipcMain.handle(IPC.getTheme, () => getTheme())
+  ipcMain.handle(IPC.setTheme, async (event, id: unknown) => {
+    if (!isThemeId(id)) return
+    await setTheme(id)
+    BrowserWindow.fromWebContents(event.sender)?.setBackgroundColor(themeInfo(id).windowBackground)
+  })
 
   ipcMain.handle(IPC.exportWord, async (_event, req: ExportRequest) => {
     try {
