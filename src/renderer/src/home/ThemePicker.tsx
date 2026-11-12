@@ -1,11 +1,11 @@
 /**
- * 首页左侧栏底部的配色主题切换：一排色块，点一下立即生效并保存。
+ * 配色主题切换（设置对话框中）：一排色块，点一下立即生效并保存。
  */
 import type { KeyboardEvent } from 'react'
 import { THEMES } from '@shared/themes'
 import { setTheme, useTheme } from '../theme/theme'
 
-export function ThemePicker() {
+export function ThemePicker({ label }: { label: string }) {
   const current = useTheme()
   const index = THEMES.findIndex((t) => t.id === current)
 
@@ -20,11 +20,7 @@ export function ThemePicker() {
   }
 
   return (
-    <div className="theme-picker">
-      <h2 className="home-side-heading" id="theme-picker-label">
-        配色
-      </h2>
-      <div className="theme-swatches" role="radiogroup" aria-labelledby="theme-picker-label" onKeyDown={onKeyDown}>
+    <div className="theme-swatches" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
         {THEMES.map((t) => {
           const on = t.id === current
           return (
@@ -47,7 +43,6 @@ export function ThemePicker() {
             </button>
           )
         })}
-      </div>
     </div>
   )
 }

@@ -2484,18 +2484,32 @@ body.is-dragging-outline * {
   animation-duration: 0s !important;
 }
 
-/* ---------- 首页：配色主题 ---------- */
-.theme-picker {
-  position: sticky;
-  bottom: -16px;
-  margin: auto -12px -16px;
-  padding: 4px 12px 14px;
-  background: var(--panel);
+/* ---------- 设置对话框 ---------- */
+.settings-dialog {
+  width: 520px;
 }
+.settings-dialog .group:first-of-type {
+  margin-top: 8px;
+}
+.settings-dialog .dialog-location {
+  margin: 6px 0 2px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+}
+.settings-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 配色主题色块 */
 .theme-swatches {
   display: flex;
-  justify-content: space-between;
-  padding: 0 4px;
+  gap: 10px;
+  margin: 6px 0 2px;
 }
 .theme-swatch {
   display: flex;

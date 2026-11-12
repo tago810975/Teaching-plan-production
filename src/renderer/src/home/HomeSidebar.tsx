@@ -4,7 +4,6 @@
  */
 import { useEffect, useState } from 'react'
 import type { LocalPlace } from '@shared/ipc'
-import { ThemePicker } from './ThemePicker'
 
 export type HomeView = { kind: 'recent' } | { kind: 'folder'; path: string; title?: string }
 
@@ -49,7 +48,7 @@ export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateF
         <button type="button" onClick={onTemplates} title="内置模板与自制模板：复制、导入、导出">
           模板…
         </button>
-        <button type="button" onClick={onSettings} title="本机的偏好设置（如导出时默认导出哪些文档）">
+        <button type="button" onClick={onSettings} title="配色、教学案库位置、默认格式预设、导出选项">
           设置…
         </button>
       </div>
@@ -86,8 +85,6 @@ export function HomeSidebar({ view, places, libraryDir, onView, onNew, onCreateF
           <FolderNode key={p.path} name={p.label} path={p.path} icon={ICONS[p.kind]} depth={0} current={p.path === scope ? current : null} onOpen={(path, name) => onView({ kind: 'folder', path, ...(path === p.path ? { title: p.label } : { title: name }) })} />
         ))}
       </ul>
-
-      <ThemePicker />
     </nav>
   )
 }

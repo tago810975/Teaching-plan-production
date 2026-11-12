@@ -5,13 +5,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FolderListing, LibraryListing, LocalPlace, ProjectListItem } from '@shared/ipc'
 import type { ProjectBundle } from '@core/model/types'
-import { allPresets } from '@core/presets'
 import { ExportDialog, ExportDoneNotice } from '../export/ExportDialog'
 import { FileTable, stem, type FileActions, type FileItem } from './FileTable'
 import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
 import { TemplatesDialog } from './TemplatesDialog'
 import { SettingsDialog } from './SettingsDialog'
-import { useDefaultPreset } from './PresetSelect'
 
 interface Props {
   /** 已在标签页中打开的文件：不能在首页重命名或删除（先关闭标签页） */
@@ -33,8 +31,6 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
   const [exporting, setExporting] = useState<{ bundle: ProjectBundle; path: string } | null>(null)
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  /** 模板列表变了：预设下拉框（导入时默认格式预设）重新读取 */
-  const [templatesRevision, setTemplatesRevision] = useState(0)
   const [exported, setExported] = useState<string[] | null>(null)
   const [places, setPlaces] = useState<LocalPlace[]>([])
   useEffect(() => {
@@ -147,7 +143,6 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
       : libraryDir !== null && samePath(view.path, libraryDir)
         ? '教学案库'
         : (places.find((p) => samePath(p.path, view.path))?.label ?? view.title ?? lastSegment(view.path))
-  const inLibrary = view.kind === 'folder' && libraryDir !== null && samePath(view.path, libraryDir)
 
   return (
     <div className="home">
@@ -218,20 +213,6 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
         )}
 
         <footer className="home-foot">
-          {libraryDir !== null && (
-            <p className="home-library">
-              教学案库：<span className="home-library-path">{libraryDir}</span>
-              {!inLibrary && (
-                <button type="button" className="link" onClick={() => go({ kind: 'folder', path: libraryDir, title: '教学案库' })}>
-                  查看
-                </button>
-              )}
-              <button type="button" className="link" onClick={() => void changeLibrary(setError, refresh)}>
-                更改…
-              </button>
-            </p>
-          )}
-          <DefaultPresetSetting key={templatesRevision} />
           <button type="button" className="link" onClick={onOpenDemo}>
             打开示例
           </button>
@@ -239,8 +220,8 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
       </main>
 
       {exported !== null && <ExportDoneNotice files={exported} onDismiss={() => setExported(null)} />}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
-      {templatesOpen && <TemplatesDialog onClose={() => setTemplatesOpen(false)} onChanged={() => setTemplatesRevision((n) => n + 1)} />}
+      {settingsOpen && <SettingsDialog libraryDir={libraryDir} onLibraryChanged={refresh} onClose={() => setSettingsOpen(false)} />}
+      {templatesOpen && <TemplatesDialog onClose={() => setTemplatesOpen(false)} onChanged={() => void refresh()} />}
       {exporting !== null && (
         <ExportDialog
           bundle={exporting.bundle}
@@ -291,12 +272,6 @@ function Breadcrumb({ dir, parent, onGo }: { dir: string; parent: string | null;
   )
 }
 
-async function changeLibrary(setError: (e: string) => void, refresh: () => Promise<void>): Promise<void> {
-  const result = await window.api.chooseLibraryDir()
-  if (!result.ok) setError(result.error)
-  else if (result.value !== null) await refresh()
-}
-
 function fromListItem(item: ProjectListItem, libraryDir: string): FileItem {
   const fileName = item.filePath.split(/[\\/]/).pop() ?? item.filePath
   return {
@@ -333,28 +308,4 @@ function parentDir(p: string): string {
 
 function lastSegment(p: string): string {
   return p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p
-}
-
-/** 设置：导入（从 Word 新建）时默认使用的格式预设；新建教学案时也以它为初始选择 */
-function DefaultPresetSetting() {
-  const [presetId, setPresetId] = useDefaultPreset()
-  return (
-    <p className="home-library">
-      <label htmlFor="default-preset">导入时默认格式预设：</label>
-      <select
-        id="default-preset"
-        value={presetId}
-        onChange={(e) => {
-          setPresetId(e.target.value)
-          void window.api.setDefaultPreset(e.target.value)
-        }}
-      >
-        {allPresets().map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-    </p>
-  )
 }
