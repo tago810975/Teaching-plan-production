@@ -2597,9 +2597,11 @@ body.is-dragging-outline * {
   --red-pen-soft: color-mix(in srgb, var(--red-pen) 22%, transparent);
   --primary-pressed: color-mix(in srgb, var(--ink) 75%, #000);
   /* 硬边投影：不模糊，整块错开 */
-  --shadow-pop: 5px 5px 0 var(--red-pen);
-  --shadow-dialog: 10px 10px 0 var(--red-pen);
-  --backdrop: rgba(120, 6, 14, 0.72);
+  /* 投影用压暗的深红，不抢内容；遮罩用黑色 */
+  --shadow-red: #8c1219;
+  --shadow-pop: 4px 4px 0 var(--shadow-red);
+  --shadow-dialog: 7px 7px 0 var(--shadow-red);
+  --backdrop: rgba(0, 0, 0, 0.68);
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
@@ -2817,13 +2819,14 @@ body.is-dragging-outline * {
 :root[data-theme='noir'] .context-menu button:hover:not(:disabled),
 :root[data-theme='noir'] .context-menu button:focus-visible,
 :root[data-theme='noir'] .menu-popup button:hover,
-:root[data-theme='noir'] .menu-popup button:focus-visible,
+:root[data-theme='noir'] .menu-popup button:focus-visible {
+  color: #fff;
+}
 :root[data-theme='noir'] .sel-btn:hover {
   background: var(--red-pen);
   color: #fff;
 }
 :root[data-theme='noir'] .context-menu button.is-danger:hover:not(:disabled) {
-  background: var(--ink);
   color: var(--red-pen);
 }
 :root[data-theme='noir'] .sel-btn--key:hover {
@@ -2879,4 +2882,194 @@ body.is-dragging-outline * {
   transition:
     opacity 100ms var(--ease-out),
     transform 200ms var(--ease-spring);
+}
+
+/* ---- 赤黑：鼠标悬停 ----
+ * 列表项：一块斜切的色块从左边“刷”进来，文字随之反色；
+ * 按钮：反色的同时歪一下、放大一点，带回弹；主按钮悬停时轻轻抖动。
+ */
+@keyframes noir-jitter {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1.06);
+  }
+  50% {
+    transform: rotate(-1.5deg) scale(1.06);
+  }
+}
+
+/* 列表项的色块：平时宽度为 0，悬停时刷满 */
+:root[data-theme='noir'] .outline-item:not(.is-selected),
+:root[data-theme='noir'] .home-nav-item:not(.is-active),
+:root[data-theme='noir'] .folder-row:not(.is-active),
+:root[data-theme='noir'] .context-menu button,
+:root[data-theme='noir'] .menu-popup button,
+:root[data-theme='noir'] .ftb-group,
+:root[data-theme='noir'] .theme-swatch {
+  background-image: linear-gradient(105deg, var(--noir-wipe, var(--ink)) calc(100% - 13px), transparent calc(100% - 12px));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  transition:
+    background-size 150ms var(--ease-out),
+    color 80ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover,
+:root[data-theme='noir'] .home-nav-item:not(.is-active):hover,
+:root[data-theme='noir'] .folder-row:not(.is-active):hover,
+:root[data-theme='noir'] .context-menu button:hover:not(:disabled),
+:root[data-theme='noir'] .context-menu button:focus-visible,
+:root[data-theme='noir'] .menu-popup button:hover,
+:root[data-theme='noir'] .menu-popup button:focus-visible,
+:root[data-theme='noir'] .ftb-group:hover,
+:root[data-theme='noir'] .theme-swatch:hover {
+  background-color: transparent;
+  background-size: calc(100% + 13px) 100%;
+}
+/* 侧栏与大纲：白色色块，文字变黑并向右顶出一点 */
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover,
+:root[data-theme='noir'] .home-nav-item:not(.is-active):hover,
+:root[data-theme='noir'] .folder-row:not(.is-active):hover {
+  color: var(--on-ink);
+  transform: translateX(4px);
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover *,
+:root[data-theme='noir'] .folder-row:not(.is-active):hover .folder-name,
+:root[data-theme='noir'] .folder-row:not(.is-active):hover .folder-toggle,
+:root[data-theme='noir'] .ftb-group:hover *,
+:root[data-theme='noir'] .theme-swatch:hover {
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover .outline-grade {
+  background: var(--on-ink);
+  color: var(--ink);
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover .outline-text::before {
+  border-color: var(--on-ink);
+}
+/* 顶出去的那几像素不要引出横向滚动条 */
+:root[data-theme='noir'] .outline-list,
+:root[data-theme='noir'] .home-side {
+  overflow-x: hidden;
+}
+/* 菜单：红色色块 */
+:root[data-theme='noir'] .context-menu button,
+:root[data-theme='noir'] .menu-popup button {
+  --noir-wipe: var(--red-pen);
+}
+:root[data-theme='noir'] .context-menu button.is-danger {
+  --noir-wipe: var(--ink);
+}
+
+/* 文件行：整行提亮，名称变斜体并顶出一点 */
+:root[data-theme='noir'] .home-row .home-row-main {
+  transition: transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .home-row:hover:not(.is-selected) {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+:root[data-theme='noir'] .home-row:hover .home-row-main {
+  transform: translateX(6px);
+}
+:root[data-theme='noir'] .home-row:hover .home-row-name {
+  font-style: italic;
+  text-decoration: none;
+}
+
+/* 按钮：歪一下、放大一点 */
+:root[data-theme='noir'] .dialog-actions button,
+:root[data-theme='noir'] .toolbar-actions > button,
+:root[data-theme='noir'] .toolbar-actions > .menu > button,
+:root[data-theme='noir'] .home-side-actions button,
+:root[data-theme='noir'] .outline-actions button,
+:root[data-theme='noir'] .notice-actions button,
+:root[data-theme='noir'] .dialog-location button,
+:root[data-theme='noir'] .toolbar-home {
+  transition:
+    background-color 60ms linear,
+    border-color 60ms linear,
+    color 60ms linear,
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='noir'] .dialog-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .toolbar-actions > button:hover:not(:disabled),
+:root[data-theme='noir'] .toolbar-actions > .menu > button:hover:not(:disabled),
+:root[data-theme='noir'] .home-side-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .outline-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .notice-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .dialog-location button:hover:not(:disabled),
+:root[data-theme='noir'] .toolbar-home:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+  transform: rotate(-2deg) scale(1.04);
+}
+:root[data-theme='noir'] .dialog-actions button:active:not(:disabled),
+:root[data-theme='noir'] .toolbar-actions > button:active:not(:disabled),
+:root[data-theme='noir'] .home-side-actions button:active:not(:disabled),
+:root[data-theme='noir'] .outline-actions button:active:not(:disabled),
+:root[data-theme='noir'] .notice-actions button:active:not(:disabled) {
+  transform: rotate(0deg) scale(0.97);
+  transition-duration: 0s;
+}
+/* 主按钮：落位后持续轻轻抖动 */
+:root[data-theme='noir'] button.primary:hover:not(:disabled) {
+  animation: noir-jitter 0.45s steps(2, jump-none) 0.2s infinite;
+  transform: rotate(-3deg) scale(1.06);
+}
+:root[data-theme='noir'] button.primary:active:not(:disabled) {
+  animation: none;
+}
+
+/* 小工具按钮：直接反色 */
+:root[data-theme='noir'] .icon-button:hover:not(:disabled),
+:root[data-theme='noir'] .format-button:hover:not(:disabled),
+:root[data-theme='noir'] .quick-menu button:hover:not(:disabled):not(.is-active),
+:root[data-theme='noir'] .segmented button:hover:not(:disabled):not(.is-active),
+:root[data-theme='noir'] .ftb-item:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .ftb-item {
+  transition: transform 160ms var(--ease-spring);
+}
+:root[data-theme='noir'] .ftb-item:hover {
+  transform: rotate(-3deg) scale(1.08);
+}
+:root[data-theme='noir'] .sel-btn {
+  transition: transform 160ms var(--ease-spring);
+}
+:root[data-theme='noir'] .sel-btn:hover {
+  transform: rotate(-4deg) scale(1.1);
+}
+
+/* 标签页：悬停时抬起；色块选择：悬停时歪一下 */
+:root[data-theme='noir'] .tab {
+  transition:
+    background-color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .tab:hover:not(.is-active) {
+  transform: translateY(-2px);
+}
+:root[data-theme='noir'] .tab-new {
+  transition: transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .tab-new:hover {
+  transform: rotate(90deg) scale(1.15);
+}
+:root[data-theme='noir'] .theme-swatch:hover .theme-swatch-chip {
+  transform: rotate(-8deg) scale(1.1);
+}
+:root[data-theme='noir'] .theme-swatch-chip {
+  transition:
+    transform 180ms var(--ease-spring),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+/* 侧栏与大纲的色块右端保留斜边 */
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover,
+:root[data-theme='noir'] .home-nav-item:not(.is-active):hover,
+:root[data-theme='noir'] .folder-row:not(.is-active):hover {
+  background-size: 100% 100%;
 }
