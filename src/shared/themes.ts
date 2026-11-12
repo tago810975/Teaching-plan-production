@@ -12,7 +12,7 @@ export interface ThemeInfo {
   windowBackground: string
 }
 
-export type ThemeId = 'slate' | 'paper' | 'mist' | 'plain' | 'dark'
+export type ThemeId = 'slate' | 'paper' | 'mist' | 'plain' | 'dark' | 'noir'
 
 export const DEFAULT_THEME: ThemeId = 'slate'
 
@@ -21,7 +21,9 @@ export const THEMES: readonly ThemeInfo[] = [
   { id: 'paper', name: '暖纸', swatch: { desk: '#e3dccf', panel: '#f7f3ec', accent: '#a5381f' }, windowBackground: '#e3dccf' },
   { id: 'mist', name: '雾蓝', swatch: { desk: '#d5dde8', panel: '#f2f5f9', accent: '#b3261e' }, windowBackground: '#d5dde8' },
   { id: 'plain', name: '素白', swatch: { desk: '#e2e2e2', panel: '#f6f6f6', accent: '#c0281f' }, windowBackground: '#e2e2e2' },
-  { id: 'dark', name: '深色', swatch: { desk: '#14181a', panel: '#1c2225', accent: '#ef6b5f' }, windowBackground: '#14181a' }
+  { id: 'dark', name: '深色', swatch: { desk: '#14181a', panel: '#1c2225', accent: '#ef6b5f' }, windowBackground: '#14181a' },
+  // 赤黑：红、黑、白的高反差风格主题，除配色外还带斜切造型与硬边投影（见 app.css 末尾）
+  { id: 'noir', name: '赤黑', swatch: { desk: '#0b0b0b', panel: '#f4f4f4', accent: '#e5191c' }, windowBackground: '#0b0b0b' }
 ]
 
 export function isThemeId(v: unknown): v is ThemeId {

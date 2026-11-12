@@ -167,7 +167,8 @@
 }
 
 /* 深色主题中，公式输入框保持白纸黑字，与预览、Word 中看到的一致 */
-:root[data-theme='dark'] .formula-field {
+:root[data-theme='dark'] .formula-field,
+:root[data-theme='noir'] .formula-field {
   background: #fff;
   color: #1f2a2e;
   color-scheme: light;
@@ -2567,4 +2568,315 @@ body.is-dragging-outline * {
 .theme-swatch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 0;
+}
+
+/* ====================================================================
+ * 赤黑主题：红、黑、白的高反差风格。
+ * 与其他主题不同，它除了换基础色，还改造型：直角、斜切的色块、硬边投影、
+ * 网点底纹，浮层带着倾斜“甩”进来。全部规则都限定在 data-theme='noir' 之下，
+ * 不影响其他主题；预览中的 A4 页面照旧是白纸黑字。
+ * ==================================================================== */
+:root[data-theme='noir'] {
+  --desk: #0b0b0b;
+  --panel: #141414;
+  --panel-raised: #1d1d1d;
+  --tabbar: #d4101c;
+  --ink: #f4f4f4;
+  --ink-soft: #ababab;
+  --on-ink: #0b0b0b;
+  --rule: #4a4a4a;
+  --rule-soft: #2e2e2e;
+  --red-pen: #f0222a;
+  --focus: #ffffff;
+  --star: #ffd400;
+  --star-on-ink: #b07a00;
+  --keypoint: #ff5a5a;
+  --shade: 0, 0, 0;
+  --hover: color-mix(in srgb, var(--ink) 10%, transparent);
+  --hover-faint: color-mix(in srgb, var(--ink) 6%, transparent);
+  --red-pen-soft: color-mix(in srgb, var(--red-pen) 22%, transparent);
+  --primary-pressed: color-mix(in srgb, var(--ink) 75%, #000);
+  /* 硬边投影：不模糊，整块错开 */
+  --shadow-pop: 5px 5px 0 var(--red-pen);
+  --shadow-dialog: 10px 10px 0 var(--red-pen);
+  --backdrop: rgba(120, 6, 14, 0.72);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --ease-spring: cubic-bezier(0.2, 1.5, 0.4, 1);
+  --dur: 160ms;
+  /* 斜切：右边向内收 */
+  --slant: 9px;
+  --cut-right: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  --cut-both: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  color-scheme: dark;
+}
+
+/* 一律直角（色块预览与文档页面内部除外） */
+:root[data-theme='noir'] *:not(.theme-swatch-chip, .theme-swatch-chip *, .page, .page *) {
+  border-radius: 0 !important;
+}
+
+/* 工作台：黑底上的红色网点 */
+:root[data-theme='noir'] body {
+  background:
+    radial-gradient(circle, rgba(240, 34, 42, 0.32) 1.3px, transparent 1.7px) 0 0 / 11px 11px,
+    radial-gradient(circle, rgba(240, 34, 42, 0.32) 1.3px, transparent 1.7px) 5.5px 5.5px / 11px 11px,
+    var(--desk);
+}
+
+/* ---- 标题：白底黑字的斜切标签，略微倾斜 ---- */
+:root[data-theme='noir'] .home-view-title,
+:root[data-theme='noir'] .dialog h2 {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 26px 3px 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  clip-path: var(--cut-right);
+  transform: rotate(-2deg);
+  transform-origin: left center;
+}
+:root[data-theme='noir'] .dialog h2 {
+  margin-bottom: 12px;
+}
+:root[data-theme='noir'] .panel-title,
+:root[data-theme='noir'] .home-side-heading {
+  color: var(--red-pen);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.08em;
+}
+:root[data-theme='noir'] .group {
+  border: 1px solid var(--rule);
+}
+:root[data-theme='noir'] .group legend {
+  padding: 0 16px 0 8px;
+  background: var(--red-pen);
+  color: #fff;
+  font-style: italic;
+  clip-path: var(--cut-right);
+}
+
+/* ---- 按钮：悬停时黑白反转；主按钮是红色斜切块 ---- */
+:root[data-theme='noir'] button {
+  transition-duration: 60ms;
+}
+:root[data-theme='noir'] .dialog-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .toolbar-actions > button:hover:not(:disabled),
+:root[data-theme='noir'] .toolbar-actions > .menu > button:hover:not(:disabled),
+:root[data-theme='noir'] .home-side-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .outline-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .notice-actions button:hover:not(:disabled),
+:root[data-theme='noir'] .dialog-location button:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] button.primary {
+  padding-left: 18px;
+  padding-right: 18px;
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+  color: #fff;
+  font-weight: 700;
+  font-style: italic;
+  clip-path: var(--cut-both);
+}
+:root[data-theme='noir'] button.primary:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] button.primary:active:not(:disabled) {
+  background: #b9b9b9;
+  border-color: #b9b9b9;
+}
+/* 斜切会裁掉外面的焦点框，改画在里面 */
+:root[data-theme='noir'] button.primary:focus-visible {
+  outline: 2px solid var(--on-ink);
+  outline-offset: -4px;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .segmented {
+  border: 1px solid var(--ink);
+}
+:root[data-theme='noir'] .segmented button.is-active {
+  background: var(--red-pen);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ---- 标签栏：红底，当前标签是黑色斜切块 ---- */
+:root[data-theme='noir'] .tabbar {
+  border-bottom: 2px solid var(--ink);
+}
+:root[data-theme='noir'] .tab {
+  padding-left: 16px;
+  padding-right: 12px;
+  border: none;
+  color: #fff;
+  clip-path: var(--cut-both);
+}
+:root[data-theme='noir'] .tab:hover:not(.is-active) {
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+:root[data-theme='noir'] .tab.is-active {
+  background: var(--desk);
+  color: var(--ink);
+  font-style: italic;
+  margin-bottom: 0;
+}
+:root[data-theme='noir'] .tab:not(.is-active) .tab-icon--doc {
+  background: var(--desk);
+}
+:root[data-theme='noir'] .tab:not(.is-active) .tab-dirty,
+:root[data-theme='noir'] .tab:not(.is-active) .tab-close,
+:root[data-theme='noir'] .tab-new {
+  color: #fff;
+}
+:root[data-theme='noir'] .tab-new:hover {
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+:root[data-theme='noir'] .tab:focus-visible {
+  outline-offset: -4px;
+}
+
+/* ---- 选中：整条红色斜切块 ---- */
+:root[data-theme='noir'] .outline-item.is-selected {
+  background: var(--red-pen);
+  color: #fff;
+  font-weight: 700;
+  clip-path: var(--cut-right);
+}
+:root[data-theme='noir'] .outline-item.is-selected .outline-no {
+  color: #fff;
+}
+:root[data-theme='noir'] .outline-item.is-selected .outline-grade {
+  background: var(--desk);
+  color: #fff;
+}
+:root[data-theme='noir'] .outline-item.is-selected .outline-stars {
+  color: #fff;
+}
+:root[data-theme='noir'] .home-nav-item.is-active,
+:root[data-theme='noir'] .folder-row.is-active {
+  background: var(--ink);
+  color: var(--on-ink);
+  font-style: italic;
+  clip-path: var(--cut-right);
+}
+:root[data-theme='noir'] .folder-row.is-active .folder-name,
+:root[data-theme='noir'] .folder-row.is-active .folder-toggle {
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .home-row.is-selected {
+  background: var(--red-pen) !important;
+}
+:root[data-theme='noir'] .home-row.is-selected,
+:root[data-theme='noir'] .home-row.is-selected td,
+:root[data-theme='noir'] .home-row.is-selected .home-row-name,
+:root[data-theme='noir'] .home-row.is-selected .home-row-path,
+:root[data-theme='noir'] .home-row.is-selected .home-row-file {
+  color: #fff;
+}
+:root[data-theme='noir'] .home-row.is-selected .file-icon--project {
+  background: var(--desk);
+}
+:root[data-theme='noir'] .home-table th {
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+  font-style: italic;
+}
+:root[data-theme='noir'] .doc-status.is-dirty {
+  font-weight: 700;
+  font-style: italic;
+}
+
+/* ---- 浮层：白色粗边 + 红色硬边投影；菜单项悬停变红 ---- */
+:root[data-theme='noir'] .context-menu,
+:root[data-theme='noir'] .menu-popup,
+:root[data-theme='noir'] .quick-menu,
+:root[data-theme='noir'] .selection-toolbar,
+:root[data-theme='noir'] .ftb-panel,
+:root[data-theme='noir'] .outline-ghost {
+  border: 2px solid var(--ink);
+  background: var(--desk);
+}
+:root[data-theme='noir'] .dialog {
+  border: 3px solid var(--ink);
+  background: var(--panel);
+}
+:root[data-theme='noir'] .context-menu button:hover:not(:disabled),
+:root[data-theme='noir'] .context-menu button:focus-visible,
+:root[data-theme='noir'] .menu-popup button:hover,
+:root[data-theme='noir'] .menu-popup button:focus-visible,
+:root[data-theme='noir'] .sel-btn:hover {
+  background: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir'] .context-menu button.is-danger:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--red-pen);
+}
+:root[data-theme='noir'] .sel-btn--key:hover {
+  color: #fff;
+}
+
+/* 通知条：实色块 */
+:root[data-theme='noir'] .notice,
+:root[data-theme='noir'] .banner {
+  border-bottom: 2px solid var(--ink);
+}
+:root[data-theme='noir'] .banner {
+  background: var(--red-pen);
+  color: #fff;
+}
+
+/* 分隔条、插入线用红色 */
+:root[data-theme='noir'] .splitter:hover::after,
+:root[data-theme='noir'] .splitter:focus-visible::after,
+:root[data-theme='noir'] .splitter.is-dragging::after,
+:root[data-theme='noir'] .tab.drop-before::before,
+:root[data-theme='noir'] .tab.drop-after::after {
+  background: var(--red-pen);
+}
+:root[data-theme='noir'] .outline-drop-line,
+:root[data-theme='noir'] .outline-drop-line::before {
+  border-color: var(--red-pen);
+}
+
+/* ---- 动效：浮层带着倾斜甩进来，对话框从歪到正 ---- */
+@starting-style {
+  :root[data-theme='noir'] .menu-popup,
+  :root[data-theme='noir'] .ftb-panel,
+  :root[data-theme='noir'] .context-menu,
+  :root[data-theme='noir'] .quick-menu,
+  :root[data-theme='noir'] .selection-toolbar {
+    opacity: 0;
+    transform: translateX(-10px) skewX(-10deg);
+  }
+  :root[data-theme='noir'] .dialog[open] {
+    opacity: 0;
+    transform: rotate(-4deg) scale(0.92);
+  }
+  :root[data-theme='noir'] .notice,
+  :root[data-theme='noir'] .banner {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+:root[data-theme='noir'] .context-menu,
+:root[data-theme='noir'] .quick-menu,
+:root[data-theme='noir'] .selection-toolbar {
+  transition:
+    opacity 100ms var(--ease-out),
+    transform 200ms var(--ease-spring);
 }
