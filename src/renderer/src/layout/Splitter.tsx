@@ -1,8 +1,8 @@
 /**
  * 栏间分隔条：鼠标悬停时显示调整光标，按住拖动改变相邻栏宽度；
- * 双击恢复默认宽度；获得焦点后可用左右方向键微调。
+ * 双击恢复默认宽度；获得焦点后可用左右方向键微调；拖动中按 Esc 取消，回到拖动前的宽度。
  */
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { PANEL_LIMITS, type PanelSide } from './usePanelWidths'
 
 interface Props {
@@ -21,6 +21,32 @@ const KEY_STEP = 10
 export function Splitter({ side, width, position, onResize, onReset }: Props) {
   const [dragging, setDragging] = useState(false)
   const startRef = useRef<{ x: number; width: number; total: number } | null>(null)
+  const handleRef = useRef<HTMLDivElement>(null)
+  const pointerRef = useRef<number | null>(null)
+
+  // 拖动中按 Esc：恢复拖动前的宽度并结束拖动（指针被捕获时分隔条拿不到焦点，所以在 window 上监听）
+  useEffect(() => {
+    if (!dragging) return
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      const start = startRef.current
+      if (start === null) return
+      e.preventDefault()
+      e.stopPropagation()
+      onResize(start.width, start.total)
+      startRef.current = null
+      setDragging(false)
+      document.body.classList.remove('is-resizing')
+      const el = handleRef.current
+      const id = pointerRef.current
+      if (el !== null && id !== null && el.hasPointerCapture(id)) el.releasePointerCapture(id)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [dragging, onResize])
+
+  // 组件卸载时不留下拖动状态
+  useEffect(() => () => document.body.classList.remove('is-resizing'), [])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return
@@ -28,6 +54,7 @@ export function Splitter({ side, width, position, onResize, onReset }: Props) {
     const workspace = e.currentTarget.parentElement
     startRef.current = { x: e.clientX, width, total: workspace?.clientWidth ?? window.innerWidth }
     e.currentTarget.setPointerCapture(e.pointerId)
+    pointerRef.current = e.pointerId
     setDragging(true)
     document.body.classList.add('is-resizing')
   }
@@ -62,6 +89,7 @@ export function Splitter({ side, width, position, onResize, onReset }: Props) {
   const { min, max } = PANEL_LIMITS[side]
   return (
     <div
+      ref={handleRef}
       className={dragging ? 'splitter is-dragging' : 'splitter'}
       style={{ left: `${position}px` }}
       role="separator"
