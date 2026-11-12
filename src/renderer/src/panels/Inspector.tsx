@@ -599,19 +599,16 @@ function ParagraphSettings({
               {i + 1}. {plainText(p).replace(/\$[^$]*\$/g, '…').slice(0, 18) || '（空）'}
             </span>
             <span className="para-settings-controls">
-              <label title="这一段之后空出的行数">
+              <span className="para-settings-lines" title="这一段之后空出的行数">
                 空行
-                <input
-                  type="number"
-                  min={0}
+                <NumberInput
+                  compact
                   max={40}
+                  label={`第 ${i + 1} 段之后空行`}
                   value={p.format?.spaceAfterLines ?? 0}
-                  onChange={(e) => {
-                    const n = Number(e.target.value)
-                    if (Number.isFinite(n) && n >= 0) setFormat(i, { spaceAfterLines: n })
-                  }}
+                  onChange={(n) => setFormat(i, { spaceAfterLines: n })}
                 />
-              </label>
+              </span>
               <label title="从这一段开始换到新的一页">
                 <input
                   type="checkbox"
@@ -650,10 +647,10 @@ function LayoutFields({
       <legend>版式</legend>
       {children}
       <Field label="学生版后留白" hint="单位：行">
-        <NumberInput value={layout.studentSpaceLines} onChange={(studentSpaceLines) => onChange({ studentSpaceLines })} />
+        <NumberInput label="学生版后留白" value={layout.studentSpaceLines} onChange={(studentSpaceLines) => onChange({ studentSpaceLines })} />
       </Field>
       <Field label="教师版后留白" hint="单位：行">
-        <NumberInput value={layout.teacherSpaceLines} onChange={(teacherSpaceLines) => onChange({ teacherSpaceLines })} />
+        <NumberInput label="教师版后留白" value={layout.teacherSpaceLines} onChange={(teacherSpaceLines) => onChange({ teacherSpaceLines })} />
       </Field>
       <Field label="跨页">
         <Segmented<KeepTogether>
@@ -1146,20 +1143,43 @@ function TextInput({ value, width, onChange, fieldId }: { value: string; width?:
   )
 }
 
-function NumberInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+/** 行数输入：数字框右侧带 − / + 按钮，点一下增减一行；仍可直接输入 */
+function NumberInput({
+  value,
+  onChange,
+  max = 60,
+  label,
+  compact = false
+}: {
+  value: number
+  onChange: (v: number) => void
+  max?: number
+  /** 读屏用的名称，如“学生版后留白” */
+  label: string
+  compact?: boolean
+}) {
+  const set = (v: number): void => onChange(Math.max(0, Math.min(max, Math.round(v))))
   return (
-    <input
-      type="number"
-      min={0}
-      max={60}
-      step={1}
-      value={value}
-      style={{ width: '5em' }}
-      onChange={(e) => {
-        const n = Number(e.target.value)
-        if (Number.isFinite(n) && n >= 0) onChange(n)
-      }}
-    />
+    <span className={compact ? 'num-stepper num-stepper--compact' : 'num-stepper'}>
+      <input
+        type="number"
+        min={0}
+        max={max}
+        step={1}
+        value={value}
+        aria-label={`${label}（行）`}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          if (e.target.value !== '' && Number.isFinite(n) && n >= 0) set(n)
+        }}
+      />
+      <button type="button" aria-label={`${label}减少一行`} title="减少一行" disabled={value <= 0} onClick={() => set(value - 1)}>
+        −
+      </button>
+      <button type="button" aria-label={`${label}增加一行`} title="增加一行" disabled={value >= max} onClick={() => set(value + 1)}>
+        +
+      </button>
+    </span>
   )
 }
 

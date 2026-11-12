@@ -11,6 +11,7 @@ import { useWorkspaceFiles } from './state/useWorkspaceFiles'
 import { activeTab, EMPTY_WORKSPACE, workspaceReducer, type Tab, type WorkspaceAction } from './state/workspace'
 import { getPreset } from '@core/presets'
 import { CreateFromDocxDialog } from './home/CreateFromDocxDialog'
+import { TabTransition } from './TabTransition'
 import { TabBar } from './TabBar'
 
 export function App() {
@@ -86,6 +87,7 @@ export function App() {
         onNew={files.newProject}
       />
       <div className="app-shell-body">
+        <TabTransition activeKey={ws.active ?? 'home'} />
         {tab === null ? (
           <>
             {error !== null && <ErrorBanner message={error} onDismiss={dismissError} />}

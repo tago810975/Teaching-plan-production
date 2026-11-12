@@ -1524,7 +1524,7 @@ body.is-dragging-outline * {
   gap: 3px;
   white-space: nowrap;
 }
-.para-settings-controls input[type='number'] {
+.para-settings-controls :not(.num-stepper) > input[type='number'] {
   width: 3.5em;
   padding: 2px 4px;
 }
@@ -3072,4 +3072,558 @@ body.is-dragging-outline * {
 :root[data-theme='noir'] .home-nav-item:not(.is-active):hover,
 :root[data-theme='noir'] .folder-row:not(.is-active):hover {
   background-size: 100% 100%;
+}
+
+/* ====================================================================
+ * 通用控件补充：勾选框、行数增减、导出完成卡片、页面切换
+ * ==================================================================== */
+
+/* ---------- 勾选框：自绘，颜色随主题 ---------- */
+input[type='checkbox'] {
+  appearance: none;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  vertical-align: -3px;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur) var(--ease-spring);
+}
+input[type='checkbox']::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--on-ink);
+  clip-path: polygon(12% 48%, 0 62%, 38% 100%, 100% 22%, 87% 10%, 37% 72%);
+  transform: scale(0);
+  transition: transform var(--dur) var(--ease-spring);
+}
+input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+}
+input[type='checkbox']:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- 行数：数字框 + 右侧的 − / + ---------- */
+.num-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+.num-stepper input[type='number'] {
+  width: 4.2em;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+.num-stepper input[type='number']::-webkit-inner-spin-button,
+.num-stepper input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.num-stepper button {
+  width: 28px;
+  padding: 0;
+  margin-left: calc(-1 * var(--hairline));
+  border-radius: 0;
+  font-size: var(--fs-title);
+  line-height: 1;
+}
+.num-stepper button:last-child {
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+}
+.num-stepper button:hover:not(:disabled),
+.num-stepper input:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+.num-stepper--compact input[type='number'] {
+  width: 3em;
+  padding: 2px 4px;
+}
+.num-stepper--compact button {
+  width: 22px;
+}
+.para-settings-lines {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* ---------- 导出完成：右下角的浮动卡片 ---------- */
+.export-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  padding: 12px 12px 12px 14px;
+  overflow: hidden;
+  background: var(--panel-raised);
+  border: var(--hairline) solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  transition:
+    opacity var(--dur) var(--ease-out),
+    transform 240ms var(--ease-spring);
+}
+@starting-style {
+  .export-toast {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.export-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.export-toast-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 完成标记：小圆点里一个勾 */
+.export-toast-mark {
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2e8b57;
+}
+.export-toast-mark::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  clip-path: polygon(12% 48%, 0 62%, 38% 100%, 100% 22%, 87% 10%, 37% 72%);
+}
+.export-toast-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+}
+.export-toast-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: var(--fs-title);
+  line-height: 1;
+}
+.export-toast-close:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.export-toast-files {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.export-toast-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+.export-toast-file:hover {
+  background: var(--hover);
+}
+.export-toast-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.export-toast-open {
+  flex: none;
+  color: var(--ink-soft);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.export-toast-file:hover .export-toast-open,
+.export-toast-file:focus-visible .export-toast-open {
+  opacity: 1;
+}
+.export-toast-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+/* 自动关闭的倒计时：底边一条细线慢慢缩短 */
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.export-toast-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--ink-soft);
+  opacity: 0.5;
+  transform-origin: left center;
+  animation: toast-countdown linear forwards;
+}
+
+/* ---------- 页面切换：首页 ↔ 教学案、教学案之间 ---------- */
+.app-shell-body {
+  position: relative;
+}
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.app-shell-body > .app,
+.app-shell-body > .home {
+  animation: view-enter 200ms var(--ease-out);
+}
+/* 斜切幕布只在赤黑主题下出现 */
+.tab-wipe {
+  display: none;
+}
+
+/* ====================================================================
+ * 赤黑主题（续）：文字选区、勾选框、属性栏与快捷窗口的悬停、导出卡片、页面切换
+ * ==================================================================== */
+:root[data-theme='noir'] {
+  /* 预览页面上的悬停、选区提示用黑色淡底，不再是蓝色 */
+  --page-accent: 0, 0, 0;
+  accent-color: var(--red-pen);
+  caret-color: var(--red-pen);
+}
+:root[data-theme='noir'] ::selection {
+  background: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir'] .page ::selection {
+  background: rgba(240, 34, 42, 0.3);
+  color: inherit;
+}
+
+/* 勾选框：歪着的方块，勾上后变红 */
+:root[data-theme='noir'] input[type='checkbox'] {
+  border: 1.5px solid var(--ink);
+  background: var(--desk);
+  transform: skewX(-10deg);
+}
+:root[data-theme='noir'] input[type='checkbox']::before {
+  background: #fff;
+}
+:root[data-theme='noir'] input[type='checkbox']:checked {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+}
+:root[data-theme='noir'] input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--ink);
+  transform: skewX(-10deg) rotate(-8deg) scale(1.15);
+}
+
+/* ---- 属性栏、右键快捷窗口：悬停 ---- */
+/* 输入框：白边 + 错开的深红硬边 */
+:root[data-theme='noir'] input[type='text'],
+:root[data-theme='noir'] input[type='number'],
+:root[data-theme='noir'] input[type='search'],
+:root[data-theme='noir'] textarea,
+:root[data-theme='noir'] select {
+  transition:
+    border-color 60ms linear,
+    box-shadow 140ms var(--ease-spring);
+}
+:root[data-theme='noir'] input[type='text']:hover,
+:root[data-theme='noir'] input[type='number']:hover,
+:root[data-theme='noir'] input[type='search']:hover,
+:root[data-theme='noir'] textarea:hover,
+:root[data-theme='noir'] select:hover {
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow-red);
+}
+:root[data-theme='noir'] input[type='text']:focus-visible,
+:root[data-theme='noir'] input[type='number']:focus-visible,
+:root[data-theme='noir'] textarea:focus-visible,
+:root[data-theme='noir'] select:focus-visible {
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--red-pen);
+}
+/* 字段：悬停时标题变红、变斜并顶出一点 */
+:root[data-theme='noir'] .field-label,
+:root[data-theme='noir'] .quick-menu-label,
+:root[data-theme='noir'] .group legend {
+  display: inline-block;
+  transition:
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .field:hover > .field-label,
+:root[data-theme='noir'] .field:hover > .field-label-row > .field-label,
+:root[data-theme='noir'] .quick-menu-row:hover > .quick-menu-label {
+  color: var(--red-pen);
+  font-style: italic;
+  transform: translateX(4px);
+}
+:root[data-theme='noir'] .group {
+  transition: border-color 60ms linear;
+}
+:root[data-theme='noir'] .group:hover {
+  border-color: var(--ink);
+}
+:root[data-theme='noir'] .group:hover > legend {
+  transform: rotate(-3deg) scale(1.08);
+}
+/* 勾选项：整行顶出，方块跟着歪 */
+:root[data-theme='noir'] .checkbox {
+  transition:
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .checkbox:hover {
+  transform: translateX(4px);
+  font-style: italic;
+}
+:root[data-theme='noir'] .checkbox:hover input[type='checkbox']:not(:disabled) {
+  transform: skewX(-10deg) rotate(-8deg) scale(1.15);
+}
+/* 行（段落设置、插图、选项）：悬停时提亮 */
+:root[data-theme='noir'] .para-settings-row,
+:root[data-theme='noir'] .figure-row,
+:root[data-theme='noir'] .option-row,
+:root[data-theme='noir'] .option-image-row {
+  transition: background-color 60ms linear;
+}
+:root[data-theme='noir'] .para-settings-row:hover,
+:root[data-theme='noir'] .figure-row:hover,
+:root[data-theme='noir'] .option-row:hover,
+:root[data-theme='noir'] .option-image-row:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+:root[data-theme='noir'] .option-row:hover .option-label {
+  color: var(--red-pen);
+  font-style: italic;
+}
+/* 属性栏、快捷窗口里的普通按钮：反色并歪一下 */
+:root[data-theme='noir'] .inspector-body button:not(.link, .star, .icon-button),
+:root[data-theme='noir'] .quick-menu button:not(.link, .star, .icon-button) {
+  transition:
+    background-color 60ms linear,
+    border-color 60ms linear,
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .inspector-body button:not(.link, .star, .icon-button, .is-active):hover:not(:disabled),
+:root[data-theme='noir'] .quick-menu button:not(.link, .star, .icon-button, .is-active):hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+  transform: rotate(-2deg) scale(1.05);
+}
+:root[data-theme='noir'] .inspector-body button:not(.link, .star):active:not(:disabled),
+:root[data-theme='noir'] .quick-menu button:not(.link, .star):active:not(:disabled) {
+  transform: scale(0.95);
+  transition-duration: 0s;
+}
+/* 分段按钮连在一起，只反色不歪 */
+:root[data-theme='noir'] .segmented button:hover:not(:disabled),
+:root[data-theme='noir'] .num-stepper button:hover:not(:disabled) {
+  transform: none !important;
+}
+:root[data-theme='noir'] .segmented button.is-active:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--red-pen);
+}
+:root[data-theme='noir'] .num-stepper button:hover:not(:disabled) {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir'] .icon-button {
+  transition: transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .icon-button:hover:not(:disabled) {
+  transform: rotate(-6deg) scale(1.1);
+}
+/* 文字按钮：白底黑字的斜切小标签 */
+:root[data-theme='noir'] button.link {
+  padding: 0 6px;
+  transition:
+    background-color 60ms linear,
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] button.link:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--on-ink);
+  text-decoration: none;
+  transform: skewX(-8deg);
+}
+:root[data-theme='noir'] button.link.danger:hover:not(:disabled) {
+  background: var(--red-pen);
+  color: #fff;
+}
+/* 星级 */
+:root[data-theme='noir'] .stars .star {
+  transition: transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .stars .star:hover {
+  transform: rotate(-14deg) scale(1.35);
+}
+
+/* ---- 导出完成卡片 ---- */
+:root[data-theme='noir'] .export-toast {
+  border: 2px solid var(--ink);
+  background: var(--desk);
+  overflow: visible;
+}
+@starting-style {
+  :root[data-theme='noir'] .export-toast {
+    opacity: 0;
+    transform: translateX(40px) skewX(-10deg);
+  }
+}
+:root[data-theme='noir'] .export-toast.is-leaving {
+  transform: translateX(40px) skewX(-10deg);
+}
+:root[data-theme='noir'] .export-toast-mark {
+  background: var(--red-pen);
+  transform: skewX(-10deg);
+}
+:root[data-theme='noir'] .export-toast-title {
+  font-weight: 900;
+  font-style: italic;
+}
+:root[data-theme='noir'] .export-toast-file {
+  background-image: linear-gradient(105deg, var(--red-pen) calc(100% - 13px), transparent calc(100% - 12px));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  transition:
+    background-size 150ms var(--ease-out),
+    color 80ms linear;
+}
+:root[data-theme='noir'] .export-toast-file:hover {
+  background-color: transparent;
+  background-size: calc(100% + 13px) 100%;
+  color: #fff;
+}
+:root[data-theme='noir'] .export-toast-file:hover .export-toast-open {
+  color: #fff;
+}
+:root[data-theme='noir'] .export-toast-close:hover {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .export-toast-actions button {
+  transition:
+    background-color 60ms linear,
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .export-toast-actions button:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+  transform: rotate(-2deg) scale(1.04);
+}
+:root[data-theme='noir'] .export-toast-timer {
+  height: 3px;
+  background: var(--red-pen);
+  opacity: 1;
+}
+
+/* ---- 页面切换：三层斜切幕布（黑、红、白）依次向右甩开，露出新页面 ---- */
+@keyframes noir-wipe {
+  from {
+    transform: translateX(0) skewX(var(--wipe-skew));
+  }
+  to {
+    transform: translateX(125%) skewX(var(--wipe-skew));
+  }
+}
+@keyframes noir-view-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+:root[data-theme='noir'] .tab-wipe {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  pointer-events: none;
+}
+:root[data-theme='noir'] .tab-wipe span {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: -25%;
+  width: 150%;
+  animation: noir-wipe cubic-bezier(0.65, 0, 0.25, 1) forwards;
+}
+/* 最底下一层最后离开 */
+:root[data-theme='noir'] .tab-wipe span:nth-child(1) {
+  --wipe-skew: -12deg;
+  background: var(--ink);
+  animation-duration: 480ms;
+}
+:root[data-theme='noir'] .tab-wipe span:nth-child(2) {
+  --wipe-skew: -20deg;
+  background: var(--red-pen);
+  animation-duration: 400ms;
+}
+:root[data-theme='noir'] .tab-wipe span:nth-child(3) {
+  --wipe-skew: -28deg;
+  background: var(--desk);
+  animation-duration: 300ms;
+}
+:root[data-theme='noir'] .app-shell-body > .app,
+:root[data-theme='noir'] .app-shell-body > .home {
+  animation: noir-view-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+/* 减弱动态效果时不放幕布 */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='noir'] .tab-wipe {
+    display: none;
+  }
+}
+:root[data-theme='noir'][data-reduce-motion='true'] .tab-wipe {
+  display: none;
 }

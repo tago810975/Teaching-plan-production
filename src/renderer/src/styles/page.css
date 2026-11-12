@@ -41,7 +41,7 @@
   cursor: pointer;
 }
 .page-header:hover {
-  background-color: rgba(47, 111, 181, 0.05);
+  background-color: rgba(var(--page-accent, 47, 111, 181), 0.05);
 }
 .page-header.is-selected {
   background-color: rgba(179, 38, 30, 0.045);
@@ -127,7 +127,7 @@
   cursor: pointer;
 }
 .page .para:hover {
-  background-color: rgba(47, 111, 181, 0.05);
+  background-color: rgba(var(--page-accent, 47, 111, 181), 0.05);
 }
 
 /* 选中的题目：左侧页边上的一道“批改红”竖线 */
@@ -181,7 +181,7 @@
 .figure--active {
   /* 手柄会伸出图片边缘，落在下一段的范围里；提高层级，避免被后面的段落盖住 */
   z-index: 3;
-  outline: 1pt dashed rgba(47, 111, 181, 0.85);
+  outline: 1pt dashed rgba(var(--page-accent, 47, 111, 181), 0.85);
   outline-offset: 1pt;
 }
 .para-float.figure {
@@ -254,7 +254,7 @@
   padding: 0;
 }
 .page .para--spacer:hover {
-  background-color: rgba(47, 111, 181, 0.04);
+  background-color: rgba(var(--page-accent, 47, 111, 181), 0.04);
 }
 
 .math--display {
@@ -279,8 +279,8 @@
 }
 .math--editable:hover,
 .math--editable:focus-visible {
-  background-color: rgba(47, 111, 181, 0.12);
-  outline: 0.75pt solid rgba(47, 111, 181, 0.45);
+  background-color: rgba(var(--page-accent, 47, 111, 181), 0.12);
+  outline: 0.75pt solid rgba(var(--page-accent, 47, 111, 181), 0.45);
 }
 
 /* 表格：与导出一致 */
@@ -346,9 +346,9 @@
   bottom: 0;
   left: 3pt;
   width: 1pt;
-  background: rgba(47, 111, 181, 0.55);
+  background: rgba(var(--page-accent, 47, 111, 181), 0.55);
 }
 .col-resize:hover::after,
 .doc-table-box.is-resizing .col-resize::after {
-  background: rgba(47, 111, 181, 0.9) !important;
+  background: rgba(var(--page-accent, 47, 111, 181), 0.9) !important;
 }

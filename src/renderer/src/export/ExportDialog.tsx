@@ -140,7 +140,7 @@ const DONE_NOTICE_MS = 8000
 const DONE_NOTICE_FADE_MS = 180
 
 /**
- * 导出完成提示：可直接用 Word 打开或打开所在文件夹。
+ * 导出完成提示（右下角的浮动卡片）：点文件名直接用 Word 打开，或打开所在文件夹。
  * 8 秒后自动淡出关闭；鼠标停在提示上或焦点在提示内时暂停计时，离开后重新计时；
  * 打开文件出错时不自动关闭，留给用户看清原因。
  */
@@ -170,10 +170,13 @@ export function ExportDoneNotice({ files, onDismiss }: { files: string[]; onDism
     return () => window.clearTimeout(t)
   }, [leaving])
 
+  const running = !hold && openError === null && !leaving
+  const open = (f: string): void => void window.api.openPath(f).then((e) => setOpenError(e === null ? null : `无法打开：${e}`))
+
   return (
     <div
       ref={rootRef}
-      className={leaving ? 'notice notice--success is-leaving' : 'notice notice--success'}
+      className={leaving ? 'export-toast is-leaving' : 'export-toast'}
       role="status"
       onMouseEnter={() => {
         setHold(true)
@@ -188,32 +191,32 @@ export function ExportDoneNotice({ files, onDismiss }: { files: string[]; onDism
         if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !e.currentTarget.matches(':hover')) setHold(false)
       }}
     >
-      <div>
-        <p className="notice-title">已导出 {files.length} 个 Word 文档。</p>
-        <ul className="notice-files">
-          {files.map((f) => (
-            <li key={f}>
-              <span className="notice-file-name">{f.split(/[\\/]/).pop()}</span>
-              <button
-                type="button"
-                className="link"
-                onClick={() => void window.api.openPath(f).then((e) => setOpenError(e === null ? null : `无法打开：${e}`))}
-              >
-                打开
-              </button>
-            </li>
-          ))}
-        </ul>
-        {openError !== null && <p className="field-error">{openError}</p>}
+      <div className="export-toast-head">
+        <span className="export-toast-mark" aria-hidden="true" />
+        <p className="export-toast-title">已导出 {files.length} 个 Word 文档</p>
+        <button type="button" className="export-toast-close" aria-label="关闭" title="关闭" onClick={onDismiss}>
+          ×
+        </button>
       </div>
-      <div className="notice-actions">
+      <ul className="export-toast-files">
+        {files.map((f) => (
+          <li key={f}>
+            <button type="button" className="export-toast-file" title={`用 Word 打开：${f}`} onClick={() => open(f)}>
+              <span className="file-icon file-icon--docx" aria-hidden="true" />
+              <span className="export-toast-file-name">{f.split(/[\\/]/).pop()}</span>
+              <span className="export-toast-open">打开</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {openError !== null && <p className="field-error">{openError}</p>}
+      <div className="export-toast-actions">
         <button type="button" onClick={() => window.api.revealInFolder(files[0]!)}>
           打开所在文件夹
         </button>
-        <button type="button" onClick={onDismiss}>
-          知道了
-        </button>
       </div>
+      {/* 自动关闭的倒计时：只在计时进行中显示，暂停后重新计时时从头开始 */}
+      {running && <span className="export-toast-timer" aria-hidden="true" style={{ animationDuration: `${DONE_NOTICE_MS}ms` }} />}
     </div>
   )
 }
