@@ -2589,7 +2589,8 @@ body.is-dragging-outline * {
   --red-pen: #f0222a;
   --focus: #ffffff;
   --star: #ffd400;
-  --star-on-ink: #b07a00;
+  /* 选中的难度是红底，星用亮黄才看得清 */
+  --star-on-ink: #ffe45e;
   --keypoint: #ff5a5a;
   --shade: 0, 0, 0;
   --hover: color-mix(in srgb, var(--ink) 10%, transparent);
@@ -3388,7 +3389,8 @@ input[type='checkbox']:disabled {
 :root[data-theme='noir'] .field-label,
 :root[data-theme='noir'] .quick-menu-label,
 :root[data-theme='noir'] .group legend {
-  display: inline-block;
+  /* 标题仍独占一行（不能改成行内块，否则会和后面的控件挤在同一行、互相重叠） */
+  width: fit-content;
   transition:
     color 60ms linear,
     transform 180ms var(--ease-spring);
@@ -3461,13 +3463,8 @@ input[type='checkbox']:disabled {
   transition-duration: 0s;
 }
 /* 分段按钮连在一起，只反色不歪 */
-:root[data-theme='noir'] .segmented button:hover:not(:disabled),
 :root[data-theme='noir'] .num-stepper button:hover:not(:disabled) {
   transform: none !important;
-}
-:root[data-theme='noir'] .segmented button.is-active:hover:not(:disabled) {
-  background: var(--ink);
-  color: var(--red-pen);
 }
 :root[data-theme='noir'] .num-stepper button:hover:not(:disabled) {
   background: var(--red-pen);
@@ -3567,19 +3564,21 @@ input[type='checkbox']:disabled {
   opacity: 1;
 }
 
-/* ---- 页面切换：三层斜切幕布（黑、红、白）依次向右甩开，露出新页面 ---- */
+/* ---- 页面切换：一道深色斜切幕布向右滑开，前缘带一条细红边 ----
+ * 幕布与界面底色同为黑色，滑过时画面亮度几乎不变，不闪眼；不再整屏铺红、铺白。
+ */
 @keyframes noir-wipe {
   from {
-    transform: translateX(0) skewX(var(--wipe-skew));
+    transform: translateX(0) skewX(-16deg);
   }
   to {
-    transform: translateX(125%) skewX(var(--wipe-skew));
+    transform: translateX(125%) skewX(-16deg);
   }
 }
 @keyframes noir-view-enter {
   from {
     opacity: 0;
-    transform: translateX(-28px);
+    transform: translateX(-12px);
   }
 }
 :root[data-theme='noir'] .tab-wipe {
@@ -3591,32 +3590,23 @@ input[type='checkbox']:disabled {
   pointer-events: none;
 }
 :root[data-theme='noir'] .tab-wipe span {
+  display: none;
+}
+:root[data-theme='noir'] .tab-wipe span:first-child {
+  display: block;
   position: absolute;
   top: -10%;
   bottom: -10%;
   left: -25%;
   width: 150%;
-  animation: noir-wipe cubic-bezier(0.65, 0, 0.25, 1) forwards;
-}
-/* 最底下一层最后离开 */
-:root[data-theme='noir'] .tab-wipe span:nth-child(1) {
-  --wipe-skew: -12deg;
-  background: var(--ink);
-  animation-duration: 480ms;
-}
-:root[data-theme='noir'] .tab-wipe span:nth-child(2) {
-  --wipe-skew: -20deg;
-  background: var(--red-pen);
-  animation-duration: 400ms;
-}
-:root[data-theme='noir'] .tab-wipe span:nth-child(3) {
-  --wipe-skew: -28deg;
   background: var(--desk);
-  animation-duration: 300ms;
+  /* 前缘（左边）的细红边，用压暗的红 */
+  border-left: 10px solid var(--shadow-red);
+  animation: noir-wipe 340ms cubic-bezier(0.5, 0, 0.2, 1) forwards;
 }
 :root[data-theme='noir'] .app-shell-body > .app,
 :root[data-theme='noir'] .app-shell-body > .home {
-  animation: noir-view-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: noir-view-enter 300ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 /* 减弱动态效果时不放幕布 */
 @media (prefers-reduced-motion: reduce) {
@@ -3626,4 +3616,223 @@ input[type='checkbox']:disabled {
 }
 :root[data-theme='noir'][data-reduce-motion='true'] .tab-wipe {
   display: none;
+}
+
+/* ====================================================================
+ * 下拉框：使用可定制的原生下拉（appearance: base-select），展开的列表可以加样式与动效。
+ * 仍是原生 <select>：键盘操作、读屏、表单行为都不变；不支持的环境自动退回系统样式。
+ * ==================================================================== */
+@supports (appearance: base-select) {
+  select:not([multiple]):not([size]),
+  select:not([multiple]):not([size])::picker(select) {
+    appearance: base-select;
+  }
+  select:not([multiple]):not([size]) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 0;
+    padding: 3px 6px 3px 8px;
+    border: var(--hairline) solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--panel-raised);
+    color: var(--ink);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+  select:not([multiple]):not([size]):hover:not(:disabled) {
+    border-color: var(--rule-strong);
+  }
+  select:not([multiple]):not([size]):disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  /* 右侧的小箭头：展开时翻转 */
+  select::picker-icon {
+    margin-left: auto;
+    color: var(--ink-soft);
+    font-size: var(--fs-small);
+    transition: rotate var(--dur) var(--ease-spring);
+  }
+  select:open::picker-icon {
+    rotate: 180deg;
+  }
+  /* 展开的列表：淡入并落位，收起时淡出 */
+  select::picker(select) {
+    margin: 4px 0;
+    padding: 4px;
+    border: var(--hairline) solid var(--rule);
+    border-radius: var(--radius-lg);
+    background: var(--panel-raised);
+    color: var(--ink);
+    box-shadow: var(--shadow-pop);
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    transform-origin: top center;
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur) var(--ease-spring),
+      overlay var(--dur) allow-discrete,
+      display var(--dur) allow-discrete;
+  }
+  select::picker(select):popover-open {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    select::picker(select):popover-open {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+  }
+  select option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 6px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 60ms linear;
+  }
+  select option:hover,
+  select option:focus-visible {
+    background: var(--hover);
+    outline: none;
+  }
+  select option:checked {
+    font-weight: 600;
+  }
+  select option::checkmark {
+    color: var(--red-pen);
+    font-size: var(--fs-small);
+  }
+
+  /* 赤黑：白色粗边 + 硬边投影，列表带着倾斜甩出，选项悬停刷红 */
+  :root[data-theme='noir'] select:not([multiple]):not([size]) {
+    background: var(--desk);
+    border: 1px solid var(--rule);
+  }
+  :root[data-theme='noir'] select:not([multiple]):not([size]):open {
+    border-color: var(--ink);
+    box-shadow: 3px 3px 0 var(--red-pen);
+  }
+  :root[data-theme='noir'] select::picker-icon {
+    color: var(--red-pen);
+  }
+  :root[data-theme='noir'] select::picker(select) {
+    border: 2px solid var(--ink);
+    background: var(--desk);
+    transform: translateX(-10px) skewX(-10deg);
+    transform-origin: top left;
+    transition:
+      opacity 100ms var(--ease-out),
+      transform 200ms var(--ease-spring),
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
+  }
+  :root[data-theme='noir'] select::picker(select):popover-open {
+    transform: none;
+  }
+  @starting-style {
+    :root[data-theme='noir'] select::picker(select):popover-open {
+      opacity: 0;
+      transform: translateX(-10px) skewX(-10deg);
+    }
+  }
+  :root[data-theme='noir'] select option {
+    background-image: linear-gradient(105deg, var(--red-pen) calc(100% - 13px), transparent calc(100% - 12px));
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    transition:
+      background-size 150ms var(--ease-out),
+      color 80ms linear;
+  }
+  :root[data-theme='noir'] select option:hover,
+  :root[data-theme='noir'] select option:focus-visible {
+    background-color: transparent;
+    background-size: calc(100% + 13px) 100%;
+    color: #fff;
+  }
+  :root[data-theme='noir'] select option:checked {
+    font-style: italic;
+  }
+  :root[data-theme='noir'] select option:hover::checkmark,
+  :root[data-theme='noir'] select option:focus-visible::checkmark {
+    color: #fff;
+  }
+}
+
+/* ---------- 分段按钮：选中时轻轻弹一下（所有主题） ---------- */
+@keyframes seg-pick {
+  from {
+    transform: scale(0.94);
+  }
+}
+.segmented button.is-active {
+  animation: seg-pick 220ms var(--ease-spring);
+}
+
+/* ====================================================================
+ * 赤黑主题（再续）：分段按钮（难度、跨页等）与格式按钮的动效
+ * ==================================================================== */
+@keyframes noir-pick {
+  0% {
+    transform: scale(1.22) rotate(-6deg);
+  }
+  60% {
+    transform: scale(0.97) rotate(1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* 直角不需要裁切，放开后按钮才能歪出框外 */
+:root[data-theme='noir'] .segmented {
+  overflow: visible;
+}
+:root[data-theme='noir'] .segmented button {
+  position: relative;
+  transition:
+    background-color 60ms linear,
+    color 60ms linear,
+    transform 180ms var(--ease-spring);
+}
+:root[data-theme='noir'] .segmented button:hover:not(:disabled):not(.is-active) {
+  z-index: 1;
+  transform: translateY(-3px) rotate(-2deg) !important;
+  box-shadow: 3px 3px 0 var(--shadow-red);
+}
+:root[data-theme='noir'] .segmented button:hover:not(:disabled):not(.is-active) .difficulty-stars {
+  color: var(--on-ink);
+}
+:root[data-theme='noir'] .segmented button.is-active {
+  z-index: 2;
+  animation: noir-pick 320ms var(--ease-out);
+}
+:root[data-theme='noir'] .segmented button.is-active:hover:not(:disabled) {
+  background: var(--red-pen);
+  color: #fff;
+  transform: none !important;
+}
+
+/* 属性栏顶部的格式按钮（B / I / U / 颜色 / 重点）：与预览中选区工具条一致 */
+:root[data-theme='noir'] .format-button {
+  transition:
+    background-color 60ms linear,
+    color 60ms linear,
+    transform 160ms var(--ease-spring);
+}
+:root[data-theme='noir'] .format-button:hover:not(:disabled) {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+  color: #fff;
+  transform: rotate(-4deg) scale(1.1);
+}
+:root[data-theme='noir'] .format-button:active:not(:disabled) {
+  transform: scale(0.94);
+  transition-duration: 0s;
 }
