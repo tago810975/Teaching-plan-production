@@ -202,13 +202,16 @@ export function Preview({
         </div>
       </div>
 
-      <div className="preview-pages" style={{ zoom }}>
+      {/* 缩放：页面始终按原尺寸排版（与测量区一致，断行、分页不随缩放变化），再整体缩小或放大显示；
+          外框按缩放后的尺寸占位。不用 CSS zoom——它会按缩放后的字号重新排版，断行与测量不一致，
+          文字也按小字号绘制，Windows 上加粗的小字带彩色边（发绿） */}
+      <div className="preview-pages" data-zoom={zoom}>
         {current.map((indices, pageIndex) => (
+          <div key={pageIndex} className="page-frame" style={{ width: `${pageWidthPt * zoom}pt`, height: `${pageHeightPt * zoom}pt` }}>
           <section
-            key={pageIndex}
             className="page"
             aria-label={`第 ${pageIndex + 1} 页`}
-            style={{ width: `${pageWidthPt}pt`, height: `${pageHeightPt}pt` }}
+            style={{ width: `${pageWidthPt}pt`, height: `${pageHeightPt}pt`, transform: zoom === 1 ? undefined : `scale(${zoom})`, transformOrigin: '0 0' }}
           >
             <PageWatermark header={ir.header} page={page} assetUrls={assetUrls} />
             <PageHeaderView
@@ -251,6 +254,7 @@ export function Preview({
               第 {pageIndex + 1} 页 共 {current.length} 页
             </footer>
           </section>
+          </div>
         ))}
       </div>
     </div>

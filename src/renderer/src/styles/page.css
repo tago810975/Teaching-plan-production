@@ -260,7 +260,9 @@
 .math--display {
   display: block;
   text-align: center;
-  margin: 2pt 0;
+  /* 用内边距而不是外边距：块的外边距会穿过段落（外边距合并），在段落框体外留出空隙，
+     选中内容时左侧的红线在公式处断开。空白大小不变，排版、分页不受影响 */
+  padding: 2pt 0;
 }
 
 /*
@@ -287,7 +289,8 @@
 .doc-table-wrap {
   display: block;
   text-indent: 0;
-  margin: 2pt 0;
+  /* 同行间公式：用内边距，免得选中时红线在表格处断开 */
+  padding: 2pt 0;
 }
 .doc-table-box {
   position: relative;
@@ -358,4 +361,15 @@
 .math-upright math mi {
   text-transform: none;
   font-style: normal;
+}
+
+/* 每页的外框：按缩放后的尺寸占位，页面在其中按原尺寸排版后用 transform 缩放 */
+.page-frame {
+  position: relative;
+  flex: none;
+}
+.page-frame > .page {
+  position: absolute;
+  top: 0;
+  left: 0;
 }

@@ -54,8 +54,9 @@ const PX_TO_EMU = 9525
 const MIN_EMU = 180000
 
 export function previewZoom(el: Element): number {
+  // 预览缩放写在 data-zoom 上（页面用 transform 缩放，鼠标移动的距离要除以它换算回页面上的距离）
   const pages = el.closest('.preview-pages') as HTMLElement | null
-  const z = pages === null ? 1 : parseFloat(pages.style.zoom)
+  const z = pages === null ? 1 : parseFloat(pages.dataset['zoom'] ?? '1')
   return Number.isFinite(z) && z > 0 ? z : 1
 }
 
