@@ -86,8 +86,9 @@ export function App() {
         onMove={(id, toIndex) => dispatch({ type: 'move-tab', id, toIndex })}
         onNew={files.newProject}
       />
+      {/* 必须排在内容区之前：它要在旧页面被移除之前拍下快照 */}
+      <TabTransition activeKey={ws.active ?? 'home'} />
       <div className="app-shell-body">
-        <TabTransition activeKey={ws.active ?? 'home'} />
         {tab === null ? (
           <>
             {error !== null && <ErrorBanner message={error} onDismiss={dismissError} />}
