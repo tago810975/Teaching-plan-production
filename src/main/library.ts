@@ -31,6 +31,8 @@ interface Settings {
   defaultPresetId?: string
   /** 导出 Word 时是否默认勾选“知识点重点难点汇总” */
   exportPointsByDefault?: boolean
+  /** 公式中的字母用正体（不倾斜）；不设时为是 */
+  mathUpright?: boolean
   /** 用户保存的选项间距方案 */
   optionStopSchemes?: unknown
   /** 界面配色主题 */
@@ -259,4 +261,15 @@ export async function setTheme(id: ThemeId): Promise<void> {
   if (!isThemeId(id)) return
   const settings = await readJsonFile<Settings>(settingsPath(), {})
   await writeFile(settingsPath(), JSON.stringify({ ...settings, theme: id }, null, 2))
+}
+
+/** 公式中的字母是否用正体（不倾斜）：预览与导出都按它；默认是 */
+export async function getMathUpright(): Promise<boolean> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  return settings.mathUpright !== false
+}
+
+export async function setMathUpright(on: boolean): Promise<void> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, mathUpright: on }, null, 2))
 }

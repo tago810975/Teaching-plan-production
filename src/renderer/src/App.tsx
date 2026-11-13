@@ -13,8 +13,14 @@ import { getPreset } from '@core/presets'
 import { CreateFromDocxDialog } from './home/CreateFromDocxDialog'
 import { TabTransition } from './TabTransition'
 import { TabBar } from './TabBar'
+import { useMathUpright } from './state/mathUpright'
 
 export function App() {
+  // 公式字母用正体（设置中修改）：整个界面中的公式预览都按它
+  const mathUpright = useMathUpright()
+  useEffect(() => {
+    document.body.classList.toggle('math-upright', mathUpright)
+  }, [mathUpright])
   const [ws, dispatch] = useReducer(workspaceReducer, EMPTY_WORKSPACE)
   const [newDialogOpen, setNewDialogOpen] = useState(false)
   const [demoError, setDemoError] = useState<string | null>(null)

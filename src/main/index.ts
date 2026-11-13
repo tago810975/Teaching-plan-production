@@ -34,6 +34,8 @@ import {
   createProject,
   getDefaultPresetId,
   getExportPointsDefault,
+  getMathUpright,
+  setMathUpright,
   setExportPointsDefault,
   getTheme,
   setTheme,
@@ -289,6 +291,8 @@ function registerIpc(): void {
     existingExportFiles(dir, baseName, variants, points === true)
   )
   ipcMain.handle(IPC.getExportPointsDefault, () => getExportPointsDefault())
+  ipcMain.handle(IPC.getMathUpright, () => getMathUpright())
+  ipcMain.handle(IPC.setMathUpright, (_event, on: boolean) => setMathUpright(on === true))
   ipcMain.handle(IPC.setExportPointsDefault, (_event, on: boolean) => setExportPointsDefault(on === true))
   ipcMain.handle(IPC.getTheme, () => getTheme())
   ipcMain.handle(IPC.setTheme, async (event, id: unknown) => {

@@ -15,7 +15,7 @@ import { A4_PAGE, contentWidthTwip } from '../document/units'
 import { FLOAT_GAP_EMU, ROOMY_CELL_TWIP, RULE_LINE_COLOR, RULE_LINE_TWIP, STYLE_SPECS, TEACHER_SHADING, TEMPLATE_OPTION_TAB_STOPS, type StyleKey } from '../document/styles'
 import { WORD_FONT_NAMES } from '../document/fonts'
 import { applyHeadingStyles } from './heading-styles'
-import { applyMathMarks } from './math-marks'
+import { applyMathMarks, uprightOmml } from './math-marks'
 import { latexToOmml } from '../math/mathml-to-omml'
 import type { Asset, FontFamily, HeaderImage, TextMarks } from '../model/types'
 import { extForMime } from '../project-file/format'
@@ -34,17 +34,20 @@ export interface ExportInput {
   title: string
   /** 模板 .docx 的内容 */
   template: Uint8Array
+  /** 公式中的字母用正体（不倾斜）；默认 false（保持 Word 的数学斜体），软件中由“设置”决定 */
+  mathUpright?: boolean
 }
 
 export class DocxExportError extends Error {
   override name = 'DocxExportError'
 }
 
-export async function writeDocx({ ir, assets, title, template }: ExportInput): Promise<Uint8Array> {
+export async function writeDocx({ ir, assets, title, template, mathUpright = false }: ExportInput): Promise<Uint8Array> {
   const zip = await JSZip.loadAsync(template)
   // 标题格式来自格式预设：写进模板的同名样式
   if (ir.styles !== undefined) zip.file('word/styles.xml', applyHeadingStyles(await readText(zip, 'word/styles.xml'), ir.styles))
   const ctx = new ExportContext(zip, assets)
+  ctx.mathUpright = mathUpright
   await ctx.loadTemplate()
 
   // ---- 正文 ----
@@ -66,6 +69,8 @@ export async function writeDocx({ ir, assets, title, template }: ExportInput): P
 }
 
 class ExportContext {
+  /** 公式中的字母用正体 */
+  mathUpright = false
   private styleIds = new Map<string, string>()
   private docRels: string[] = []
   private relCounter = 0
@@ -266,6 +271,7 @@ class ExportContext {
         }
         if (omml === undefined) return ''
         omml = applyMathMarks(normalizeOmml(omml), run)
+        if (this.mathUpright) omml = uprightOmml(omml)
         return run.display === true ? `<m:oMathPara>${omml}</m:oMathPara>` : omml
       }
     }

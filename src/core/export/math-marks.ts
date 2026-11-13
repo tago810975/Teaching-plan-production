@@ -34,3 +34,25 @@ export function applyMathMarks(omml: string, marks: { bold?: boolean; underline?
   }
   return out
 }
+
+/**
+ * 公式中的字母改为正体（不倾斜）：每个 <m:r> 的数学样式 m:sty 设为 p（原为粗体 b / bi 的设为 b）。
+ * Word 中公式字母默认是数学斜体，只能逐段标明正体。已是手写体、花体等（m:scr）的保持原样。
+ * 用于“设置 → 公式中的字母用正体”（默认打开）。
+ */
+export function uprightOmml(omml: string): string {
+  return omml.replace(/<m:r>([\s\S]*?)<\/m:r>/g, (whole, inner: string) => {
+    const mrPrMatch = /<m:rPr>([\s\S]*?)<\/m:rPr>/.exec(inner)
+    const mrPr = mrPrMatch?.[1] ?? ''
+    if (/<m:scr\b/.test(mrPr) || /<m:nor\s*\/>/.test(mrPr)) return whole
+    const sty = /<m:sty m:val="(\w+)"\/>/.exec(mrPr)?.[1]
+    const upright = sty === 'b' || sty === 'bi' ? 'b' : 'p'
+    if (sty === upright) return whole
+    // m:rPr 中元素的顺序：lit、nor、scr、sty、brk、aln——sty 放在 brk、aln 之前
+    const cleaned = mrPr.replace(/<m:sty\b[^>]*\/>/, '')
+    const at = cleaned.search(/<m:(brk|aln)\b/)
+    const next = at === -1 ? `${cleaned}<m:sty m:val="${upright}"/>` : `${cleaned.slice(0, at)}<m:sty m:val="${upright}"/>${cleaned.slice(at)}`
+    const body = mrPrMatch !== null ? inner.replace(mrPrMatch[0], `<m:rPr>${next}</m:rPr>`) : `<m:rPr>${next}</m:rPr>${inner}`
+    return `<m:r>${body}</m:r>`
+  })
+}

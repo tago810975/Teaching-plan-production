@@ -10,6 +10,7 @@ import type { ExportRequest, ExportResult } from '@shared/ipc'
 import { exportFileName, pointsFileName } from '@shared/export-name'
 import { buildPointsDocument } from '@core/document/points'
 import { templateDir } from './template-io'
+import { getMathUpright } from './library'
 
 export { exportFileName }
 
@@ -33,13 +34,15 @@ export async function exportWord(req: ExportRequest): Promise<ExportResult> {
   const template = new Uint8Array(await readFile(join(templateDir(project.templateId), 'template.docx')))
   const assets = { ...req.bundle.assets, ...req.replacementAssets }
   const files: string[] = []
+  // 公式字母是否用正体，与预览一致（设置中修改，默认是）
+  const mathUpright = await getMathUpright()
   const jobs = [
     ...req.variants.map((variant) => ({ name: exportFileName(req.baseName, variant), ir: () => buildDocument(project, variant) })),
     // 知识点重点难点汇总
     ...(req.points === true ? [{ name: pointsFileName(req.baseName), ir: () => buildPointsDocument(project) }] : [])
   ]
   for (const job of jobs) {
-    const bytes = await writeDocx({ ir: job.ir(), assets, title: project.meta.title, template })
+    const bytes = await writeDocx({ ir: job.ir(), assets, title: project.meta.title, template, mathUpright })
     const path = join(req.dir, job.name)
     try {
       await writeFile(path, bytes)

@@ -43,6 +43,8 @@ export const IPC = {
   setDefaultPreset: 'settings:set-default-preset',
   exportCheck: 'export:check',
   getExportPointsDefault: 'settings:get-export-points-default',
+  getMathUpright: 'settings:get-math-upright',
+  setMathUpright: 'settings:set-math-upright',
   setExportPointsDefault: 'settings:set-export-points-default',
   getTheme: 'settings:get-theme',
   setTheme: 'settings:set-theme',
@@ -233,6 +235,9 @@ export interface RendererApi {
   /** 设置：导出 Word 时是否默认勾选“知识点重点难点汇总”（默认不勾） */
   getExportPointsDefault(): Promise<boolean>
   setExportPointsDefault(on: boolean): Promise<void>
+  /** 设置：公式中的字母用正体（不倾斜），预览与导出都按它；默认是 */
+  getMathUpright(): Promise<boolean>
+  setMathUpright(on: boolean): Promise<void>
   /** 设置：界面配色主题 */
   getTheme(): Promise<ThemeId>
   setTheme(id: ThemeId): Promise<void>

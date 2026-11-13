@@ -352,3 +352,10 @@
 .doc-table-box.is-resizing .col-resize::after {
   background: rgba(var(--page-accent, 47, 111, 181), 0.9) !important;
 }
+
+/* 公式字母用正体（设置中修改，默认是）：浏览器对单个字母的 <mi> 自动用数学斜体（text-transform: math-auto），这里关掉；
+   与导出时给 OMML 加的 m:sty="p" 一致 */
+.math-upright math mi {
+  text-transform: none;
+  font-style: normal;
+}
