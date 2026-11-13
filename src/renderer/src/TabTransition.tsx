@@ -30,7 +30,8 @@ interface Shot {
 }
 
 function takeShot(): Shot | null {
-  const src = document.querySelector<HTMLElement>('.app-shell-body > .app, .app-shell-body > .home')
+  // 后台标签页的编辑器也在（隐藏着），只拍当前显示的
+  const src = document.querySelector<HTMLElement>('.app-shell-body > .app:not(.is-inactive), .app-shell-body > .home')
   if (src === null) return null
   const node = src.cloneNode(true) as HTMLElement
   // 快照只用来看：去掉对话框与浮动卡片，避免重复的弹层

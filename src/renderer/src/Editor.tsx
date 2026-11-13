@@ -39,6 +39,13 @@ interface Props {
   state: EditorState
   dispatch: Dispatch<EditorAction>
   files: EditorFiles
+  /**
+   * 后台标签页的编辑器：保留着（切回来时不必重新排版、测量分页、渲染），但隐藏、不可交互，
+   * 不响应快捷键与菜单命令
+   */
+  inactive?: boolean
+  /** 所属标签页（恢复滚动位置时用来找到本编辑器的预览） */
+  tabId?: string
   error: string | null
   onDismissError: () => void
   importReport: ImportReport | null
@@ -71,7 +78,9 @@ function EditorBody({
   onImportReport,
   onError,
   exportOpen,
-  onExportOpenChange
+  onExportOpenChange,
+  inactive: inactiveProp,
+  tabId
 }: Props) {
   const [exportedFiles, setExportedFiles] = useState<string[] | null>(null)
   const { widths: panelWidths, setWidth: setPanelWidth, reset: resetPanel } = usePanelWidths()
@@ -161,13 +170,15 @@ function EditorBody({
   )
   const selectHeader = useCallback(() => dispatch({ type: 'select', blockId: HEADER_SELECTION }), [dispatch])
 
+  const inactive = inactiveProp === true
   useEffect(() => {
+    if (inactive) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') dispatch({ type: 'select', blockId: null })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dispatch])
+  }, [dispatch, inactive])
 
   // 撤销 / 重做：工具栏按钮、Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z、“编辑”菜单
   const travel = useCallback(
@@ -186,6 +197,8 @@ function EditorBody({
     [dispatch]
   )
   useEffect(() => {
+    // 后台标签页不响应撤销快捷键与菜单命令
+    if (inactive) return
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return
       // 有对话框开着时（表格编辑器、公式编辑……）由对话框自己处理撤销；
@@ -206,7 +219,7 @@ function EditorBody({
       window.removeEventListener('keydown', onKey, true)
       off()
     }
-  }, [travel])
+  }, [travel, inactive])
   // 快捷窗口：右键内容（预览或大纲）弹出版式窗口，右键图片弹出图片窗口
   const [quickMenu, setQuickMenu] = useState<
     | { kind: 'block'; blockId: string; x: number; y: number }
@@ -254,7 +267,7 @@ function EditorBody({
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
   return (
-    <div className="app">
+    <div className={inactive ? 'app is-inactive' : 'app'} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
       <header className="toolbar">
         <div className="toolbar-doc">
           <button type="button" className="toolbar-home" onClick={files.goHome} title="回到首页（教学案保持打开，可在上方标签页中切换回来）">

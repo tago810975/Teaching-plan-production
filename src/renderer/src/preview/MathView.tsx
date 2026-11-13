@@ -12,6 +12,7 @@ interface Props {
 
 /** 转换结果缓存：同一公式在预览和测量区各渲染一次，教学案中也常有重复公式 */
 const ommlCache = new Map<string, string>()
+const latexCache = new Map<string, string>()
 
 /**
  * 公式显示，由 Chromium 原生渲染 MathML。
@@ -35,9 +36,15 @@ export const MathView = memo(function MathView({ latex, omml, display, onEdit }:
           }
         }
   if (latex !== undefined) {
-    let html: string
+    // LaTeX 转换的结果也按内容缓存（切换标签页、重新排版时同一公式不再重复转换）
+    const key = `${display === true ? 'D' : 'I'}${latex}`
+    let html = latexCache.get(key)
     try {
-      html = temml.renderToString(latex, { displayMode: display === true, throwOnError: true })
+      if (html === undefined) {
+        html = temml.renderToString(latex, { displayMode: display === true, throwOnError: true })
+        if (latexCache.size > 5000) latexCache.clear()
+        latexCache.set(key, html)
+      }
     } catch {
       return (
         <span className="math-error" title="公式有误，请检查 LaTeX 写法" {...editable}>

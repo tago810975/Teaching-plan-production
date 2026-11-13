@@ -1,42 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import type { Asset } from '@core/model/types'
 
 /**
  * 为图片资源创建 blob URL。
  *
- * 资源 ID 是内容的哈希，同一 ID 的内容永远相同，所以按 ID 缓存 URL，
- * 只为新增资源创建、为移除的资源回收。URL 的创建和回收都放在 effect 中成对进行，
- * 开发模式下 React 有意重复执行 effect（挂载→卸载→再挂载）时也不会留下失效的 URL。
+ * 资源 ID 是内容的哈希，同一 ID 的内容永远相同，所以全程按 ID 共享一份 URL：所有标签页、反复切换标签页、
+ * 编辑器重新挂载时都直接复用，浏览器也不必重新解码图片。URL 在第一次渲染时就同步备好——此前在 effect 中
+ * 异步创建，切换标签页时预览先在“没有图片”的状态下排版、测量分页一遍，拿到 URL 后再全部重排一遍。
+ * URL 在本次运行期间不回收（内容与工程中的图片数据相同，数量有限）。
  */
+const urls = new Map<string, string>()
+
+function urlOf(asset: Asset): string {
+  let url = urls.get(asset.id)
+  if (url === undefined) {
+    url = URL.createObjectURL(new Blob([asset.data as Uint8Array<ArrayBuffer>], { type: asset.mime }))
+    urls.set(asset.id, url)
+  }
+  return url
+}
+
 export function useAssetUrls(assets: Record<string, Asset>): ReadonlyMap<string, string> {
-  const cacheRef = useRef(new Map<string, string>())
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(() => new Map())
-
-  useEffect(() => {
-    const cache = cacheRef.current
-    for (const [id, url] of cache) {
-      if (assets[id] === undefined) {
-        URL.revokeObjectURL(url)
-        cache.delete(id)
-      }
-    }
-    for (const asset of Object.values(assets)) {
-      if (!cache.has(asset.id)) {
-        const blob = new Blob([asset.data as Uint8Array<ArrayBuffer>], { type: asset.mime })
-        cache.set(asset.id, URL.createObjectURL(blob))
-      }
-    }
-    setUrls(new Map(cache))
-  }, [assets])
-
-  // 卸载时全部回收
-  useEffect(() => {
-    const cache = cacheRef.current
-    return () => {
-      cache.forEach((url) => URL.revokeObjectURL(url))
-      cache.clear()
-    }
-  }, [])
-
-  return urls
+  return useMemo(() => new Map(Object.values(assets).map((a) => [a.id, urlOf(a)] as const)), [assets])
 }

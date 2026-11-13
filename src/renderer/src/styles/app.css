@@ -3885,3 +3885,11 @@ input[type='checkbox']:disabled {
   justify-content: center;
   min-width: 28px;
 }
+
+/* 后台标签页的编辑器：保留着但隐藏，尺寸与当前的相同（切回来时不必重新测量分页） */
+.app-shell-body > .app.is-inactive {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}

@@ -80,6 +80,14 @@ export function App() {
     setDemoError(null)
   }
   const tab = activeTab(ws)
+  // 保留着编辑器的标签页（最近使用的 KEEP_ALIVE 个，当前的排第一）；其余的切回来时重新创建
+  const aliveRef = useRef<string[]>([])
+  {
+    const ids = new Set(ws.tabs.map((t) => t.id))
+    const list = aliveRef.current.filter((id) => ids.has(id) && id !== ws.active)
+    aliveRef.current = (ws.active !== null ? [ws.active, ...list] : list).slice(0, KEEP_ALIVE)
+  }
+  const alive = aliveRef.current
   const openPaths = ws.tabs.flatMap((t) => (t.state.filePath !== null ? [t.state.filePath] : []))
 
   return (
@@ -107,21 +115,26 @@ export function App() {
               onCreateFromDocx={(filePath) => setFromDocx(filePath !== undefined ? { filePath } : {})}
             />
           </>
-        ) : (
-          <TabEditor
-            key={tab.id}
-            tab={tab}
-            workspaceDispatch={dispatch}
-            files={files}
-            error={error}
-            onDismissError={dismissError}
-            importReport={importReport?.tabId === tab.id ? importReport.report : null}
-            onImportReport={(report) => setImportReport(report === null ? null : { tabId: tab.id, report })}
-            onError={setDemoError}
-            exportOpen={exportTab === tab.id}
-            onExportOpenChange={(open) => setExportTab(open ? tab.id : null)}
-          />
-        )}
+        ) : null}
+        {/* 最近使用的几个标签页的编辑器保留着，只隐藏后台的：切回来时不必重新排版、测量分页、渲染 */}
+        {ws.tabs
+          .filter((t) => alive.includes(t.id))
+          .map((t) => (
+            <TabEditor
+              key={t.id}
+              tab={t}
+              active={t.id === ws.active}
+              workspaceDispatch={dispatch}
+              files={files}
+              error={t.id === ws.active ? error : null}
+              onDismissError={dismissError}
+              importReport={importReport?.tabId === t.id ? importReport.report : null}
+              onImportReport={(report) => setImportReport(report === null ? null : { tabId: t.id, report })}
+              onError={setDemoError}
+              exportOpen={exportTab === t.id}
+              onExportOpenChange={(open) => setExportTab(open ? t.id : null)}
+            />
+          ))}
       </div>
       {newDialogOpen && (
         <NewProjectDialog
@@ -146,12 +159,16 @@ export function App() {
   )
 }
 
+/** 最多保留几个标签页的编辑器（每个都占内存：几十页的教学案约几十 MB） */
+const KEEP_ALIVE = 4
+
 /** 预览滚动位置：切换标签页回来时恢复 */
 const scrollPositions = new Map<string, number>()
 
 /** 一个标签页的编辑器：动作交给工作区中对应的标签页处理 */
 function TabEditor(props: {
   tab: Tab
+  active: boolean
   workspaceDispatch: Dispatch<WorkspaceAction>
   files: ReturnType<typeof useWorkspaceFiles>
   error: string | null
@@ -162,7 +179,7 @@ function TabEditor(props: {
   exportOpen: boolean
   onExportOpenChange: (open: boolean) => void
 }) {
-  const { tab, workspaceDispatch, files, ...rest } = props
+  const { tab, active, workspaceDispatch, files, ...rest } = props
   const id = tab.id
   const dispatch = useCallback((action: EditorAction) => workspaceDispatch({ type: 'doc', id, action }), [workspaceDispatch, id])
   const editorFiles: EditorFiles = useMemo(
@@ -172,7 +189,7 @@ function TabEditor(props: {
 
   // 记住并恢复预览的滚动位置（预览排版需要一点时间，内容够高了再恢复）
   useEffect(() => {
-    const el = document.querySelector<HTMLElement>('.preview')
+    const el = document.querySelector<HTMLElement>(`.app[data-tab="${CSS.escape(id)}"] .preview`)
     if (el === null) return
     const saved = scrollPositions.get(id) ?? 0
     let frames = 0
@@ -192,5 +209,5 @@ function TabEditor(props: {
     }
   }, [id])
 
-  return <Editor state={tab.state} dispatch={dispatch} files={editorFiles} {...rest} />
+  return <Editor state={tab.state} dispatch={dispatch} files={editorFiles} inactive={!active} tabId={id} {...rest} />
 }
