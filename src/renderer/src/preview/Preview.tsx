@@ -43,6 +43,8 @@ interface Props {
   onImageMenu?: (target: ImageTarget, x: number, y: number) => void
   /** 在预览中拖动表格列边框后设置列宽（不提供时不显示拖动手柄） */
   onTableWidths?: (ref: InlineRef, widthsTwip: number[]) => void
+  /** 在预览中选中文字后设置段落对齐 */
+  onAlignRanges?: (ranges: TextRange[], align: 'left' | 'center' | 'right') => void
   /** 在预览中选中文字后改格式（不提供时不显示选区工具条） */
   onFormatRange?: (ranges: TextRange[], op: FormatOp) => void
   formatColors?: FormatPreset['textColors']
@@ -62,6 +64,7 @@ export function Preview({
   onOptionImageResize,
   linkOptionImages = false,
   onFormatRange,
+  onAlignRanges,
   onTableWidths,
   onBlockMenu,
   onImageMenu,
@@ -251,7 +254,7 @@ export function Preview({
         ))}
       </div>
     </div>
-      {onFormatRange !== undefined && <SelectionToolbar container={scrollRef} onApply={onFormatRange} colors={formatColors} keyPoint={keyPoint} />}
+      {onFormatRange !== undefined && <SelectionToolbar container={scrollRef} onApply={onFormatRange} {...(onAlignRanges !== undefined ? { onAlign: onAlignRanges } : {})} colors={formatColors} keyPoint={keyPoint} />}
     </ImageMenuContext.Provider>
     </TableResizeContext.Provider>
     </StylesContext.Provider>

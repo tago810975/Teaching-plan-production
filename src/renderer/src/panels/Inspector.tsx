@@ -1000,7 +1000,18 @@ function RichTextField({
     onChange(next)
   }
   // 加粗、倾斜、下划线：属性面板顶部的格式工具与 Ctrl+B / I / U
-  const formattable = useFormattable(ref, () => ({ text: draft, objects: initial.objects as Map<number, Inline> }), update)
+  // 段落对齐：光标所在的段或选中的几段（输入框中一行一段）；左对齐即清除对齐，回到样式默认
+  const align = (paragraphs: number[], to: 'left' | 'center' | 'right'): void => {
+    onChange(
+      latest.current.map((p, i) => {
+        if (!paragraphs.includes(i)) return p
+        const { align: _a, ...rest } = p.format ?? {}
+        const format = to === 'left' ? rest : { ...rest, align: to }
+        return Object.keys(format).length > 0 ? { ...p, format } : { inlines: p.inlines }
+      })
+    )
+  }
+  const formattable = useFormattable(ref, () => ({ text: draft, objects: initial.objects as Map<number, Inline> }), update, align)
   // 表格：⟦表格N⟧ 标记对应的表格在编辑器中修改；n 为 null 表示插入新表格
   const [tableEdit, setTableEdit] = useState<{ n: number | null; table: TableInline } | null>(null)
   const tableTokens = [...draft.matchAll(/⟦表格(\d+)⟧/g)].map((m) => Number(m[1]))

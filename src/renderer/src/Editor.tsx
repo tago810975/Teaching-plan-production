@@ -376,6 +376,7 @@ function EditorBody({
           onFigureChange={(ref, patch) => dispatch({ type: 'update-figure', ref, patch })}
           onOptionImageResize={resizeOptionImageFromPreview}
           onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
+          onAlignRanges={(ranges, align) => dispatch({ type: 'set-align', align, paragraphs: ranges.map((r) => ({ blockId: r.blockId, path: r.path })) })}
           onTableWidths={(ref, widths) => dispatch({ type: 'set-table-widths', ref, widths })}
           onBlockMenu={openQuickMenu}
           onImageMenu={openImageMenu}

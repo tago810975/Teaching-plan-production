@@ -6,15 +6,18 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactElement, type R
 import type { FormatOp } from '@core/model/markup'
 import type { FormatPreset } from '@core/presets'
 import type { TextRange } from '../state/store'
+import { AlignIcon } from '../panels/FormatToolbar'
 
 interface Props {
   container: RefObject<HTMLElement | null>
   onApply: (ranges: TextRange[], op: FormatOp) => void
+  /** 段落对齐：选区涉及的各段 */
+  onAlign?: (ranges: TextRange[], align: 'left' | 'center' | 'right') => void
   colors: FormatPreset['textColors']
   keyPoint: FormatPreset['keyPoint'] | undefined
 }
 
-export function SelectionToolbar({ container, onApply, colors, keyPoint }: Props) {
+export function SelectionToolbar({ container, onApply, onAlign, colors, keyPoint }: Props) {
   const [state, setState] = useState<{ rect: DOMRect; ranges: TextRange[] } | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -78,6 +81,34 @@ export function SelectionToolbar({ container, onApply, colors, keyPoint }: Props
       <span className="sel-divider" aria-hidden="true" />
       {colors.map((c) =>
         btn(c.label, c.color !== undefined ? `文字颜色：${c.label}色` : '恢复黑色', { color: c.color }, c.color !== undefined ? '' : 'sel-btn--black')
+      )}
+      {onAlign !== undefined && (
+        <>
+          <span className="sel-divider" aria-hidden="true" />
+          {(
+            [
+              ['left', '左对齐（恢复默认）'],
+              ['center', '居中'],
+              ['right', '右对齐']
+            ] as const
+          ).map(([align, title]) => (
+            <button
+              key={align}
+              type="button"
+              className="sel-btn sel-btn--align"
+              title={`${title}：选中文字所在的段`}
+              aria-label={title}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onAlign(state.ranges, align)
+                window.getSelection()?.removeAllRanges()
+                setState(null)
+              }}
+            >
+              <AlignIcon align={align} />
+            </button>
+          ))}
+        </>
       )}
     </div>
   )

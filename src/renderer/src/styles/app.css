@@ -3878,3 +3878,10 @@ input[type='checkbox']:disabled {
   transform: scale(0.94);
   transition-duration: 0s;
 }
+
+.format-align {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+}

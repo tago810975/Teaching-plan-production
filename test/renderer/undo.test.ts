@@ -203,3 +203,24 @@ describe('在预览中拖动表格列边框', () => {
     expect(reduceAt(s, { type: 'set-table-widths', ref: { blockId: 'q1', path: ['question', 'stem', 9] }, widths: [1] }, 7000)).toBe(s)
   })
 })
+
+describe('段落对齐', () => {
+  it('居中 / 右对齐写入段落格式，左对齐清除；可撤销；对齐不变时不产生修改', () => {
+    let s = start()
+    s = run(s, [[{ type: 'update-block', blockId: 'q1', update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, stem: [para('第一段'), { ...para('第二段'), format: { firstLineChars: 2 } }] } } : b) }, 500]])
+    const stem = (st: EditorState) => {
+      const b = st.bundle.project.blocks.find((x) => x.id === 'q1')
+      return b?.type === 'question' ? b.question.stem.map((p) => p.format ?? null) : []
+    }
+    const at = (i: number) => ({ blockId: 'q1', path: ['question', 'stem', i] as const })
+    s = reduceAt(s, { type: 'set-align', align: 'center', paragraphs: [at(0), at(1)] }, 5000)
+    expect(stem(s)).toEqual([{ align: 'center' }, { firstLineChars: 2, align: 'center' }])
+    s = reduceAt(s, { type: 'set-align', align: 'right', paragraphs: [at(1)] }, 6000)
+    expect(stem(s)[1]).toEqual({ firstLineChars: 2, align: 'right' })
+    s = reduceAt(s, { type: 'set-align', align: 'left', paragraphs: [at(0), at(1)] }, 7000)
+    expect(stem(s)).toEqual([null, { firstLineChars: 2 }])
+    expect(reduceAt(s, { type: 'set-align', align: 'left', paragraphs: [at(0)] }, 8000)).toBe(s)
+    s = reduceAt(s, { type: 'undo' }, 9000)
+    expect(stem(s)[1]).toEqual({ firstLineChars: 2, align: 'right' })
+  })
+})

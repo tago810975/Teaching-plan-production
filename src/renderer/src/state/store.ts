@@ -134,6 +134,8 @@ export type EditorAction =
    * 选区跨几段时有几个范围，合为一步撤销
    */
   | { type: 'format-range'; ranges: TextRange[]; op: FormatOp }
+  /** 设置段落对齐（在预览中选中文字后）：各段的路径；left 为清除对齐，回到样式默认 */
+  | { type: 'set-align'; paragraphs: Array<{ blockId: string; path: ReadonlyArray<string | number> }>; align: 'left' | 'center' | 'right' }
   /** 在预览中拖动表格列边框后设置列宽（twip） */
   | { type: 'set-table-widths'; ref: InlineRef; widths: number[] }
   | { type: 'undo'; focus?: CaretAt }
@@ -258,6 +260,26 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
         )
       )
       // 属性面板的输入框重新读取内容
+      return changed ? { ...next, revision: next.revision + 1 } : state
+    }
+    case 'set-align': {
+      let changed = false
+      const next = withBlocks(state, (blocks) =>
+        action.paragraphs.reduce(
+          (acc, r) =>
+            mapBlockById(acc, r.blockId, (b) => {
+              const p = getAt(b, r.path) as RichParagraph | undefined
+              if (p === undefined || !Array.isArray(p.inlines)) return b
+              const { align: _a, ...rest } = p.format ?? {}
+              const format = action.align === 'left' ? rest : { ...rest, align: action.align }
+              if ((p.format?.align ?? 'left') === action.align) return b
+              changed = true
+              return replaceAt(b, r.path, Object.keys(format).length > 0 ? { ...p, format } : { inlines: p.inlines }) as Block
+            }),
+          blocks
+        )
+      )
+      // 属性面板的输入框重新读取（段落格式变了）
       return changed ? { ...next, revision: next.revision + 1 } : state
     }
     case 'set-table-widths': {

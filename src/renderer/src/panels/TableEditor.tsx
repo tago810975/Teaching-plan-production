@@ -219,7 +219,7 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
           拆分单元格
         </button>
       </div>
-      <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={preset.keyPoint} />
+      <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={preset.keyPoint} showAlign={false} />
       <div className="table-editor-widths" role="group" aria-label="列宽">
         <span className="table-editor-size">列宽（厘米）</span>
         {widths.map((w, i) => (
