@@ -3569,31 +3569,36 @@ input[type='checkbox']:disabled {
  * 幕布与界面底色同为黑色，边缘带一条压暗的细红边；旧页面在被盖住之前一直可见，不会突然黑屏。
  * 旧页面是切换前拍下的快照（见 TabTransition.tsx）。
  */
+/* 幕布是一块转了角度的大方块，沿“左上 → 右下”的方向平移：
+ * 先从左上角外滑进来盖住旧页面，停一瞬，再继续朝右下滑出去；两段方向相同。
+ * 方块边长 150vmax，转过任何角度都盖得住内容区；位移 ±146vmax 刚好完全移出。
+ */
 @keyframes noir-curtain {
   0% {
-    transform: translate(-45%, -115%) skewX(-16deg);
+    transform: rotate(32deg) translateX(-146vmax);
     animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
   }
   44% {
-    transform: translate(0, 0) skewX(-16deg);
+    transform: rotate(32deg) translateX(0);
   }
   54% {
-    transform: translate(0, 0) skewX(-16deg);
+    transform: rotate(32deg) translateX(0);
     animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1);
   }
   100% {
-    transform: translate(125%, 0) skewX(-16deg);
+    transform: rotate(32deg) translateX(146vmax);
   }
 }
-/* 旧页面：幕布盖严（一半时间）之后撤掉 */
+/* 旧页面：幕布盖严（一半时间）之后撤掉。用透明度而不是 visibility：
+ * 子元素可以把 visibility 改回 visible（预览中的部分图形就是这样），透明度则压得住 */
 @keyframes noir-old-page {
   0%,
   48% {
-    visibility: visible;
+    opacity: 1;
   }
   49%,
   100% {
-    visibility: hidden;
+    opacity: 0;
   }
 }
 @keyframes noir-view-enter {
@@ -3608,6 +3613,7 @@ input[type='checkbox']:disabled {
   inset: 0;
   z-index: 70;
   overflow: hidden;
+  isolation: isolate;
   pointer-events: none;
 }
 :root[data-theme='noir'] .tab-wipe-old {
@@ -3619,6 +3625,10 @@ input[type='checkbox']:disabled {
     radial-gradient(circle, rgba(240, 34, 42, 0.32) 1.3px, transparent 1.7px) 0 0 / 11px 11px,
     radial-gradient(circle, rgba(240, 34, 42, 0.32) 1.3px, transparent 1.7px) 5.5px 5.5px / 11px 11px,
     var(--desk);
+  /* 自成一层：快照里带 z-index 的内容（浮动图片、SVG 图形等）不会跑到幕布上面 */
+  isolation: isolate;
+  z-index: 0;
+  contain: paint;
   animation: noir-old-page 640ms linear forwards;
 }
 :root[data-theme='noir'] .tab-wipe-old > * {
@@ -3628,14 +3638,16 @@ input[type='checkbox']:disabled {
 }
 :root[data-theme='noir'] .tab-wipe-curtain {
   position: absolute;
-  top: -10%;
-  bottom: -10%;
-  left: -25%;
-  width: 150%;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
   background: var(--desk);
-  /* 落下时看到的是下边，滑开时看到的是左边：两条边都带细红边 */
+  /* 盖下来时看到的是前缘（右边），滑出去时看到的是后缘（左边）：两条边都带细红边 */
   border-left: 10px solid var(--shadow-red);
-  border-bottom: 10px solid var(--shadow-red);
+  border-right: 10px solid var(--shadow-red);
   animation: noir-curtain 640ms linear forwards;
 }
 /* 新页面等幕布开始滑开时再出现 */
