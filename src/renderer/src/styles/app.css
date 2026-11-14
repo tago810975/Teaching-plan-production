@@ -168,7 +168,8 @@
 
 /* 深色主题中，公式输入框保持白纸黑字，与预览、Word 中看到的一致 */
 :root[data-theme='dark'] .formula-field,
-:root[data-theme='noir'] .formula-field {
+:root[data-theme='noir'] .formula-field,
+:root[data-theme='tide'] .formula-field {
   background: #fff;
   color: #1f2a2e;
   color-scheme: light;
@@ -3892,4 +3893,677 @@ input[type='checkbox']:disabled {
   inset: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* ====================================================================
+ * 月潮主题：深海蓝底、青色光、白字的冷调风格。
+ * 与“赤黑”的硬朗相对，这一套是流动、透亮的：细斜角、青色辉光、
+ * 悬停时一道光从左向右掠过，浮层水平滑入，页面切换是一道带青边的深蓝斜幕。
+ * 全部规则限定在 data-theme='tide' 之下；预览中的 A4 页面照旧是白纸黑字。
+ * ==================================================================== */
+:root[data-theme='tide'] {
+  --desk: #081a3a;
+  --panel: #0c2350;
+  --panel-raised: #11306a;
+  --tabbar: #061430;
+  --ink: #eaf6ff;
+  --ink-soft: #8fb3d9;
+  --on-ink: #061430;
+  --rule: #2b5294;
+  --rule-soft: #1a3a72;
+  --red-pen: #21c8ff;
+  --focus: #7fe3ff;
+  --star: #ffe27a;
+  --star-on-ink: #ffe27a;
+  --keypoint: #ff7a8a;
+  --shade: 0, 6, 24;
+  --glow: rgba(33, 200, 255, 0.45);
+  --cyan-soft: rgba(33, 200, 255, 0.16);
+  --hover: color-mix(in srgb, #21c8ff 12%, transparent);
+  --hover-faint: color-mix(in srgb, #21c8ff 7%, transparent);
+  --selected: color-mix(in srgb, #21c8ff 18%, transparent);
+  --red-pen-soft: var(--cyan-soft);
+  --primary-hover: #6fe0ff;
+  --primary-pressed: #0fa6d8;
+  --shadow-pop: 0 0 0 1px rgba(33, 200, 255, 0.35), 0 10px 30px rgba(0, 6, 24, 0.6), 0 0 22px rgba(33, 200, 255, 0.18);
+  --shadow-dialog: 0 0 0 1px rgba(33, 200, 255, 0.45), 0 20px 60px rgba(0, 6, 24, 0.7), 0 0 40px rgba(33, 200, 255, 0.2);
+  --backdrop: rgba(2, 10, 30, 0.7);
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --ease-spring: cubic-bezier(0.25, 1.25, 0.45, 1);
+  /* 平行四边形：左右两边都斜 */
+  --tilt: 7px;
+  --cut-para: polygon(var(--tilt) 0, 100% 0, calc(100% - var(--tilt)) 100%, 0 100%);
+  /* 悬停时掠过的那道光 */
+  --sheen: linear-gradient(105deg, transparent 0 35%, rgba(255, 255, 255, 0.38) 48%, transparent 62% 100%);
+  accent-color: #21c8ff;
+  caret-color: #21c8ff;
+  color-scheme: dark;
+}
+
+/* 工作台：深海的渐变，右上方一团淡淡的月光，再叠一层很淡的水平细纹 */
+:root[data-theme='tide'] body {
+  background:
+    repeating-linear-gradient(0deg, rgba(127, 227, 255, 0.035) 0 1px, transparent 1px 6px),
+    radial-gradient(ellipse 60% 50% at 85% 0%, rgba(127, 227, 255, 0.22), transparent 70%),
+    linear-gradient(160deg, #0b2554 0%, #081a3a 45%, #050f26 100%);
+}
+:root[data-theme='tide'] .panel,
+:root[data-theme='tide'] .home-side {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+:root[data-theme='tide'] .home-main {
+  background: color-mix(in srgb, var(--desk) 70%, transparent);
+}
+:root[data-theme='tide'] ::selection {
+  background: #21c8ff;
+  color: #061430;
+}
+:root[data-theme='tide'] .page ::selection {
+  background: rgba(33, 200, 255, 0.32);
+  color: inherit;
+}
+:root[data-theme='tide'] {
+  --page-accent: 33, 140, 200;
+}
+
+/* ---- 标题：白色斜体，下面一道从青到透明的光带 ---- */
+:root[data-theme='tide'] .home-view-title,
+:root[data-theme='tide'] .dialog h2 {
+  position: relative;
+  width: fit-content;
+  padding: 0 28px 6px 2px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+:root[data-theme='tide'] .home-view-title::after,
+:root[data-theme='tide'] .dialog h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #21c8ff, rgba(33, 200, 255, 0));
+  transform: skewX(-30deg);
+  transform-origin: left;
+}
+:root[data-theme='tide'] .panel-title,
+:root[data-theme='tide'] .home-side-heading {
+  color: #7fe3ff;
+  font-style: italic;
+  letter-spacing: 0.1em;
+}
+:root[data-theme='tide'] .group {
+  border: 1px solid var(--rule);
+  background: linear-gradient(180deg, rgba(33, 200, 255, 0.05), transparent 60%);
+}
+:root[data-theme='tide'] .group legend {
+  padding: 0 14px 0 8px;
+  color: #7fe3ff;
+  font-style: italic;
+  letter-spacing: 0.06em;
+}
+
+/* ---- 标签栏：深色，当前标签是青色平行四边形 ---- */
+:root[data-theme='tide'] .tabbar {
+  border-bottom: 1px solid rgba(33, 200, 255, 0.5);
+  box-shadow: 0 1px 12px rgba(33, 200, 255, 0.15);
+}
+:root[data-theme='tide'] .tab {
+  padding-left: 14px;
+  padding-right: 12px;
+  border: none;
+  color: var(--ink-soft);
+  clip-path: var(--cut-para);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] .tab:hover:not(.is-active) {
+  background: rgba(33, 200, 255, 0.14);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+:root[data-theme='tide'] .tab.is-active {
+  background: linear-gradient(180deg, #4fd8ff, #17a9e0);
+  color: #061430;
+  font-weight: 700;
+  font-style: italic;
+  margin-bottom: 0;
+}
+:root[data-theme='tide'] .tab.is-active .tab-dirty,
+:root[data-theme='tide'] .tab.is-active .tab-close {
+  color: #061430;
+}
+:root[data-theme='tide'] .tab-new:hover {
+  background: rgba(33, 200, 255, 0.14);
+  color: #7fe3ff;
+}
+:root[data-theme='tide'] .tab:focus-visible {
+  outline-offset: -3px;
+}
+
+/* ---- 按钮 ---- */
+:root[data-theme='tide'] button {
+  position: relative;
+}
+:root[data-theme='tide'] .dialog-actions button,
+:root[data-theme='tide'] .toolbar-actions > button,
+:root[data-theme='tide'] .toolbar-actions > .menu > button,
+:root[data-theme='tide'] .home-side-actions button,
+:root[data-theme='tide'] .outline-actions button,
+:root[data-theme='tide'] .notice-actions button,
+:root[data-theme='tide'] .export-toast-actions button,
+:root[data-theme='tide'] .dialog-location button,
+:root[data-theme='tide'] .toolbar-home,
+:root[data-theme='tide'] .inspector-body button:not(.link, .star, .icon-button),
+:root[data-theme='tide'] .quick-menu button:not(.link, .star, .icon-button) {
+  background-color: rgba(8, 26, 58, 0.6);
+  background-image: var(--sheen);
+  background-repeat: no-repeat;
+  background-size: 250% 100%;
+  background-position: 160% 0;
+  border-color: var(--rule);
+  transition:
+    background-position 0s,
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+/* 悬停：一道光从左掠到右，边框亮起青色辉光，按钮微微上浮 */
+:root[data-theme='tide'] .dialog-actions button:hover:not(:disabled),
+:root[data-theme='tide'] .toolbar-actions > button:hover:not(:disabled),
+:root[data-theme='tide'] .toolbar-actions > .menu > button:hover:not(:disabled),
+:root[data-theme='tide'] .home-side-actions button:hover:not(:disabled),
+:root[data-theme='tide'] .outline-actions button:hover:not(:disabled),
+:root[data-theme='tide'] .notice-actions button:hover:not(:disabled),
+:root[data-theme='tide'] .export-toast-actions button:hover:not(:disabled),
+:root[data-theme='tide'] .dialog-location button:hover:not(:disabled),
+:root[data-theme='tide'] .toolbar-home:hover:not(:disabled),
+:root[data-theme='tide'] .inspector-body button:not(.link, .star, .icon-button, .is-active):hover:not(:disabled),
+:root[data-theme='tide'] .quick-menu button:not(.link, .star, .icon-button, .is-active):hover:not(:disabled) {
+  background-color: rgba(33, 200, 255, 0.16);
+  background-position: -60% 0;
+  border-color: #21c8ff;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(33, 200, 255, 0.4), 0 0 16px var(--glow);
+  transform: translateY(-2px);
+  transition:
+    background-position 520ms var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97) !important;
+  transition-duration: 0s !important;
+}
+/* 主按钮：青色平行四边形 */
+:root[data-theme='tide'] button.primary {
+  padding-left: 18px;
+  padding-right: 18px;
+  border: none;
+  background-color: #21c8ff;
+  background-image: var(--sheen);
+  background-repeat: no-repeat;
+  background-size: 250% 100%;
+  background-position: 160% 0;
+  color: #061430;
+  font-weight: 700;
+  font-style: italic;
+  clip-path: var(--cut-para);
+  transition:
+    background-position 0s,
+    background-color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] button.primary:hover:not(:disabled) {
+  background-color: #6fe0ff;
+  background-position: -60% 0;
+  box-shadow: none;
+  color: #061430;
+  transform: translateX(3px);
+  transition:
+    background-position 520ms var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] button.primary:focus-visible {
+  outline: 2px solid #061430;
+  outline-offset: -4px;
+}
+:root[data-theme='tide'] .icon-button,
+:root[data-theme='tide'] .format-button,
+:root[data-theme='tide'] .sel-btn {
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] .icon-button:hover:not(:disabled),
+:root[data-theme='tide'] .format-button:hover:not(:disabled),
+:root[data-theme='tide'] .sel-btn:hover {
+  background: rgba(33, 200, 255, 0.2);
+  border-color: #21c8ff;
+  color: #fff;
+  box-shadow: 0 0 12px var(--glow);
+  transform: translateY(-2px);
+}
+:root[data-theme='tide'] button.link:hover:not(:disabled) {
+  color: #fff;
+  text-decoration: none;
+  text-shadow: 0 0 8px var(--glow);
+}
+:root[data-theme='tide'] .sel-btn--key:hover {
+  color: var(--keypoint);
+}
+
+/* ---- 列表项：青色光带从左铺开，文字微微右移 ---- */
+:root[data-theme='tide'] .outline-item:not(.is-selected),
+:root[data-theme='tide'] .home-nav-item:not(.is-active),
+:root[data-theme='tide'] .folder-row:not(.is-active),
+:root[data-theme='tide'] .context-menu button,
+:root[data-theme='tide'] .menu-popup button,
+:root[data-theme='tide'] .ftb-group,
+:root[data-theme='tide'] .export-toast-file {
+  background-image: linear-gradient(90deg, rgba(33, 200, 255, 0.32), rgba(33, 200, 255, 0.06));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  transition:
+    background-size 260ms var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    padding-left 200ms var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+:root[data-theme='tide'] .outline-item:not(.is-selected):hover,
+:root[data-theme='tide'] .home-nav-item:not(.is-active):hover,
+:root[data-theme='tide'] .folder-row:not(.is-active):hover,
+:root[data-theme='tide'] .context-menu button:hover:not(:disabled),
+:root[data-theme='tide'] .context-menu button:focus-visible,
+:root[data-theme='tide'] .menu-popup button:hover,
+:root[data-theme='tide'] .menu-popup button:focus-visible,
+:root[data-theme='tide'] .ftb-group:hover,
+:root[data-theme='tide'] .export-toast-file:hover {
+  background-color: transparent;
+  background-size: 100% 100%;
+  color: #fff;
+  box-shadow: inset 2px 0 0 #21c8ff;
+}
+:root[data-theme='tide'] .home-nav-item:not(.is-active):hover,
+:root[data-theme='tide'] .context-menu button:hover:not(:disabled),
+:root[data-theme='tide'] .menu-popup button:hover {
+  padding-left: 14px;
+}
+:root[data-theme='tide'] .context-menu button.is-danger:hover:not(:disabled) {
+  color: var(--keypoint);
+}
+/* 选中：青色渐变条 */
+:root[data-theme='tide'] .outline-item.is-selected,
+:root[data-theme='tide'] .home-nav-item.is-active,
+:root[data-theme='tide'] .folder-row.is-active {
+  background: linear-gradient(90deg, #21c8ff, rgba(33, 200, 255, 0.35));
+  color: #061430;
+  font-weight: 700;
+  font-style: italic;
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-no,
+:root[data-theme='tide'] .folder-row.is-active .folder-name,
+:root[data-theme='tide'] .folder-row.is-active .folder-toggle {
+  color: #061430;
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-grade {
+  background: #061430;
+  color: #7fe3ff;
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-stars {
+  color: #061430;
+}
+/* 文件行 */
+:root[data-theme='tide'] .home-table th {
+  border-bottom: 1px solid rgba(33, 200, 255, 0.6);
+  color: #7fe3ff;
+  font-style: italic;
+}
+:root[data-theme='tide'] .home-row .home-row-main {
+  transition: transform 220ms var(--ease-out);
+}
+:root[data-theme='tide'] .home-row:hover:not(.is-selected) {
+  background: linear-gradient(90deg, rgba(33, 200, 255, 0.16), transparent 80%);
+}
+:root[data-theme='tide'] .home-row:hover .home-row-main {
+  transform: translateX(5px);
+}
+:root[data-theme='tide'] .home-row.is-selected {
+  background: linear-gradient(90deg, rgba(33, 200, 255, 0.4), rgba(33, 200, 255, 0.08)) !important;
+  box-shadow: inset 3px 0 0 #21c8ff;
+}
+:root[data-theme='tide'] .home-row.is-selected .home-row-name {
+  color: #fff;
+}
+
+/* ---- 输入框、下拉框：悬停边框亮起，聚焦时一圈青光 ---- */
+:root[data-theme='tide'] input[type='text'],
+:root[data-theme='tide'] input[type='number'],
+:root[data-theme='tide'] input[type='search'],
+:root[data-theme='tide'] textarea,
+:root[data-theme='tide'] select {
+  background-color: rgba(4, 14, 36, 0.7);
+  border-color: var(--rule);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+:root[data-theme='tide'] input[type='text']:hover,
+:root[data-theme='tide'] input[type='number']:hover,
+:root[data-theme='tide'] input[type='search']:hover,
+:root[data-theme='tide'] textarea:hover,
+:root[data-theme='tide'] select:hover {
+  border-color: #21c8ff;
+  box-shadow: 0 0 10px rgba(33, 200, 255, 0.25);
+}
+:root[data-theme='tide'] input[type='text']:focus-visible,
+:root[data-theme='tide'] input[type='number']:focus-visible,
+:root[data-theme='tide'] textarea:focus-visible,
+:root[data-theme='tide'] select:focus-visible {
+  outline: none;
+  border-color: #7fe3ff;
+  box-shadow: 0 0 0 1px #21c8ff, 0 0 16px var(--glow);
+}
+/* 字段：悬停时标题变青 */
+:root[data-theme='tide'] .field-label,
+:root[data-theme='tide'] .quick-menu-label {
+  width: fit-content;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    text-shadow var(--dur) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+:root[data-theme='tide'] .field:hover > .field-label,
+:root[data-theme='tide'] .field:hover > .field-label-row > .field-label,
+:root[data-theme='tide'] .quick-menu-row:hover > .quick-menu-label {
+  color: #7fe3ff;
+  text-shadow: 0 0 8px var(--glow);
+  transform: translateX(3px);
+}
+:root[data-theme='tide'] .group {
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+:root[data-theme='tide'] .group:hover {
+  border-color: rgba(33, 200, 255, 0.7);
+  box-shadow: 0 0 14px rgba(33, 200, 255, 0.12);
+}
+:root[data-theme='tide'] .para-settings-row,
+:root[data-theme='tide'] .figure-row,
+:root[data-theme='tide'] .option-row,
+:root[data-theme='tide'] .option-image-row {
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+:root[data-theme='tide'] .para-settings-row:hover,
+:root[data-theme='tide'] .figure-row:hover,
+:root[data-theme='tide'] .option-row:hover,
+:root[data-theme='tide'] .option-image-row:hover {
+  background: linear-gradient(90deg, rgba(33, 200, 255, 0.12), transparent 85%);
+}
+
+/* ---- 勾选框：菱形，勾上后亮起青光 ---- */
+:root[data-theme='tide'] input[type='checkbox'] {
+  border: 1.5px solid var(--ink-soft);
+  background: rgba(4, 14, 36, 0.7);
+  transform: rotate(45deg) scale(0.86);
+}
+:root[data-theme='tide'] input[type='checkbox']::before {
+  background: #061430;
+  rotate: -45deg;
+}
+:root[data-theme='tide'] input[type='checkbox']:checked {
+  background: #21c8ff;
+  border-color: #21c8ff;
+  box-shadow: 0 0 10px var(--glow);
+}
+:root[data-theme='tide'] input[type='checkbox']:hover:not(:disabled),
+:root[data-theme='tide'] .checkbox:hover input[type='checkbox']:not(:disabled) {
+  border-color: #7fe3ff;
+  transform: rotate(135deg) scale(0.95);
+}
+:root[data-theme='tide'] .checkbox {
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+:root[data-theme='tide'] .checkbox:hover {
+  color: #fff;
+  transform: translateX(3px);
+}
+
+/* ---- 分段按钮（难度、跨页等） ---- */
+:root[data-theme='tide'] .segmented {
+  border: 1px solid var(--rule);
+  overflow: visible;
+}
+:root[data-theme='tide'] .segmented button {
+  position: relative;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    transform 200ms var(--ease-spring);
+}
+:root[data-theme='tide'] .segmented button:hover:not(:disabled):not(.is-active) {
+  z-index: 1;
+  background: rgba(33, 200, 255, 0.16);
+  color: #fff;
+  box-shadow: 0 0 12px var(--glow);
+  transform: translateY(-2px);
+}
+@keyframes tide-pick {
+  0% {
+    box-shadow: 0 0 0 0 rgba(33, 200, 255, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(33, 200, 255, 0);
+  }
+}
+:root[data-theme='tide'] .segmented button.is-active {
+  z-index: 2;
+  background: linear-gradient(180deg, #4fd8ff, #17a9e0);
+  color: #061430;
+  font-weight: 700;
+  animation: tide-pick 480ms var(--ease-out);
+}
+:root[data-theme='tide'] .segmented button.is-active .difficulty-stars {
+  color: #061430;
+}
+:root[data-theme='tide'] .num-stepper button:hover:not(:disabled) {
+  transform: none !important;
+}
+:root[data-theme='tide'] .stars .star {
+  transition:
+    transform 200ms var(--ease-spring),
+    text-shadow var(--dur) var(--ease-out);
+}
+:root[data-theme='tide'] .stars .star:hover {
+  text-shadow: 0 0 10px rgba(255, 226, 122, 0.9);
+  transform: scale(1.3);
+}
+
+/* ---- 浮层：半透明深蓝 + 青色描边与辉光，从左侧水平滑入 ---- */
+:root[data-theme='tide'] .context-menu,
+:root[data-theme='tide'] .menu-popup,
+:root[data-theme='tide'] .quick-menu,
+:root[data-theme='tide'] .selection-toolbar,
+:root[data-theme='tide'] .ftb-panel,
+:root[data-theme='tide'] .export-toast {
+  border: 1px solid rgba(33, 200, 255, 0.55);
+  background: color-mix(in srgb, #0a2048 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+:root[data-theme='tide'] .dialog {
+  border: 1px solid rgba(33, 200, 255, 0.6);
+  background: linear-gradient(170deg, #11306a, #0a2048 60%);
+}
+@starting-style {
+  :root[data-theme='tide'] .menu-popup,
+  :root[data-theme='tide'] .ftb-panel,
+  :root[data-theme='tide'] .context-menu,
+  :root[data-theme='tide'] .quick-menu,
+  :root[data-theme='tide'] .selection-toolbar {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  :root[data-theme='tide'] .dialog[open] {
+    opacity: 0;
+    transform: translateX(-24px) skewX(-4deg);
+  }
+  :root[data-theme='tide'] .export-toast {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+:root[data-theme='tide'] .export-toast.is-leaving {
+  transform: translateX(30px);
+}
+:root[data-theme='tide'] .export-toast-mark {
+  background: #21c8ff;
+  box-shadow: 0 0 10px var(--glow);
+}
+:root[data-theme='tide'] .export-toast-mark::before {
+  background: #061430;
+}
+:root[data-theme='tide'] .export-toast-title {
+  font-style: italic;
+}
+:root[data-theme='tide'] .export-toast-timer {
+  height: 2px;
+  background: linear-gradient(90deg, #21c8ff, #7fe3ff);
+  opacity: 1;
+  box-shadow: 0 0 8px var(--glow);
+}
+:root[data-theme='tide'] .banner {
+  background: rgba(255, 122, 138, 0.15);
+}
+
+/* 下拉框列表 */
+@supports (appearance: base-select) {
+  :root[data-theme='tide'] select::picker(select) {
+    border: 1px solid rgba(33, 200, 255, 0.6);
+    background: #0a2048;
+    transform: translateX(-12px);
+  }
+  :root[data-theme='tide'] select::picker(select):popover-open {
+    transform: none;
+  }
+  @starting-style {
+    :root[data-theme='tide'] select::picker(select):popover-open {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+  :root[data-theme='tide'] select::picker-icon {
+    color: #21c8ff;
+  }
+  :root[data-theme='tide'] select option {
+    background-image: linear-gradient(90deg, rgba(33, 200, 255, 0.34), rgba(33, 200, 255, 0.06));
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    transition:
+      background-size 240ms var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  :root[data-theme='tide'] select option:hover,
+  :root[data-theme='tide'] select option:focus-visible {
+    background-color: transparent;
+    background-size: 100% 100%;
+    color: #fff;
+  }
+  :root[data-theme='tide'] select option::checkmark {
+    color: #21c8ff;
+  }
+}
+
+/* 分隔条、插入线 */
+:root[data-theme='tide'] .splitter:hover::after,
+:root[data-theme='tide'] .splitter:focus-visible::after,
+:root[data-theme='tide'] .splitter.is-dragging::after,
+:root[data-theme='tide'] .tab.drop-before::before,
+:root[data-theme='tide'] .tab.drop-after::after {
+  background: #21c8ff;
+  box-shadow: 0 0 8px var(--glow);
+}
+
+/* ---- 页面切换：与赤黑同样的斜幕扫过，幕布是深蓝渐变，两侧青色光边 ---- */
+:root[data-theme='tide'] .tab-wipe {
+  --wipe-dur: 760ms;
+  --wipe-ease: cubic-bezier(0.62, 0, 0.38, 1);
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  isolation: isolate;
+  pointer-events: none;
+}
+:root[data-theme='tide'] .tab-wipe-old {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #0b2554 0%, #081a3a 45%, #050f26 100%);
+  isolation: isolate;
+  z-index: 0;
+  animation: noir-old-page var(--wipe-dur) var(--wipe-ease) both;
+}
+:root[data-theme='tide'] .tab-wipe-old > * {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+:root[data-theme='tide'] .tab-wipe-curtain {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 60vmax;
+  height: 300vmax;
+  margin: -150vmax 0 0 -30vmax;
+  background: linear-gradient(90deg, #0d2c63, #061430 50%, #0d2c63);
+  border-left: 14px solid #21c8ff;
+  border-right: 4px solid rgba(127, 227, 255, 0.7);
+  box-shadow:
+    -6px 0 24px rgba(33, 200, 255, 0.55),
+    6px 0 18px rgba(33, 200, 255, 0.3);
+  animation: noir-curtain var(--wipe-dur) var(--wipe-ease) both;
+  will-change: transform;
+}
+:root[data-theme='tide'] .app-shell-body > .app,
+:root[data-theme='tide'] .app-shell-body > .home {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='tide'] .tab-wipe {
+    display: none;
+  }
+}
+:root[data-theme='tide'][data-reduce-motion='true'] .tab-wipe {
+  display: none;
+}
+/* 月潮：强调色是青色，“删除”这类危险操作单独保留暖红，不跟着变青 */
+:root[data-theme='tide'] .is-danger,
+:root[data-theme='tide'] button.link.danger {
+  color: var(--keypoint);
+}
+:root[data-theme='tide'] .home-search {
+  background-color: rgba(4, 14, 36, 0.7);
+  color: var(--ink);
 }

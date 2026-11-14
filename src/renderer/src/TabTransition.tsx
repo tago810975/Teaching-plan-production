@@ -1,5 +1,5 @@
 /**
- * 切换标签页（首页 ↔ 教学案、教学案之间）时的过场，只在“赤黑”主题下出现；
+ * 切换标签页（首页 ↔ 教学案、教学案之间）时的过场，只在“赤黑”“月潮”主题下出现；
  * 其他主题只有内容淡入（纯 CSS，见 app.css）。
  *
  * 过程：一道斜幕布从左上扫到右下，幕布前面是旧页面，后面是新页面。
@@ -19,7 +19,8 @@ const SCROLLERS = ['.preview', '.outline-list', '.inspector-body', '.home-main',
 
 function enabled(): boolean {
   const root = document.documentElement
-  if (root.dataset['theme'] !== 'noir') return false
+  // 带页面切换幕布的风格主题
+  if (root.dataset['theme'] !== 'noir' && root.dataset['theme'] !== 'tide') return false
   if (root.dataset['reduceMotion'] === 'true') return false
   return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

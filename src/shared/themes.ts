@@ -12,7 +12,7 @@ export interface ThemeInfo {
   windowBackground: string
 }
 
-export type ThemeId = 'slate' | 'paper' | 'mist' | 'plain' | 'dark' | 'noir'
+export type ThemeId = 'slate' | 'paper' | 'mist' | 'plain' | 'dark' | 'noir' | 'tide'
 
 export const DEFAULT_THEME: ThemeId = 'slate'
 
@@ -23,7 +23,9 @@ export const THEMES: readonly ThemeInfo[] = [
   { id: 'plain', name: '素白', swatch: { desk: '#e2e2e2', panel: '#f6f6f6', accent: '#c0281f' }, windowBackground: '#e2e2e2' },
   { id: 'dark', name: '深色', swatch: { desk: '#14181a', panel: '#1c2225', accent: '#ef6b5f' }, windowBackground: '#14181a' },
   // 赤黑：红、黑、白的高反差风格主题，除配色外还带斜切造型与硬边投影（见 app.css 末尾）
-  { id: 'noir', name: '赤黑', swatch: { desk: '#0b0b0b', panel: '#f4f4f4', accent: '#e5191c' }, windowBackground: '#0b0b0b' }
+  { id: 'noir', name: '赤黑', swatch: { desk: '#0b0b0b', panel: '#f4f4f4', accent: '#e5191c' }, windowBackground: '#0b0b0b' },
+  // 月潮：深海蓝与青色的冷调风格主题，带流光悬停、水平滑入的浮层与青色幕布（见 app.css 末尾）
+  { id: 'tide', name: '月潮', swatch: { desk: '#081a3a', panel: '#e8f6ff', accent: '#21c8ff' }, windowBackground: '#081a3a' }
 ]
 
 export function isThemeId(v: unknown): v is ThemeId {
