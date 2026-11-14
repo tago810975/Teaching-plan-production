@@ -5194,10 +5194,12 @@ input[type='checkbox']:disabled {
 }
 
 /* ---- 页面切换：沉入水中 ----
- * 0 – 650ms   旧页面以底边为轴向后仰倒、下沉、变暗变模糊
- * 0 – 560ms   海水从上往下涌入：前缘是一道翻滚的波浪和发亮的水线，越往下越快
- * 0 – 1000ms  气泡升起，水中的光束缓缓摇晃
- * 620 – 1000ms 海水淡去，新页面从水中浮现（模糊、偏下 → 清晰、到位）
+ * 0 – 650ms    旧页面以底边为轴向后仰倒、下沉、变暗变模糊
+ * 0 – 600ms    平涂风格的海水从上往下灌：亮蓝水柱带着鼓包状的下缘先落，深蓝随后铺满；
+ *              浅青、近白的长条水流像冰锥一样刺下来
+ * 120 – 900ms  浪花一团团炸开、漂移、缩回；空心水泡上浮
+ * 700 – 1100ms 海水淡去，新页面从水中浮现（模糊、偏下 → 清晰、到位）
+ * 水的形状由 theme/tideWater.ts 每次随机生成。
  */
 @keyframes tide-sink {
   0% {
@@ -5211,64 +5213,6 @@ input[type='checkbox']:disabled {
     opacity: 0;
   }
 }
-@keyframes tide-water {
-  0% {
-    transform: translateY(-100%);
-    opacity: 1;
-    animation-timing-function: cubic-bezier(0.55, 0.05, 0.6, 1);
-  }
-  56% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  62% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 0;
-  }
-}
-/* 前缘的波浪横向翻滚 */
-@keyframes tide-wave-roll {
-  from {
-    background-position-x: 0, 0;
-  }
-  to {
-    background-position-x: 240px, -180px;
-  }
-}
-@keyframes tide-rays {
-  0% {
-    opacity: 0;
-    transform: skewX(-12deg) translateX(-4%);
-  }
-  35%,
-  65% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: skewX(-6deg) translateX(4%);
-  }
-}
-@keyframes tide-bubble {
-  0% {
-    transform: translate(0, 0) scale(0.6);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.9;
-  }
-  50% {
-    transform: translate(6px, -45vh) scale(1);
-  }
-  100% {
-    transform: translate(-4px, -95vh) scale(1.1);
-    opacity: 0;
-  }
-}
 @keyframes tide-surface {
   from {
     opacity: 0;
@@ -5279,10 +5223,10 @@ input[type='checkbox']:disabled {
 /* 深海底色：旧页面沉下去后露出来，水退时再淡出，让新页面浮上来 */
 @keyframes tide-deep {
   0%,
-  55% {
+  60% {
     opacity: 1;
   }
-  85%,
+  90%,
   100% {
     opacity: 0;
   }
@@ -5293,7 +5237,7 @@ input[type='checkbox']:disabled {
   inset: 0;
   z-index: -1;
   background: radial-gradient(ellipse 80% 60% at 50% 0%, #0d2c63, #030a1c 75%);
-  animation: tide-deep 1000ms linear forwards;
+  animation: tide-deep 1100ms linear forwards;
 }
 :root[data-theme='tide'] .tab-wipe-old {
   clip-path: none;
@@ -5310,63 +5254,97 @@ input[type='checkbox']:disabled {
   mix-blend-mode: multiply;
   pointer-events: none;
 }
-:root[data-theme='tide'] .tab-wipe-water {
-  position: absolute;
-  /* 比画面高出一截：涌到底时前缘的波浪落在画面外，底部不留缝 */
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(100% + 60px);
-  z-index: 2;
-  background: linear-gradient(180deg, rgba(2, 10, 30, 0.95) 0%, rgba(6, 30, 76, 0.9) 55%, rgba(18, 82, 160, 0.82) 100%);
-  animation: tide-water 1000ms linear forwards;
-  will-change: transform, opacity;
-}
-/* 前缘：两层错开、反向翻滚的波浪，最下面一道发亮的水线 */
-:root[data-theme='tide'] .tab-wipe-water::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 34px;
-  margin-top: -1px;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34' viewBox='0 0 240 34'%3E%3Cpath d='M0 0H240V14C210 14 200 30 170 30S130 8 100 8 60 26 30 26 10 14 0 14Z' fill='%231252a0' fill-opacity='0.82'/%3E%3Cpath d='M0 14C10 14 0 26 30 26S70 8 100 8 140 30 170 30 210 14 240 14' fill='none' stroke='%23c8f4ff' stroke-width='2.5' stroke-opacity='0.9'/%3E%3C/svg%3E")
-      repeat-x 0 0 / 240px 34px,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='34' viewBox='0 0 180 34'%3E%3Cpath d='M0 0H180V10C160 10 150 22 120 22S80 6 60 6 20 18 0 10Z' fill='%2321c8ff' fill-opacity='0.35'/%3E%3C/svg%3E")
-      repeat-x 0 0 / 180px 34px;
-  filter: drop-shadow(0 4px 10px rgba(127, 227, 255, 0.55));
-  animation: tide-wave-roll 1000ms linear infinite;
-}
-:root[data-theme='tide'] .tab-wipe-rays {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  background: repeating-linear-gradient(100deg, transparent 0 7%, rgba(127, 227, 255, 0.1) 9% 11%, transparent 13% 21%);
-  mix-blend-mode: screen;
-  animation: tide-rays 1000ms ease-in-out forwards;
-}
-:root[data-theme='tide'] .tab-wipe-bubble {
-  position: absolute;
-  z-index: 4;
-  left: var(--x);
-  bottom: -20px;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  border: 1px solid rgba(200, 245, 255, 0.85);
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.8), rgba(127, 227, 255, 0.15) 45%, transparent 70%);
-  opacity: 0;
-  animation: tide-bubble 820ms cubic-bezier(0.3, 0.1, 0.4, 1) var(--delay) forwards;
-}
 :root[data-theme='tide'] .tab-wipe-curtain {
   display: none;
 }
 /* 新页面：等水退时从水中浮现 */
 :root[data-theme='tide'] .app-shell-body:has(> .tab-wipe) > :is(.app:not(.is-inactive), .home) {
-  animation: tide-surface 460ms cubic-bezier(0.2, 0.8, 0.2, 1) 560ms backwards;
+  animation: tide-surface 460ms cubic-bezier(0.2, 0.8, 0.2, 1) 680ms backwards;
 }
 :root[data-theme='tide'] :is(.dialog, .export-toast, .quick-menu) {
   border-radius: var(--radius-lg);
+}
+
+/* ---- 月潮：平涂海水（theme/tideWater.ts 生成） ---- */
+@keyframes tide-pour {
+  0% {
+    transform: translateY(-105%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes tide-water-out {
+  0%,
+  62% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes tide-streak-in {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes tide-foam-pop {
+  0% {
+    transform: scale(0);
+  }
+  35% {
+    transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4)) scale(1.12);
+  }
+  75% {
+    transform: translate(var(--dx), var(--dy)) scale(0.95);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0);
+  }
+}
+@keyframes tide-ring-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.4);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--rise) * -1)) scale(1.1);
+  }
+}
+:root[data-theme='tide'] .tide-water {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: tide-water-out 1100ms linear forwards;
+}
+:root[data-theme='tide'] .tide-mass {
+  transform-box: view-box;
+}
+/* 亮蓝水柱先落、越往下越快；深蓝稍晚跟上，最终铺满 */
+:root[data-theme='tide'] .tide-mass--mid {
+  animation: tide-pour 480ms cubic-bezier(0.55, 0, 0.7, 0.35) both;
+}
+:root[data-theme='tide'] .tide-mass--deep {
+  animation: tide-pour 620ms cubic-bezier(0.5, 0, 0.6, 0.4) 60ms both;
+}
+:root[data-theme='tide'] .tide-streak {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: tide-streak-in 380ms cubic-bezier(0.5, 0, 0.6, 0.4) var(--delay) both;
+}
+:root[data-theme='tide'] .tide-foam {
+  transform-box: view-box;
+  animation: tide-foam-pop 620ms cubic-bezier(0.3, 0.7, 0.4, 1) var(--delay) both;
+}
+:root[data-theme='tide'] .tide-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tide-ring-rise 560ms cubic-bezier(0.3, 0.2, 0.4, 1) var(--delay) both;
 }
