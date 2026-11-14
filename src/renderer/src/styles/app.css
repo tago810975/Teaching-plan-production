@@ -4919,3 +4919,376 @@ input[type='checkbox']:disabled {
   color: #fff;
   transform: rotate(-3deg) scale(1.08);
 }
+
+/* ====================================================================
+ * 月潮（再续）：与赤黑同样的完善思路，换成“水”的语言——
+ * 标题逐字从水中浮起并轻轻漂动；悬停条目底下是一道起伏的水波光带；
+ * 滚动条、字段加框；页面切换时旧页面向后仰倒沉入水中，新页面从水里浮现。
+ * ==================================================================== */
+
+/* ---- 标题：逐字从水下浮起（模糊 → 清晰），之后随水轻轻漂动 ---- */
+@keyframes tide-char-rise {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateY(0.7em);
+  }
+}
+@keyframes tide-char-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+:root[data-theme='tide'] .collage-char {
+  display: inline-block;
+  color: #f2fbff;
+  text-shadow:
+    0 0 10px rgba(33, 200, 255, 0.55),
+    0 1px 0 rgba(0, 20, 60, 0.6);
+  animation:
+    tide-char-rise 620ms cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i) * 45ms) backwards,
+    tide-char-bob 3.6s ease-in-out calc(620ms + var(--i) * -280ms) infinite;
+}
+/* 隔一个字带一点青色，像水面的反光 */
+:root[data-theme='tide'] .collage-char:nth-child(3n + 2) {
+  color: #9fe9ff;
+}
+:root[data-theme='tide'] .panel-title .collage-char {
+  color: #7fe3ff;
+}
+
+/* ---- 悬停条目：底下一道青色水波光带，右边缘像水面一样缓缓起伏，上面一道光来回流动 ---- */
+@keyframes tide-wave {
+  0%,
+  100% {
+    clip-path: polygon(0 0, 92% 0, 98% 20%, 94% 45%, 100% 70%, 95% 100%, 0 100%);
+  }
+  33% {
+    clip-path: polygon(0 0, 96% 0, 93% 25%, 99% 50%, 94% 75%, 100% 100%, 0 100%);
+  }
+  66% {
+    clip-path: polygon(0 0, 94% 0, 100% 30%, 95% 55%, 98% 80%, 92% 100%, 0 100%);
+  }
+}
+@keyframes tide-wave-in {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+@keyframes tide-shimmer {
+  0%,
+  100% {
+    background-position: -40% 0;
+  }
+  50% {
+    background-position: 140% 0;
+  }
+}
+:root[data-theme='tide'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ) {
+  position: relative;
+  isolation: isolate;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+:root[data-theme='tide'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0) 100%) no-repeat,
+    linear-gradient(90deg, rgba(33, 200, 255, 0.55), rgba(33, 200, 255, 0.12));
+  background-size:
+    30% 100%,
+    100% 100%;
+  box-shadow: inset 2px 0 0 #7fe3ff;
+  transform-origin: left center;
+  animation:
+    tide-wave-in 240ms var(--ease-out),
+    tide-wave 2.6s ease-in-out infinite,
+    tide-shimmer 2.2s ease-in-out infinite;
+}
+:root[data-theme='tide'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled) {
+  background-color: transparent !important;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(33, 200, 255, 0.6);
+}
+:root[data-theme='tide'] :is(.home-nav-item, .folder-row, .outline-item):hover :is(.folder-name, .folder-toggle, .outline-no, .outline-text) {
+  color: #fff;
+}
+
+/* ---- 滚动条：深海轨道，青色渐变的细长滑块，悬停发亮 ---- */
+:root[data-theme='tide'],
+:root[data-theme='tide'] * {
+  scrollbar-width: auto !important;
+  scrollbar-color: auto !important;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-track {
+  background: linear-gradient(90deg, rgba(2, 10, 30, 0.6), rgba(8, 26, 58, 0.6));
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #7fe3ff, #1690c8);
+  background-clip: padding-box;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-thumb:hover {
+  border-width: 2px;
+  background: linear-gradient(180deg, #c8f4ff, #21c8ff);
+  background-clip: padding-box;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-thumb:active {
+  background: #e8faff;
+  background-clip: padding-box;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-button {
+  display: none;
+}
+:root[data-theme='tide'] ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---- 属性栏字段加框：细青线框，字段名是压在框线上的青色平行四边形标签 ---- */
+:root[data-theme='tide'] .inspector-body > .field {
+  position: relative;
+  margin: 22px 0 14px;
+  padding: 16px 12px 10px;
+  border: 1px solid var(--rule);
+  background: linear-gradient(180deg, rgba(33, 200, 255, 0.05), transparent 60%);
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+:root[data-theme='tide'] .inspector-body > .field:hover {
+  border-color: rgba(33, 200, 255, 0.7);
+  box-shadow: 0 0 14px rgba(33, 200, 255, 0.12);
+}
+:root[data-theme='tide'] .inspector-body > .field > .field-label,
+:root[data-theme='tide'] .inspector-body > .field > .field-label-row > .field-label {
+  padding: 1px 16px 1px 12px;
+  background: linear-gradient(90deg, #21c8ff, #1690c8);
+  color: #061430;
+  font-style: italic;
+  font-weight: 700;
+  clip-path: var(--cut-para);
+  text-shadow: none;
+}
+:root[data-theme='tide'] .inspector-body > .field > .field-label {
+  display: block;
+  margin: -28px 0 10px -4px;
+}
+:root[data-theme='tide'] .inspector-body > .field > .field-label-row {
+  align-items: flex-start;
+  margin: -12px 0 8px;
+}
+:root[data-theme='tide'] .inspector-body > .field > .field-label-row > .field-label {
+  margin: -16px 0 0 -4px;
+}
+:root[data-theme='tide'] .inspector-body > .field:hover > .field-label,
+:root[data-theme='tide'] .inspector-body > .field:hover > .field-label-row > .field-label {
+  color: #061430;
+  text-shadow: none;
+  transform: translateX(4px);
+}
+/* 段落设置等组的标题也做成同样的标签 */
+:root[data-theme='tide'] .group legend {
+  padding: 1px 16px 1px 12px;
+  background: linear-gradient(90deg, #21c8ff, #1690c8);
+  color: #061430;
+  font-weight: 700;
+  clip-path: var(--cut-para);
+}
+
+/* ---- 对话框：像从水下浮上来（模糊、偏下 → 清晰、到位） ---- */
+:root[data-theme='tide'] .dialog[open] {
+  transition:
+    opacity 260ms var(--ease-out),
+    transform 420ms cubic-bezier(0.2, 0.9, 0.25, 1),
+    filter 360ms var(--ease-out);
+}
+@starting-style {
+  :root[data-theme='tide'] .dialog[open] {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(28px) scale(0.97);
+  }
+}
+
+/* ---- 页面切换：向后仰倒，沉入水中 ----
+ * 0 – 650ms   旧页面以底边为轴向后仰倒、下沉、变暗变模糊，染上海水的蓝
+ * 80 – 700ms  水面（带一道发亮的水线）从下往上漫过画面
+ * 0 – 1000ms  气泡从底部升起，水中的光束缓缓摇晃
+ * 550 – 1000ms 水退成透明，新页面从水中浮现（模糊、偏下 → 清晰、到位）
+ */
+@keyframes tide-sink {
+  0% {
+    transform: perspective(1400px) rotateX(0) translateY(0) scale(1);
+    filter: blur(0) brightness(1);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(1400px) rotateX(32deg) translateY(22%) scale(0.86);
+    filter: blur(7px) brightness(0.45) saturate(0.6);
+    opacity: 0;
+  }
+}
+@keyframes tide-water {
+  0% {
+    transform: translateY(100%);
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(-6%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-6%);
+    opacity: 0;
+  }
+}
+@keyframes tide-rays {
+  0% {
+    opacity: 0;
+    transform: skewX(-12deg) translateX(-4%);
+  }
+  35%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: skewX(-6deg) translateX(4%);
+  }
+}
+@keyframes tide-bubble {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(6px, -45vh) scale(1);
+  }
+  100% {
+    transform: translate(-4px, -95vh) scale(1.1);
+    opacity: 0;
+  }
+}
+@keyframes tide-surface {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(18px) scale(1.02);
+  }
+}
+/* 深海底色：旧页面沉下去后露出来，水退时再淡出，让新页面浮上来 */
+@keyframes tide-deep {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  85%,
+  100% {
+    opacity: 0;
+  }
+}
+:root[data-theme='tide'] .tab-wipe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, #0d2c63, #030a1c 75%);
+  animation: tide-deep 1000ms linear forwards;
+}
+:root[data-theme='tide'] .tab-wipe-old {
+  clip-path: none;
+  transform-origin: 50% 100%;
+  animation: tide-sink 650ms cubic-bezier(0.55, 0, 0.75, 0.6) forwards;
+  will-change: transform, filter, opacity;
+}
+/* 旧页面在下沉时染上海水的蓝 */
+:root[data-theme='tide'] .tab-wipe-old::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 40, 100, 0.15), rgba(4, 20, 60, 0.75));
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+:root[data-theme='tide'] .tab-wipe-water {
+  position: absolute;
+  inset: -8% 0 0;
+  z-index: 2;
+  /* 顶部那道发亮的水线，下面是渐深的海水 */
+  background:
+    radial-gradient(ellipse 18% 9px at 20% 0, rgba(200, 245, 255, 0.9), transparent 100%),
+    radial-gradient(ellipse 22% 8px at 58% 0, rgba(200, 245, 255, 0.8), transparent 100%),
+    radial-gradient(ellipse 16% 7px at 88% 0, rgba(200, 245, 255, 0.8), transparent 100%),
+    linear-gradient(180deg, rgba(127, 227, 255, 0.85) 0, rgba(33, 200, 255, 0.35) 6px, rgba(10, 50, 110, 0.55) 18%, rgba(4, 16, 44, 0.9) 100%);
+  animation: tide-water 1000ms cubic-bezier(0.45, 0.05, 0.25, 1) forwards;
+  will-change: transform, opacity;
+}
+:root[data-theme='tide'] .tab-wipe-rays {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(100deg, transparent 0 7%, rgba(127, 227, 255, 0.1) 9% 11%, transparent 13% 21%);
+  mix-blend-mode: screen;
+  animation: tide-rays 1000ms ease-in-out forwards;
+}
+:root[data-theme='tide'] .tab-wipe-bubble {
+  position: absolute;
+  z-index: 4;
+  left: var(--x);
+  bottom: -20px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  border: 1px solid rgba(200, 245, 255, 0.85);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.8), rgba(127, 227, 255, 0.15) 45%, transparent 70%);
+  opacity: 0;
+  animation: tide-bubble 820ms cubic-bezier(0.3, 0.1, 0.4, 1) var(--delay) forwards;
+}
+:root[data-theme='tide'] .tab-wipe-curtain {
+  display: none;
+}
+/* 新页面：等水退时从水中浮现 */
+:root[data-theme='tide'] .app-shell-body:has(> .tab-wipe) > :is(.app:not(.is-inactive), .home) {
+  animation: tide-surface 460ms cubic-bezier(0.2, 0.8, 0.2, 1) 560ms backwards;
+}
+:root[data-theme='tide'] :is(.dialog, .export-toast, .quick-menu) {
+  border-radius: var(--radius-lg);
+}

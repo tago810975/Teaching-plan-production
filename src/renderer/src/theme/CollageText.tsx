@@ -1,6 +1,6 @@
 /**
  * 拼贴字：把一段短标题拆成一个个字，每个字带一组固定的“剪报”样式编号（底色、字体、角度、大小）。
- * 只有“赤黑”主题会把这些编号画成拼贴效果；其他主题下看起来就是普通文字。
+ * “赤黑”主题把这些编号画成剪报拼贴；“月潮”让每个字依次从水中浮起、轻轻漂动；其他主题下看起来就是普通文字。
  * 样式由文字内容算出，同一个标题每次显示都一样，不会每次刷新都乱跳。
  * 读屏读的是隐藏的整段文字，拆开的字对读屏隐藏。
  */
@@ -37,7 +37,7 @@ export function CollageText({ text }: { text: string }) {
               className="collage-char"
               data-v={v}
               data-f={font}
-              style={{ '--r': `${rot}deg`, '--s': scale, '--dy': `${dy}px` } as React.CSSProperties}
+              style={{ '--r': `${rot}deg`, '--s': scale, '--dy': `${dy}px`, '--i': i } as React.CSSProperties}
             >
               {c}
             </span>
