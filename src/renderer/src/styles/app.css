@@ -4671,11 +4671,13 @@ input[type='checkbox']:disabled {
 }
 
 /* ---- 悬停选项：底下一块不停变形的不规则四边形 ----
- * 红色四边形在下，黑色（或白色）四边形错开一点叠在后面；两块的形状按不同节奏跳变，
- * 每次跳到一个新的歪斜形状（steps 跳变，不是平滑过渡），像游戏菜单的选中框。
+ * 红色四边形在前，白色（菜单里是黑色）四边形错开一点叠在后面；两块的四个角按不同节奏缓慢游移，
+ * 形状连续、丝滑地变化，像游戏菜单的选中框。
  */
+/* 四个角各自缓慢游移，形状连续地变化；首尾相同，循环时没有接缝 */
 @keyframes noir-quad-a {
-  0% {
+  0%,
+  100% {
     clip-path: polygon(2% 12%, 97% 0%, 100% 86%, 0% 100%);
   }
   25% {
@@ -4689,7 +4691,8 @@ input[type='checkbox']:disabled {
   }
 }
 @keyframes noir-quad-b {
-  0% {
+  0%,
+  100% {
     clip-path: polygon(0% 0%, 100% 20%, 98% 100%, 6% 80%);
   }
   33% {
@@ -4753,7 +4756,7 @@ input[type='checkbox']:disabled {
   background: var(--red-pen);
   animation:
     noir-quad-in 160ms var(--ease-spring),
-    noir-quad-a 0.72s steps(1, end) infinite;
+    noir-quad-a 1.8s ease-in-out infinite;
 }
 /* 后面错开的白块（菜单里是黑块，因为菜单底本来就是黑色） */
 :root[data-theme='noir'] :is(
@@ -4769,7 +4772,7 @@ input[type='checkbox']:disabled {
   background: var(--ink);
   animation:
     noir-quad-in 220ms var(--ease-spring),
-    noir-quad-b 0.96s steps(1, end) infinite;
+    noir-quad-b 2.3s ease-in-out infinite;
 }
 :root[data-theme='noir'] :is(.context-menu button, .menu-popup button):is(:hover, :focus-visible):not(:disabled)::after {
   background: #f4f4f4;
@@ -4822,4 +4825,97 @@ input[type='checkbox']:disabled {
     animation: none !important;
     clip-path: polygon(0% 0%, 100% 20%, 98% 100%, 6% 80%);
   }
+}
+
+/* ---------- 菜单：不出现横向滚动条 ----------
+ * 悬停效果（赤黑的四边形）在出现的一瞬间会略微伸出条目，让可纵向滚动的菜单冒出横向滚动条 */
+.menu-popup,
+.context-menu {
+  overflow-x: hidden;
+}
+
+/* ====================================================================
+ * 赤黑（再续）：滚动条、属性栏的“标题”“内容”等字段加框
+ * ==================================================================== */
+
+/* ---- 滚动条：黑色轨道，红黑斜纹的滑块，悬停变白 ----
+ * 要让 ::-webkit-scrollbar 生效，标准的 scrollbar-width / scrollbar-color 必须是 auto */
+:root[data-theme='noir'],
+:root[data-theme='noir'] * {
+  scrollbar-width: auto !important;
+  scrollbar-color: auto !important;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-track {
+  background: #0b0b0b;
+  border-left: 1px solid #2e2e2e;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-track:horizontal {
+  border-left: none;
+  border-top: 1px solid #2e2e2e;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-thumb {
+  border: 2px solid #0b0b0b;
+  background:
+    repeating-linear-gradient(-45deg, var(--red-pen) 0 5px, #8c1219 5px 8px);
+  background-clip: padding-box;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-thumb:hover {
+  background:
+    repeating-linear-gradient(-45deg, #f4f4f4 0 5px, #b9b9b9 5px 8px);
+  background-clip: padding-box;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-thumb:active {
+  background: #f4f4f4;
+  background-clip: padding-box;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-button {
+  display: none;
+}
+:root[data-theme='noir'] ::-webkit-scrollbar-corner {
+  background: #0b0b0b;
+}
+
+/* ---- 属性栏：直接放在属性栏里的字段（标题、内容、难度……）像“段落设置”一样加框，
+ *      字段名做成压在框线上的红色斜切标签 ---- */
+:root[data-theme='noir'] .inspector-body > .field {
+  position: relative;
+  margin: 22px 0 14px;
+  padding: 16px 12px 10px;
+  border: 1px solid var(--rule);
+  transition: border-color 60ms linear;
+}
+:root[data-theme='noir'] .inspector-body > .field:hover {
+  border-color: var(--ink);
+}
+:root[data-theme='noir'] .inspector-body > .field > .field-label,
+:root[data-theme='noir'] .inspector-body > .field > .field-label-row > .field-label {
+  padding: 1px 16px 1px 8px;
+  background: var(--red-pen);
+  color: #fff;
+  font-style: italic;
+  font-weight: 700;
+  clip-path: var(--cut-right);
+}
+/* 只有字段名时：用负外边距把标签提到框线上，后面的内容随之上移 */
+:root[data-theme='noir'] .inspector-body > .field > .field-label {
+  display: block;
+  margin: -28px 0 10px -4px;
+}
+/* 字段名右边还有控件（如字体选择）时：只把字段名提上去，控件留在框内右上角 */
+:root[data-theme='noir'] .inspector-body > .field > .field-label-row {
+  align-items: flex-start;
+  margin: -12px 0 8px;
+}
+:root[data-theme='noir'] .inspector-body > .field > .field-label-row > .field-label {
+  margin: -16px 0 0 -4px;
+}
+/* 悬停：标签像“段落设置”的标签一样歪一下，不再变红（红底上看不见） */
+:root[data-theme='noir'] .inspector-body > .field:hover > .field-label,
+:root[data-theme='noir'] .inspector-body > .field:hover > .field-label-row > .field-label {
+  color: #fff;
+  transform: rotate(-3deg) scale(1.08);
 }
