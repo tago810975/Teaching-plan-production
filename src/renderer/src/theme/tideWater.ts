@@ -40,38 +40,32 @@ function waveEdge(w: number, baseY: number, amp: number): Array<[number, number]
 
 const line = (pts: Array<[number, number]>): string => pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')
 
-export function buildTideWater(w: number, h: number): SVGSVGElement {
-  const svg = el('svg', { class: 'tide-water', viewBox: `0 0 ${w} ${h}`, width: w, height: h, preserveAspectRatio: 'none' })
+export function buildTideWater(w: number, h: number): HTMLDivElement {
+  // 每层水是一个独立的 <svg> 元素，动画加在这个元素本身上（而不是 SVG 内部的图形），
+  // 浏览器就能把位移交给显卡合成：新页面在主线程上排版、绘制时，水照样流畅地往下灌
+  const box = document.createElement('div')
+  box.className = 'tide-water'
   const amp = Math.max(10, h * 0.025)
 
-  // 浅青领头、画在最下面；亮蓝、深蓝晚一步，依次叠在上面。灌的过程中前缘露出浅青、亮蓝两道波浪，最后深蓝铺满
-  for (let i = 0; i < LAYERS.length; i++) {
-    const layer = LAYERS[i]!
+  // 浅青领头、在最下面；亮蓝、深蓝晚一步，依次叠在上面。灌的过程中前缘露出浅青、亮蓝两道波浪，最后深蓝铺满
+  LAYERS.forEach((layer, i) => {
     // 每层的下缘都在画面外，灌到底时铺满、不留缝
     const edge = waveEdge(w, h + amp * 2 + 8, amp * (1 - i * 0.15))
-    const g = el('g', { class: `tide-layer ${layer.cls}` })
+    const svg = el('svg', { class: `tide-layer ${layer.cls}`, viewBox: `0 ${-h * 0.4} ${w} ${h * 1.4 + amp * 4}`, preserveAspectRatio: 'none' })
     // 顶边在画面上方，右边下来，沿波浪从右往左走回左边
     const back = [...edge].reverse()
-    g.append(el('path', { fill: layer.fill, d: `M -20 ${(-h * 0.4).toFixed(1)} L ${w + 20} ${(-h * 0.4).toFixed(1)} L ${line(back)} Z` }))
-    if (i === 0) g.append(el('path', { d: `M ${line(edge)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 3, 'stroke-opacity': 0.9 }))
-    svg.append(g)
-  }
+    svg.append(el('path', { fill: layer.fill, d: `M -20 ${(-h * 0.4).toFixed(1)} L ${w + 20} ${(-h * 0.4).toFixed(1)} L ${line(back)} Z` }))
+    if (i === 0) svg.append(el('path', { d: `M ${line(edge)}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 3, 'stroke-opacity': 0.9 }))
+    box.append(svg)
+  })
 
-  // 几个空心水泡
+  // 几个空心水泡（普通元素，同样交给显卡合成）
   for (let i = 0; i < 7; i++) {
-    const r = rnd(5, 12)
-    svg.append(
-      el('circle', {
-        class: 'tide-ring',
-        cx: ((i + rnd(0.2, 0.8)) / 7) * w,
-        cy: rnd(0.55, 0.95) * h,
-        r,
-        fill: 'none',
-        stroke: '#c4f1ff',
-        'stroke-width': 2,
-        style: `--delay:${Math.round(rnd(420, 560))}ms;--rise:${Math.round(rnd(90, 200))}px`
-      })
-    )
+    const r = Math.round(rnd(5, 12))
+    const b = document.createElement('span')
+    b.className = 'tide-ring'
+    b.style.cssText = `left:${(((i + rnd(0.2, 0.8)) / 7) * 100).toFixed(1)}%;top:${rnd(55, 95).toFixed(1)}%;width:${r * 2}px;height:${r * 2}px;--delay:${Math.round(rnd(420, 560))}ms;--rise:${Math.round(rnd(90, 200))}px`
+    box.append(b)
   }
-  return svg
+  return box
 }

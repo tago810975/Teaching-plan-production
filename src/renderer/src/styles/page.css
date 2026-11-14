@@ -369,6 +369,9 @@
 .page-frame {
   position: relative;
   flex: none;
+  /* 不在屏幕附近的页面跳过绘制：切换到页数多的教学案、或从后台标签页切回来时，
+   * 浏览器只需画眼前的一两页。外框尺寸由行内样式给定，滚动条长度与位置都不受影响 */
+  content-visibility: auto;
 }
 .page-frame > .page {
   position: absolute;
