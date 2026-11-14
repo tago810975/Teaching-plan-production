@@ -5195,9 +5195,8 @@ input[type='checkbox']:disabled {
 
 /* ---- 页面切换：沉入水中 ----
  * 0 – 650ms    旧页面以底边为轴向后仰倒、下沉、变暗变模糊
- * 0 – 600ms    平涂风格的海水从上往下灌：亮蓝水柱带着鼓包状的下缘先落，深蓝随后铺满；
- *              浅青、近白的长条水流像冰锥一样刺下来
- * 120 – 900ms  浪花一团团炸开、漂移、缩回；空心水泡上浮
+ * 0 – 700ms    浅青、亮蓝、深蓝三层纯色水体依次从上往下灌，下缘是舒缓的波浪，领头那层描白色亮线
+ * 420 – 1000ms 几个空心水泡上浮
  * 700 – 1100ms 海水淡去，新页面从水中浮现（模糊、偏下 → 清晰、到位）
  * 水的形状由 theme/tideWater.ts 每次随机生成。
  */
@@ -5265,59 +5264,25 @@ input[type='checkbox']:disabled {
   border-radius: var(--radius-lg);
 }
 
-/* ---- 月潮：平涂海水（theme/tideWater.ts 生成） ----
- * 入场不突兀：整张水先用 120ms 淡入；亮蓝水柱起步慢、越落越快；深蓝晚一步跟上。
+/* ---- 月潮：简洁的涌水（theme/tideWater.ts 生成） ----
+ * 三层纯色水体依次从上往下灌：浅青领头，亮蓝、深蓝各晚一步；起步慢、越落越快。
+ * 灌满后整张水淡去，新页面浮现。
  */
 @keyframes tide-pour {
-  0% {
-    transform: translateY(-100%);
+  from {
+    transform: translateY(-145%);
   }
-  100% {
+  to {
     transform: translateY(0);
   }
 }
 @keyframes tide-water-life {
-  0% {
-    opacity: 0;
-  }
-  12%,
+  0%,
   64% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-  }
-}
-@keyframes tide-drop-fall {
-  0% {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.6);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(70px) scale(0.8, 1.2);
-  }
-}
-@keyframes tide-foam-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.2);
-  }
-  30% {
-    opacity: 1;
-    transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4)) scale(1.06);
-  }
-  70% {
-    opacity: 1;
-    transform: translate(var(--dx), var(--dy)) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--dx), var(--dy)) scale(0.85);
   }
 }
 @keyframes tide-ring-rise {
@@ -5342,32 +5307,15 @@ input[type='checkbox']:disabled {
   overflow: visible;
   animation: tide-water-life 1100ms linear forwards;
 }
-:root[data-theme='tide'] .tide-mass {
+:root[data-theme='tide'] .tide-layer {
   transform-box: view-box;
+  animation: tide-pour 560ms cubic-bezier(0.5, 0, 0.45, 1) both;
 }
-:root[data-theme='tide'] .tide-mass--mid {
-  animation: tide-pour 560ms cubic-bezier(0.45, 0, 0.55, 1) both;
+:root[data-theme='tide'] .tide-layer--2 {
+  animation-delay: 70ms;
 }
-/* 深蓝的下缘在画面外（约 1.2 倍高），起点要提得更高，否则一开始就露在画面顶上 */
-@keyframes tide-pour-deep {
-  0% {
-    transform: translateY(-130%);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-:root[data-theme='tide'] .tide-mass--deep {
-  animation: tide-pour-deep 680ms cubic-bezier(0.45, 0, 0.5, 1) 100ms both;
-}
-:root[data-theme='tide'] .tide-drop {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tide-drop-fall 420ms cubic-bezier(0.5, 0, 0.8, 0.5) var(--delay) both;
-}
-:root[data-theme='tide'] .tide-foam {
-  transform-box: view-box;
-  animation: tide-foam-pop 560ms cubic-bezier(0.3, 0.7, 0.4, 1) var(--delay) both;
+:root[data-theme='tide'] .tide-layer--3 {
+  animation-delay: 140ms;
 }
 :root[data-theme='tide'] .tide-ring {
   transform-box: fill-box;
