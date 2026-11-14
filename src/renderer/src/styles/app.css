@@ -5212,11 +5212,12 @@ input[type='checkbox']:disabled {
     opacity: 0;
   }
 }
+/* 新页面浮现：只用透明度和位移。不用模糊和缩放——动画结束撤掉滤镜、缩放的那一刻，
+ * 文字从合成层换回正常绘制，会看到“跳一下”，大页面上还会卡一帧 */
 @keyframes tide-surface {
   from {
     opacity: 0;
-    filter: blur(8px);
-    transform: translateY(18px) scale(1.02);
+    transform: translateY(14px);
   }
 }
 /* 深海底色：旧页面沉下去后露出来，水退时再淡出，让新页面浮上来 */

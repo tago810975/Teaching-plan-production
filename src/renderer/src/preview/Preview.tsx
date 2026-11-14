@@ -135,15 +135,22 @@ export function Preview({
   const pageCount = layout?.pages.length ?? 1
   useEffect(() => onPageCount?.(pageCount), [pageCount, onPageCount])
 
-  // 页面宽度随窗口自适应
-  useEffect(() => {
+  // 页面宽度随窗口自适应。
+  // 首次显示时在绘制之前就算好缩放（布局副作用里同步计算），否则会先按 100% 画出一帧、
+  // 等 ResizeObserver 回调后再突然放大或缩小，看起来就是“打开后跳一下”。
+  useLayoutEffect(() => {
     const el = scrollRef.current
     if (el === null) return
-    const observer = new ResizeObserver(([entry]) => {
-      const available = (entry?.contentRect.width ?? 0) - 64
+    const fit = (contentWidth: number): void => {
+      if (contentWidth <= 0) return
       const pagePx = pageWidthPt * PT_TO_PX
-      setZoom(Math.min(1.5, Math.max(0.4, available / pagePx)))
-    })
+      const next = Math.min(1.5, Math.max(0.4, (contentWidth - 64) / pagePx))
+      // 只在变化明显时更新，避免亚像素抖动引起的反复重排
+      setZoom((z) => (Math.abs(z - next) < 0.002 ? z : next))
+    }
+    const style = getComputedStyle(el)
+    fit(el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight))
+    const observer = new ResizeObserver(([entry]) => fit(entry?.contentRect.width ?? 0))
     observer.observe(el)
     return () => observer.disconnect()
   }, [pageWidthPt])
