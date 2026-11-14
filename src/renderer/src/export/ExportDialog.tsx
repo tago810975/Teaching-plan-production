@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ProjectBundle, Variant } from '@core/model/types'
 import { rasterizeForWord } from './rasterize'
 import { exportFileName, pointsFileName } from '@shared/export-name'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   bundle: ProjectBundle
@@ -65,7 +66,7 @@ export function ExportDialog({ bundle, projectPath, onDone, onCancel }: Props) {
         if (!busy) onCancel()
       }}
     >
-      <h2 id="export-title">导出 Word</h2>
+      <h2 id="export-title"><CollageText text="导出 Word" /></h2>
 
       <div className="field">
         <span className="field-label">导出版本</span>

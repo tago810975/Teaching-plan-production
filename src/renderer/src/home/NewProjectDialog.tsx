@@ -3,6 +3,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { PresetSelect, useDefaultPreset } from './PresetSelect'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   onCreate: (title: string, dir: string | null, presetId: string) => Promise<void>
@@ -49,7 +50,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         onCancel()
       }}
     >
-      <h2 id="new-project-title">新建教学案</h2>
+      <h2 id="new-project-title"><CollageText text="新建教学案" /></h2>
       <div className="field">
         <label className="field-label" htmlFor="new-project-name">
           名称

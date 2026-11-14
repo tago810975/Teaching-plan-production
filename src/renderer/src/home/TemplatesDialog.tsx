@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { setUserPresets } from '@core/presets'
 import type { TemplateCatalog } from '@shared/ipc'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   onClose: () => void
@@ -98,7 +99,7 @@ export function TemplatesDialog({ onClose, onChanged }: Props) {
         onClose()
       }}
     >
-      <h2 id="templates-title">模板</h2>
+      <h2 id="templates-title"><CollageText text="模板" /></h2>
       <p className="field-hint">
         内置模板随软件安装，不能修改；要做自己的模板，先把一个模板“复制为新模板”，再修改模板文件夹中的 preset.json
         （格式预设）与 template.docx（Word 模板），说明见文件夹里的 README.md。也可以导入其他老师导出的模板压缩包。

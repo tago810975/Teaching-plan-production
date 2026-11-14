@@ -3,6 +3,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { PresetSelect, useDefaultPreset } from './PresetSelect'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   /** 首页中选中的 Word 文档；不设时点按钮后选择文件 */
@@ -30,7 +31,7 @@ export function CreateFromDocxDialog({ filePath, onChoose, onCancel }: Props) {
         onCancel()
       }}
     >
-      <h2 id="from-docx-title">从 Word 文档新建</h2>
+      <h2 id="from-docx-title"><CollageText text="从 Word 文档新建" /></h2>
       {filePath !== undefined && (
         <p className="from-docx-file" title={filePath}>
           文档：{filePath.split(/[\\/]/).pop()}

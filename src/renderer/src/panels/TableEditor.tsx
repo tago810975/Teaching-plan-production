@@ -28,6 +28,7 @@ import { A4_PAGE, contentWidthTwip } from '@core/document/units'
 import type { Inline, TableInline } from '@core/model/types'
 import { FormatTargetProvider, FormatToolbar, useFormatTargets, useFormattable } from './FormatToolbar'
 import { PresetContext } from './preset-context'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   table: TableInline
@@ -168,7 +169,7 @@ export function TableEditor({ table, title, onSave, onCancel }: Props) {
         onCancel()
       }}
     >
-      <h2 id="table-editor-title">{title}</h2>
+      <h2 id="table-editor-title"><CollageText text={title} /></h2>
       <div className="table-editor-tools" role="toolbar" aria-label="撤销与表格结构">
         <button type="button" className="icon-button" onClick={() => travel('undo')} disabled={history.current.past.length === 0} title="撤销（Ctrl+Z）" aria-label="撤销">
           ↶

@@ -7,6 +7,7 @@ import { allPresets } from '@core/presets'
 import { ThemePicker } from './ThemePicker'
 import { useDefaultPreset } from './PresetSelect'
 import { setMathUpright, useMathUpright } from '../state/mathUpright'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   libraryDir: string | null
@@ -50,7 +51,7 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
         onClose()
       }}
     >
-      <h2 id="settings-title">设置</h2>
+      <h2 id="settings-title"><CollageText text="设置" /></h2>
 
       <fieldset className="group">
         <legend>配色</legend>

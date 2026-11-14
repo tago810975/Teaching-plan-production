@@ -7,6 +7,7 @@ import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
 import { difficultyOf, type FormatPreset } from '@core/presets'
 import { HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction } from '../state/store'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   blocks: Block[]
@@ -39,7 +40,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
 
   return (
     <nav className="panel outline" aria-label="大纲">
-      <h2 className="panel-title">大纲</h2>
+      <h2 className="panel-title"><CollageText text="大纲" /></h2>
       <div className="outline-fixed">
         <button
           type="button"

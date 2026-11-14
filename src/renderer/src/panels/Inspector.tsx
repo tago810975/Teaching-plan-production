@@ -43,6 +43,7 @@ import type {
 import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
 import type { LineSpacing, PageHeader, ProjectLayout, QuestionFields, Variant } from '@core/model/types'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   block: Block | null
@@ -69,7 +70,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   if (layout !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
-        <h2 className="panel-title">版式设置</h2>
+        <h2 className="panel-title"><CollageText text="版式设置" /></h2>
         <div className="inspector-body">
           <LayoutForm layout={layout} dispatch={dispatch} preset={preset} />
         </div>
@@ -79,7 +80,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   if (header !== null) {
     return (
       <aside className="panel inspector" aria-label="属性">
-        <h2 className="panel-title">页眉</h2>
+        <h2 className="panel-title"><CollageText text="页眉" /></h2>
         <div className="inspector-body">
           <HeaderForm header={header} assetUrls={assetUrls} dispatch={dispatch} />
         </div>
@@ -89,7 +90,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
   if (block === null) {
     return (
       <aside className="panel inspector" aria-label="属性">
-        <h2 className="panel-title">属性</h2>
+        <h2 className="panel-title"><CollageText text="属性" /></h2>
         <p className="panel-empty">在大纲或预览中点选一项内容，即可在这里修改。</p>
       </aside>
     )
@@ -104,7 +105,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
 
   return (
     <aside className="panel inspector" aria-label="属性">
-      <h2 className="panel-title">{BLOCK_NAMES[block.type]}</h2>
+      <h2 className="panel-title"><CollageText text={BLOCK_NAMES[block.type]} /></h2>
       <FormatToolbar active={format.active} onApply={format.apply} colors={preset.textColors} keyPoint={block.type === 'knowledge' ? preset.keyPoint : undefined} />
       {/* key 保证切换选中项时各输入框重新初始化 */}
       <FormatTargetProvider value={format.provider}>

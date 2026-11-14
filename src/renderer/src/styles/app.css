@@ -4567,3 +4567,259 @@ input[type='checkbox']:disabled {
   background-color: rgba(4, 14, 36, 0.7);
   color: var(--ink);
 }
+
+/* ====================================================================
+ * 拼贴字（CollageText）：所有主题下默认就是普通文字
+ * ==================================================================== */
+.collage-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.collage-gap {
+  display: inline-block;
+  width: 0.3em;
+}
+
+/* ====================================================================
+ * 赤黑（再续）：剪报拼贴字、悬停时跳动的不规则四边形
+ * ==================================================================== */
+
+/* ---- 剪报拼贴字：每个字一块剪下来的纸片，底色、字体、角度、大小各不相同 ---- */
+:root[data-theme='noir'] .collage-chars {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  vertical-align: middle;
+}
+:root[data-theme='noir'] .collage-char {
+  display: inline-block;
+  padding: 0.04em 0.16em 0.08em;
+  line-height: 1.15;
+  font-style: normal;
+  letter-spacing: 0;
+  transform: translateY(var(--dy)) rotate(var(--r)) scale(var(--s));
+  transition: transform 220ms var(--ease-spring);
+}
+/* 字体：宋体（报纸）、黑体（杂志）、楷体（手写招贴） */
+:root[data-theme='noir'] .collage-char[data-f='0'] {
+  font-family: SimSun, 'Songti SC', serif;
+  font-weight: 900;
+}
+:root[data-theme='noir'] .collage-char[data-f='1'] {
+  font-family: var(--ui-font);
+  font-weight: 900;
+}
+:root[data-theme='noir'] .collage-char[data-f='2'] {
+  font-family: KaiTi, 'Kaiti SC', STKaiti, serif;
+  font-weight: 700;
+}
+/* 纸片：白底黑字、黑底白字、红底白字、白底红字、旧报纸、黑底红字、红底黑字 */
+:root[data-theme='noir'] .collage-char[data-v='0'] {
+  background: #f4f4f4;
+  color: #0b0b0b;
+}
+:root[data-theme='noir'] .collage-char[data-v='1'] {
+  background: #0b0b0b;
+  color: #f4f4f4;
+  outline: 1.5px solid #f4f4f4;
+  outline-offset: -1px;
+}
+:root[data-theme='noir'] .collage-char[data-v='2'] {
+  background: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir'] .collage-char[data-v='3'] {
+  background: #f4f4f4;
+  color: var(--red-pen);
+}
+:root[data-theme='noir'] .collage-char[data-v='4'] {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.08) 0 1px, transparent 1px 3px),
+    #d9d4c7;
+  color: #1a1a1a;
+}
+:root[data-theme='noir'] .collage-char[data-v='5'] {
+  background: #0b0b0b;
+  color: var(--red-pen);
+  outline: 1.5px solid var(--red-pen);
+  outline-offset: -1px;
+}
+:root[data-theme='noir'] .collage-char[data-v='6'] {
+  background: var(--red-pen);
+  color: #0b0b0b;
+  clip-path: polygon(0 6%, 100% 0, 94% 100%, 4% 92%);
+}
+/* 悬停在标题上：纸片各自抖一下 */
+:root[data-theme='noir'] :is(.home-view-title, .dialog h2, .panel-title):hover .collage-char {
+  transform: translateY(calc(var(--dy) * -1)) rotate(calc(var(--r) * -1)) scale(var(--s));
+}
+/* 拼贴字自带底色，标题本身不再画白色标签底 */
+:root[data-theme='noir'] .home-view-title:has(.collage),
+:root[data-theme='noir'] .dialog h2:has(.collage) {
+  padding: 4px 6px;
+  background: none;
+  clip-path: none;
+  transform: rotate(-2deg);
+}
+:root[data-theme='noir'] .panel-title:has(.collage) {
+  font-size: var(--fs-body);
+}
+
+/* ---- 悬停选项：底下一块不停变形的不规则四边形 ----
+ * 红色四边形在下，黑色（或白色）四边形错开一点叠在后面；两块的形状按不同节奏跳变，
+ * 每次跳到一个新的歪斜形状（steps 跳变，不是平滑过渡），像游戏菜单的选中框。
+ */
+@keyframes noir-quad-a {
+  0% {
+    clip-path: polygon(2% 12%, 97% 0%, 100% 86%, 0% 100%);
+  }
+  25% {
+    clip-path: polygon(0% 0%, 100% 14%, 95% 100%, 4% 88%);
+  }
+  50% {
+    clip-path: polygon(4% 4%, 99% 8%, 97% 92%, 0% 96%);
+  }
+  75% {
+    clip-path: polygon(0% 18%, 96% 2%, 100% 100%, 2% 84%);
+  }
+}
+@keyframes noir-quad-b {
+  0% {
+    clip-path: polygon(0% 0%, 100% 20%, 98% 100%, 6% 80%);
+  }
+  33% {
+    clip-path: polygon(5% 16%, 96% 0%, 100% 90%, 0% 100%);
+  }
+  66% {
+    clip-path: polygon(0% 8%, 100% 4%, 94% 96%, 3% 100%);
+  }
+}
+@keyframes noir-quad-in {
+  from {
+    transform: scaleX(0.2) skewX(-20deg);
+    opacity: 0;
+  }
+}
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ) {
+  position: relative;
+  isolation: isolate;
+  background-image: none !important;
+  overflow: visible;
+}
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::before,
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  transform-origin: left center;
+}
+/* 前面的红块 */
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::before {
+  inset: -2px 6px -2px 0;
+  z-index: -1;
+  background: var(--red-pen);
+  animation:
+    noir-quad-in 160ms var(--ease-spring),
+    noir-quad-a 0.72s steps(1, end) infinite;
+}
+/* 后面错开的白块（菜单里是黑块，因为菜单底本来就是黑色） */
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::after {
+  inset: 2px 0 -4px 10px;
+  z-index: -2;
+  background: var(--ink);
+  animation:
+    noir-quad-in 220ms var(--ease-spring),
+    noir-quad-b 0.96s steps(1, end) infinite;
+}
+:root[data-theme='noir'] :is(.context-menu button, .menu-popup button):is(:hover, :focus-visible):not(:disabled)::after {
+  background: #f4f4f4;
+  opacity: 0.9;
+}
+/* 文字：红块上统一白字，斜体，略微右移 */
+:root[data-theme='noir'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled) {
+  background-color: transparent !important;
+  color: #fff !important;
+  font-style: italic;
+}
+:root[data-theme='noir'] :is(.home-nav-item, .folder-row, .outline-item):hover :is(*:not(.outline-grade)) {
+  color: #fff !important;
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover .outline-grade {
+  background: #0b0b0b;
+  color: #fff;
+}
+:root[data-theme='noir'] .outline-item:not(.is-selected):hover .outline-stars {
+  color: #ffe45e !important;
+}
+:root[data-theme='noir'] .context-menu button.is-danger:hover:not(:disabled) {
+  color: #fff !important;
+}
+:root[data-theme='noir'] .context-menu button.is-danger:hover:not(:disabled)::before {
+  background: #0b0b0b;
+  outline: 2px solid var(--red-pen);
+  outline-offset: -2px;
+}
+/* 大纲、侧栏的四边形会伸出一点，不要被裁掉 */
+:root[data-theme='noir'] .outline-list,
+:root[data-theme='noir'] .home-side {
+  overflow-x: clip;
+  overflow-clip-margin: 8px;
+}
+/* 减弱动态效果：四边形不跳动，保持一个固定的歪斜形状 */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='noir'] :is(.home-nav-item, .folder-row, .outline-item, .context-menu button, .menu-popup button, .export-toast-file):hover::before {
+    animation: none !important;
+    clip-path: polygon(2% 12%, 97% 0%, 100% 86%, 0% 100%);
+  }
+  :root[data-theme='noir'] :is(.home-nav-item, .folder-row, .outline-item, .context-menu button, .menu-popup button, .export-toast-file):hover::after {
+    animation: none !important;
+    clip-path: polygon(0% 0%, 100% 20%, 98% 100%, 6% 80%);
+  }
+}

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MathfieldElement } from 'mathlive'
 import 'mathlive/fonts.css'
 import { FormulaToolbar } from './FormulaToolbar'
+import { CollageText } from '../theme/CollageText'
 
 // 字体由上面的 CSS 随程序一起打包，不再动态加载；不使用按键音效
 MathfieldElement.fontsDirectory = null
@@ -113,7 +114,7 @@ export function FormulaEditor({ initialLatex, initialDisplay, mode, onSave, onDe
         escape()
       }}
     >
-      <h2 id="formula-title">{mode === 'insert' ? '插入公式' : '编辑公式'}</h2>
+      <h2 id="formula-title"><CollageText text={mode === 'insert' ? '插入公式' : '编辑公式'} /></h2>
 
       <FormulaToolbar onInsert={insert} onOpenChange={setPanelOpen} closeRequest={closePanels} />
 

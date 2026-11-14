@@ -10,6 +10,7 @@ import { FileTable, stem, type FileActions, type FileItem } from './FileTable'
 import { HomeSidebar, samePath, type HomeView } from './HomeSidebar'
 import { TemplatesDialog } from './TemplatesDialog'
 import { SettingsDialog } from './SettingsDialog'
+import { CollageText } from '../theme/CollageText'
 
 interface Props {
   /** 已在标签页中打开的文件：不能在首页重命名或删除（先关闭标签页） */
@@ -169,7 +170,7 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
         )}
 
         <div className="home-list-bar">
-          <h1 className="home-view-title">{title}</h1>
+          <h1 className="home-view-title"><CollageText text={title} /></h1>
           <button type="button" className="icon-button" title="刷新" aria-label="刷新" onClick={() => void refresh()}>
             ⟳
           </button>
