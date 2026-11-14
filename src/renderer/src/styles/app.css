@@ -4961,32 +4961,22 @@ input[type='checkbox']:disabled {
   color: #7fe3ff;
 }
 
-/* ---- 悬停条目：底下一道青色水波光带，右边缘像水面一样缓缓起伏，上面一道光来回流动 ---- */
-@keyframes tide-wave {
-  0%,
-  100% {
-    clip-path: polygon(0 0, 92% 0, 98% 20%, 94% 45%, 100% 70%, 95% 100%, 0 100%);
-  }
-  33% {
-    clip-path: polygon(0 0, 96% 0, 93% 25%, 99% 50%, 94% 75%, 100% 100%, 0 100%);
-  }
-  66% {
-    clip-path: polygon(0 0, 94% 0, 100% 30%, 95% 55%, 98% 80%, 92% 100%, 0 100%);
-  }
-}
-@keyframes tide-wave-in {
+/* ---- 悬停条目：边框 + 反色 ----
+ * 平时是深色条目；悬停时一块白色斜切底从左侧顺滑铺开，文字反成深蓝，外面一圈青色边框，
+ * 右端再错开一道细红边作点缀。选中项是深色底、青色边框、白字斜体，与悬停的白底正好相反。
+ */
+@keyframes tide-fill-in {
   from {
-    transform: scaleX(0);
-    opacity: 0;
+    clip-path: polygon(0 0, 0 0, -10px 100%, 0 100%);
+  }
+  to {
+    clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   }
 }
-@keyframes tide-shimmer {
-  0%,
-  100% {
-    background-position: -40% 0;
-  }
-  50% {
-    background-position: 140% 0;
+@keyframes tide-edge-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
   }
 }
 :root[data-theme='tide'] :is(
@@ -5001,7 +4991,9 @@ input[type='checkbox']:disabled {
   isolation: isolate;
   background-image: none !important;
   box-shadow: none !important;
+  transition: color 160ms var(--ease-out);
 }
+/* 白色斜切底 + 青色边框 */
 :root[data-theme='tide'] :is(
     .home-nav-item:not(.is-active),
     .folder-row:not(.is-active),
@@ -5012,21 +5004,36 @@ input[type='checkbox']:disabled {
   ):is(:hover, :focus-visible):not(:disabled)::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 2px 0 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0) 100%) no-repeat,
-    linear-gradient(90deg, rgba(33, 200, 255, 0.55), rgba(33, 200, 255, 0.12));
-  background-size:
-    30% 100%,
-    100% 100%;
-  box-shadow: inset 2px 0 0 #7fe3ff;
-  transform-origin: left center;
-  animation:
-    tide-wave-in 240ms var(--ease-out),
-    tide-wave 2.6s ease-in-out infinite,
-    tide-shimmer 2.2s ease-in-out infinite;
+  background: #f2fbff;
+  box-shadow:
+    inset 0 0 0 2px #21c8ff,
+    inset 0 -3px 0 2px rgba(33, 200, 255, 0.35);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  animation: tide-fill-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 右端错开的一道细红边 */
+:root[data-theme='tide'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled)::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  width: 38%;
+  height: 3px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(255, 80, 100, 0), #ff5064);
+  transform: skewX(-30deg);
+  animation: tide-edge-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) 60ms backwards;
 }
 :root[data-theme='tide'] :is(
     .home-nav-item:not(.is-active),
@@ -5037,11 +5044,52 @@ input[type='checkbox']:disabled {
     .export-toast-file
   ):is(:hover, :focus-visible):not(:disabled) {
   background-color: transparent !important;
-  color: #fff;
-  text-shadow: 0 0 8px rgba(33, 200, 255, 0.6);
+  color: #061430 !important;
+  font-weight: 700;
+  font-style: italic;
+  text-shadow: none;
 }
-:root[data-theme='tide'] :is(.home-nav-item, .folder-row, .outline-item):hover :is(.folder-name, .folder-toggle, .outline-no, .outline-text) {
+:root[data-theme='tide'] :is(.home-nav-item, .folder-row, .outline-item):not(.is-active, .is-selected):hover :is(.folder-name, .folder-toggle, .outline-no, .outline-text, .nav-icon) {
+  color: #061430 !important;
+}
+:root[data-theme='tide'] .outline-item:not(.is-selected):hover .outline-grade {
+  background: #061430;
+  color: #7fe3ff;
+}
+:root[data-theme='tide'] .outline-item:not(.is-selected):hover .outline-stars {
+  color: #c98a00;
+}
+:root[data-theme='tide'] .context-menu button.is-danger:hover:not(:disabled) {
+  color: #d01f3a !important;
+}
+/* 选中项：与悬停相反——深色底、青色边框、白字 */
+:root[data-theme='tide'] .outline-item.is-selected,
+:root[data-theme='tide'] .home-nav-item.is-active,
+:root[data-theme='tide'] .folder-row.is-active {
+  background: #030a1c;
+  box-shadow:
+    inset 0 0 0 2px #21c8ff,
+    0 0 14px rgba(33, 200, 255, 0.35);
   color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-no,
+:root[data-theme='tide'] .folder-row.is-active .folder-name,
+:root[data-theme='tide'] .folder-row.is-active .folder-toggle {
+  color: #7fe3ff;
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-grade {
+  background: #21c8ff;
+  color: #061430;
+}
+:root[data-theme='tide'] .outline-item.is-selected .outline-stars {
+  color: var(--star);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='tide'] :is(.home-nav-item, .folder-row, .outline-item, .context-menu button, .menu-popup button, .export-toast-file):hover::before,
+  :root[data-theme='tide'] :is(.home-nav-item, .folder-row, .outline-item, .context-menu button, .menu-popup button, .export-toast-file):hover::after {
+    animation: none !important;
+  }
 }
 
 /* ---- 滚动条：深海轨道，青色渐变的细长滑块，悬停发亮 ---- */
@@ -5145,11 +5193,11 @@ input[type='checkbox']:disabled {
   }
 }
 
-/* ---- 页面切换：向后仰倒，沉入水中 ----
- * 0 – 650ms   旧页面以底边为轴向后仰倒、下沉、变暗变模糊，染上海水的蓝
- * 80 – 700ms  水面（带一道发亮的水线）从下往上漫过画面
- * 0 – 1000ms  气泡从底部升起，水中的光束缓缓摇晃
- * 550 – 1000ms 水退成透明，新页面从水中浮现（模糊、偏下 → 清晰、到位）
+/* ---- 页面切换：沉入水中 ----
+ * 0 – 650ms   旧页面以底边为轴向后仰倒、下沉、变暗变模糊
+ * 0 – 560ms   海水从上往下涌入：前缘是一道翻滚的波浪和发亮的水线，越往下越快
+ * 0 – 1000ms  气泡升起，水中的光束缓缓摇晃
+ * 620 – 1000ms 海水淡去，新页面从水中浮现（模糊、偏下 → 清晰、到位）
  */
 @keyframes tide-sink {
   0% {
@@ -5165,16 +5213,30 @@ input[type='checkbox']:disabled {
 }
 @keyframes tide-water {
   0% {
-    transform: translateY(100%);
+    transform: translateY(-100%);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.55, 0.05, 0.6, 1);
+  }
+  56% {
+    transform: translateY(0);
     opacity: 1;
   }
   62% {
-    transform: translateY(-6%);
+    transform: translateY(0);
     opacity: 1;
   }
   100% {
-    transform: translateY(-6%);
+    transform: translateY(0);
     opacity: 0;
+  }
+}
+/* 前缘的波浪横向翻滚 */
+@keyframes tide-wave-roll {
+  from {
+    background-position-x: 0, 0;
+  }
+  to {
+    background-position-x: 240px, -180px;
   }
 }
 @keyframes tide-rays {
@@ -5250,16 +5312,32 @@ input[type='checkbox']:disabled {
 }
 :root[data-theme='tide'] .tab-wipe-water {
   position: absolute;
-  inset: -8% 0 0;
+  /* 比画面高出一截：涌到底时前缘的波浪落在画面外，底部不留缝 */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% + 60px);
   z-index: 2;
-  /* 顶部那道发亮的水线，下面是渐深的海水 */
-  background:
-    radial-gradient(ellipse 18% 9px at 20% 0, rgba(200, 245, 255, 0.9), transparent 100%),
-    radial-gradient(ellipse 22% 8px at 58% 0, rgba(200, 245, 255, 0.8), transparent 100%),
-    radial-gradient(ellipse 16% 7px at 88% 0, rgba(200, 245, 255, 0.8), transparent 100%),
-    linear-gradient(180deg, rgba(127, 227, 255, 0.85) 0, rgba(33, 200, 255, 0.35) 6px, rgba(10, 50, 110, 0.55) 18%, rgba(4, 16, 44, 0.9) 100%);
-  animation: tide-water 1000ms cubic-bezier(0.45, 0.05, 0.25, 1) forwards;
+  background: linear-gradient(180deg, rgba(2, 10, 30, 0.95) 0%, rgba(6, 30, 76, 0.9) 55%, rgba(18, 82, 160, 0.82) 100%);
+  animation: tide-water 1000ms linear forwards;
   will-change: transform, opacity;
+}
+/* 前缘：两层错开、反向翻滚的波浪，最下面一道发亮的水线 */
+:root[data-theme='tide'] .tab-wipe-water::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 34px;
+  margin-top: -1px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34' viewBox='0 0 240 34'%3E%3Cpath d='M0 0H240V14C210 14 200 30 170 30S130 8 100 8 60 26 30 26 10 14 0 14Z' fill='%231252a0' fill-opacity='0.82'/%3E%3Cpath d='M0 14C10 14 0 26 30 26S70 8 100 8 140 30 170 30 210 14 240 14' fill='none' stroke='%23c8f4ff' stroke-width='2.5' stroke-opacity='0.9'/%3E%3C/svg%3E")
+      repeat-x 0 0 / 240px 34px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='34' viewBox='0 0 180 34'%3E%3Cpath d='M0 0H180V10C160 10 150 22 120 22S80 6 60 6 20 18 0 10Z' fill='%2321c8ff' fill-opacity='0.35'/%3E%3C/svg%3E")
+      repeat-x 0 0 / 180px 34px;
+  filter: drop-shadow(0 4px 10px rgba(127, 227, 255, 0.55));
+  animation: tide-wave-roll 1000ms linear infinite;
 }
 :root[data-theme='tide'] .tab-wipe-rays {
   position: absolute;
