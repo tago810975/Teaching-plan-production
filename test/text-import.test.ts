@@ -67,3 +67,48 @@ describe('从文字导入题目', async () => {
     expect(r.issues.filter((i) => !i.includes('[图1]'))).toEqual([])
   })
 })
+
+describe('真实题目图片的转写（test/fixtures/image-import，来自用户提供的常见图片类型）', async () => {
+  const { readFileSync } = await import('node:fs')
+  const png = await createAsset(new Uint8Array([1, 2, 3]), 'image/png')
+  const figures = new Map(Array.from({ length: 6 }, (_, i) => [i + 1, { asset: { ...png, id: `${png.id}-${i + 1}` }, widthEmu: 1000000, heightEmu: 600000 }]))
+  const load = (name: string) => importText(readFileSync(`test/fixtures/image-import/${name}`, 'utf8'), { presetId: 'physics-v1', figures })
+  const questions = (r: ReturnType<typeof importText>) => r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
+  const count = (v: unknown, type: string) => JSON.stringify(v).split(`"type":"${type}"`).length - 1
+
+  it('练习题：图片选项、填空、图注去掉、“四、查漏补缺”为小标题', () => {
+    const r = load('练习题-查漏补缺.txt')
+    expect(r.questionCount).toBe(5)
+    expect(r.blocks[0]).toMatchObject({ type: 'topic', text: '四、查漏补缺' })
+    const qs = questions(r)
+    expect(qs.map((q) => q.options.length)).toEqual([4, 4, 4, 4, 0])
+    expect(qs[1]!.options.every((o) => o.content.inlines.some((i) => i.type === 'image'))).toBe(true)
+    expect(qs[2]!.figures).toHaveLength(1)
+    expect(qs[4]!.kind).toBe('fill-blank')
+    expect(count(qs[4]!.stem, 'blank')).toBe(2)
+    expect(JSON.stringify(r.blocks)).not.toContain('题图')
+    expect(qs[3]!.kind).toBe('multi-choice')
+  })
+
+  it('例题：小问自己的选项跟在小问后面；小问里的①②保留；二维码提示去掉', () => {
+    const r = load('例题-质谱仪回旋加速器.txt')
+    const qs = questions(r)
+    expect(qs.map((q) => q.subQuestions.length)).toEqual([4, 2])
+    expect(qs.every((q) => q.options.length === 0)).toBe(true)
+    expect(plainText(qs[0]!.subQuestions[1]!.content)).toContain('A．电量和质量')
+    expect(plainText(qs[1]!.subQuestions[1]!.content)).toMatch(/①它们的最大速度[\s\S]*②加速氘核/)
+    expect(count(qs[0]!.subQuestions[0]!.content, 'blank')).toBe(2)
+    expect(JSON.stringify(r.blocks)).not.toContain('扫码')
+  })
+
+  it('案例：圈码小问、方括号【解析】；小问与解析交错时重排，学生版不会漏掉小问', () => {
+    const r = load('案例-交流电.txt')
+    const [q] = questions(r)
+    expect(q!.subQuestions.map((s) => plainText(s.content).slice(0, 5))).toEqual(['求交流电的', '当 $t=', '图中线圈中'])
+    const analysis = plainText(q!.analysis)
+    expect(analysis.startsWith('【解析】（1）根据电流瞬时值表达式')).toBe(true)
+    expect(analysis).toContain('（2）当')
+    expect(analysis).toContain('（3）')
+    expect(analysis).not.toContain('线圈平面位于哪个位置')
+  })
+})

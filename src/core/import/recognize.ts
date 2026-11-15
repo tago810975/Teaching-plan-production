@@ -80,7 +80,15 @@ export interface RecognizeResult {
   firstTitle?: string
 }
 
-export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
+export interface RecognizeOptions {
+  /**
+   * 小问之后的选项作为这个小问的内容（保持原来的顺序）。题目的数据结构中小问还没有自己的选项，
+   * 导入 Word 时仍把选项归到整道题上（保留图片选项的统一大小、分列等功能）；从文字导入时打开。
+   */
+  optionsFollowSubQuestion?: boolean
+}
+
+export function recognize(paragraphs: ReadParagraph[], options: RecognizeOptions = {}): RecognizeResult {
   const usesStyles = paragraphs.some((p) => p.styleName !== undefined && /物理排版\s*题目$/.test(p.styleName))
   const blocks: Block[] = []
   let current: { q: Question; stage: 'stem' | 'options' | 'teacher' } | null = null
@@ -341,6 +349,14 @@ export function recognize(paragraphs: ReadParagraph[]): RecognizeResult {
       continue
     }
 
+    // 小问之后的选项属于这个小问（如“（2）……的（　　）”后面的 A～D）：作为小问的内容，保持原来的顺序；
+    // 否则会被挪到所有小问之后显示
+    if (options.optionsFollowSubQuestion === true && q.subQuestions.length > 0 && (OPTION_START.test(text) || /^\s*[B-H]\s*[．.、]/.test(text))) {
+      q.subQuestions[q.subQuestions.length - 1]!.content.push(clean(para.inlines))
+      addFloating(q, para.floating)
+      continue
+    }
+
     // 选项。“A．”由 Word 自动编号生成时文字里没有它，只能看到其后的“B．”
     const numberedOptions = para.numbered && q.options.length === 0 && !OPTION_START.test(text) && /[\t\s　]B\s*[．.]/.test(text)
     if (OPTION_START.test(text) || numberedOptions || (cur.stage === 'options' && /^\s*[B-H]\s*[．.、]/.test(text))) {
@@ -405,7 +421,7 @@ function finalizeQuestion(q: Question): void {
   const stemText = q.stem.map((p) => textOf({ inlines: p.inlines, numbered: false, floating: [] })).join('')
   if (q.options.length > 0) {
     q.kind = /多选|不定项/.test(stemText) ? 'multi-choice' : 'single-choice'
-  } else if (/_{3,}|＿{2,}/.test(stemText)) {
+  } else if (/_{3,}|＿{2,}/.test(stemText) || q.stem.some((p) => p.inlines.some((i) => i.type === 'blank'))) {
     q.kind = 'fill-blank'
   } else {
     q.kind = 'solve'

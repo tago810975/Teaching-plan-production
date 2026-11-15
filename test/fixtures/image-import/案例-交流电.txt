@@ -1,0 +1,11 @@
+1．（P823 T1）正弦交流电的电流 $i$ 随时间 $t$ 的变化规律如图所示。
+[图1]
+①求交流电的电流瞬时值表达式？
+[解析]根据电流瞬时值表达式 $i=I_m\sin\omega t$ 或 $i=I_m\cos\omega t$ 可知，需根据图像信息求得电流峰值 $I_m$ 和角速度 $\omega$。由图可知，电流峰值 $I_m=2\,\mathrm{A}$，交流电周期 $T=4\times10^{-2}\,\mathrm{s}$，由 $\omega=\frac{2\pi}{T}$ 解得 $\omega=50\pi\ \mathrm{rad/s}$
+题目所给 $i-t$ 图像为正弦图像，则该交流电的电流瞬时值表达式为 $i=I_m\sin\omega t=2\sin50\pi t\,(\mathrm{A})$
+②当 $t=2\times10^{-2}\,\mathrm{s}$ 时，线圈平面位于哪个位置？
+[解析]当 $t=2\times10^{-2}\,\mathrm{s}$ 时，线圈中感应电流为零，因此可知此时线圈中没有感应电动势。将图像与线圈转动平面对应起来，当线圈位于中性面位置时，线圈中没有感应电动势，所以当 $t=2\times10^{-2}\,\mathrm{s}$ 末电流为零时，线圈位于中性面，如图所示。
+[图2]
+③图中线圈中的磁通量 $\Phi$ 何时最大？磁通量变化率 $\frac{\Delta\Phi}{\Delta t}$ 何时最大？
+[解析]$\Phi$ 最大：磁通量 $\Phi$ 最大时，变化率 $\frac{\Delta\Phi}{\Delta t}=0$，由 $E=n\frac{\Delta\Phi}{\Delta t}$ 可知，此时感应电动势 $E$ 为零，感应电流 $i$ 也为零，由图可知当 $t=0\,\mathrm{s}$、$0.02\,\mathrm{s}$、$0.04\,\mathrm{s}$、$0.06\,\mathrm{s}$ 时，感应电流 $i$ 为零，磁通量 $\Phi$ 最大。
+$\frac{\Delta\Phi}{\Delta t}$ 最大：由 $E=n\frac{\Delta\Phi}{\Delta t}$，可知当磁通量变化率 $\frac{\Delta\Phi}{\Delta t}$ 最大时，感应电动势 $E$ 最大，感应电流 $i$ 也最大，由图可知当 $t=0.01\,\mathrm{s}$、$0.03\,\mathrm{s}$、$0.05\,\mathrm{s}$ 时，变化率 $\frac{\Delta\Phi}{\Delta t}$ 最大。

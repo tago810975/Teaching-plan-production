@@ -31,11 +31,20 @@ export const FORMAT_GUIDE = `请把图片中的题目逐字转写成下面的格
 3. 只输出转写结果，不要输出说明、不要用代码块包起来。
 
 【格式】
-- 一行一段。题号写成“1．”“2．”（数字加全角句点），按图片中的题号。
+- 一行一段。按阅读顺序转写；分两栏的页面先左栏、后右栏。
+- 每道题以题号开头，写成“1．”“2．”（数字加全角句点），按图片中的顺序编号。
+  “例1”“原型题11”“案例一”“(1)案例一”这类题目标签也改成“1．”这样的题号。
 - 单选、多选等说明照原样写在题干开头，如“（多选）”。
-- 选项写成“A．”“B．”“C．”“D．”，可以写在同一行，也可以一行一个。
-- 小问写成“（1）”“（2）”，各占一行。
-- 答案、解析等另起一行，用【答案】【解析】【点睛】等标签开头，后面接内容。
+- 选项写成“A．”“B．”“C．”“D．”，可以写在同一行，也可以一行一个。选项本身是图时写成“A．[图2]”。
+- 小问写成“（1）”“（2）”，各占一行；圈码“①②③”作小问时也改成“（1）（2）（3）”。
+  小问里再分的“①②”保持原样。小问自己的选项紧跟在这个小问后面。
+- 答案、解析等另起一行，用【答案】【解析】【点睛】等标签开头，后面接内容；“[解析]”这类方括号标签也改成【解析】。
+- 每个小问各有解析时：先写完这道题的全部小问，再写一个【解析】，在解析里用“（1）”“（2）”分开各小问的解析。
+  不要把解析夹在小问之间。
+- 填空的横线写成“______”（至少三个下划线）。
+- 讲解、笔记、知识梳理等不是题目的内容照原样转写，标题照原样写（如“一、霍尔元件”“1.模型解析”）。
+- 页面开头是上一页题目的后半部分时，照原样转写，不要编题号。
+- 不要转写：图下的说明（如“（第15题图）”“（例1图）”）、二维码及“扫码看解析”、页眉页脚、页码。
 - 所有公式、物理量符号、单位中的上下标都用 LaTeX 写在 $ 和 $ 之间，例如 $v_0$、$F=qvB$、$\\frac{mv}{qB}$、$1.6\\times10^{-19}\\,\\mathrm{C}$。
   单独成行的长公式写成 $$…$$。不要用 Unicode 上下标（如 v₀、m²）。
 - 插图、示意图、电路图：在它出现的位置单独写一行 [图1]、[图2]……（按出现顺序编号），不要描述图的内容。
@@ -78,6 +87,15 @@ function parseLine(line: string, figures: ReadonlyMap<number, TextFigure>, used:
   const out: Inline[] = []
   const pushText = (text: string, marks?: TextMarks): void => {
     if (text === '') return
+    // 填空横线：连续三个以上的下划线（全角、半角）
+    const blankParts = text.split(/([_＿]{3,})/)
+    if (blankParts.length > 1) {
+      blankParts.forEach((part, i) => {
+        if (i % 2 === 1) out.push({ type: 'blank', widthChars: Math.max(4, Math.round([...part].length / 2)) })
+        else pushText(part, marks)
+      })
+      return
+    }
     // **加粗**
     const parts = text.split(/\*\*(.+?)\*\*/g)
     parts.forEach((part, i) => {
@@ -118,6 +136,95 @@ function parseLine(line: string, figures: ReadonlyMap<number, TextFigure>, used:
   return out
 }
 
+/**
+ * 整理 AI 的转写（识别前）：圈码小问、方括号标签、图注、二维码提示。
+ * 只用于文字导入，不改动通用的识别器（以免影响 Word 导入）。
+ */
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
+const BRACKET_LABEL = /^(\s*)[[［〔]\s*(答案|解析|详解|分析|点睛|点评|知识点|考点|重点|难点)\s*[\]］〕]/
+const CAPTION = /^\s*[（(]?\s*(第\s*\d+\s*题\s*图|例\s*\d+\s*图|[甲乙丙丁]\s*图|图\s*[甲乙丙丁])\s*[）)]?\s*$/
+const NOISE = /^\s*(扫码看解析|扫描二维码.*|第\s*\d+\s*页.*)$/
+/** 讲解中的小标题：“1.模型解析”“一、电流按正弦规律变化时的有效值计算”——短、没有句读与括号，不是题目 */
+const HEADING = /^\s*(?:\d{1,2}\s*[．.、]|[一二三四五六七八九十]+\s*[、．.])\s*[^\s，。；：？！,.;:?!（）()【】$]{1,24}\s*$/
+
+function normalizeLine(line: string, hasSubQuestions: boolean): { text: string; heading: boolean } | null {
+  if (CAPTION.test(line) || NOISE.test(line)) return null
+  let t = line
+  // 圈码作小问；本题已有“（1）”这样的小问时，圈码是小问里的下一级，保留原样
+  const c = CIRCLED.indexOf(t.trimStart()[0] ?? '')
+  if (c !== -1 && !hasSubQuestions) t = `（${c + 1}）${t.trimStart().slice(1).trimStart()}`
+  t = t.replace(BRACKET_LABEL, '$1【$2】')
+  return { text: t, heading: HEADING.test(t) && !/\$/.test(t) }
+}
+
+const QUESTION_LINE = /^\s*\d{1,3}\s*[．.、]/
+const SUB_LINE = /^\s*[（(]\s*(\d{1,2})\s*[）)]/
+const ANSWER_LINE = /^\s*【\s*答案\s*】\s*/
+const ANALYSIS_LINE = /^\s*【\s*(解析|详解|分析|点睛|点评)\s*】\s*/
+
+/**
+ * 小问与解析交错（“（1）…【解析】…（2）…【解析】…”，原图常这样排）时重排为：全部小问 → 一个【答案】→ 一个【解析】，
+ * 各小问的答案、解析用“（1）”“（2）”分开。题目的解析只属于整道题，交错时后面的小问会被当成解析，学生版里就看不到了。
+ */
+function restructureInterleaved(lines: Array<{ text: string; heading: boolean }>): Array<{ text: string; heading: boolean }> {
+  const out: Array<{ text: string; heading: boolean }> = []
+  let i = 0
+  while (i < lines.length) {
+    if (!QUESTION_LINE.test(lines[i]!.text)) {
+      out.push(lines[i]!)
+      i++
+      continue
+    }
+    // 一道题：到下一道题或小标题为止
+    let j = i + 1
+    while (j < lines.length && !QUESTION_LINE.test(lines[j]!.text) && !lines[j]!.heading) j++
+    const q = lines.slice(i, j)
+    i = j
+    // 是否交错：某个小问出现在答案或解析之后
+    let seenTeacher = false
+    let interleaved = false
+    for (const l of q) {
+      if (ANSWER_LINE.test(l.text) || ANALYSIS_LINE.test(l.text)) seenTeacher = true
+      else if (seenTeacher && SUB_LINE.test(l.text)) interleaved = true
+    }
+    if (!interleaved) {
+      out.push(...q)
+      continue
+    }
+    const body: Array<{ text: string; heading: boolean }> = []
+    const answers: string[] = []
+    const analyses: string[] = []
+    let sub = 0
+    let mode: 'body' | 'answer' | 'analysis' = 'body'
+    for (const l of q) {
+      const m = SUB_LINE.exec(l.text)
+      if (m !== null && body.length > 0) {
+        sub = Number(m[1])
+        mode = 'body'
+        body.push(l)
+      } else if (ANSWER_LINE.test(l.text)) {
+        mode = 'answer'
+        answers.push(`${sub > 0 ? `（${sub}）` : ''}${l.text.replace(ANSWER_LINE, '')}`)
+      } else if (ANALYSIS_LINE.test(l.text)) {
+        mode = 'analysis'
+        analyses.push(`${sub > 0 ? `（${sub}）` : ''}${l.text.replace(ANALYSIS_LINE, '')}`)
+      } else if (mode === 'answer') answers.push(l.text)
+      else if (mode === 'analysis') analyses.push(l.text)
+      else body.push(l)
+    }
+    out.push(...body)
+    if (answers.length > 0) {
+      out.push({ text: `【答案】${answers[0]}`, heading: false })
+      answers.slice(1).forEach((t) => out.push({ text: t, heading: false }))
+    }
+    if (analyses.length > 0) {
+      out.push({ text: `【解析】${analyses[0]}`, heading: false })
+      analyses.slice(1).forEach((t) => out.push({ text: t, heading: false }))
+    }
+  }
+  return out
+}
+
 /** 去掉 AI 常带的 Markdown 记号与代码块 */
 function cleanLine(line: string): string {
   return line
@@ -136,10 +243,21 @@ export function textToParagraphs(
   const used = new Set<number>()
   const missing = new Set<number>()
   const paragraphs: ReadParagraph[] = []
+  let hasSubQuestions = false
+  const lines: Array<{ text: string; heading: boolean }> = []
   for (const raw of text.replace(/\r\n?/g, '\n').split('\n')) {
-    const line = cleanLine(raw)
-    if (line.trim() === '') continue
-    paragraphs.push({ numbered: false, inlines: parseLine(line, figures, used, missing), floating: [] })
+    const cleaned = cleanLine(raw)
+    if (cleaned.trim() === '') continue
+    if (QUESTION_LINE.test(cleaned)) hasSubQuestions = false
+    const n = normalizeLine(cleaned, hasSubQuestions)
+    if (n === null) continue
+    // 只有原文本来就写着“（1）”时，后面的圈码才是小问里的下一级（由圈码转换来的不算）
+    if (SUB_LINE.test(cleaned)) hasSubQuestions = true
+    lines.push(n)
+  }
+  for (const n of restructureInterleaved(lines)) {
+    // 讲解中的小标题作为“题型分组”标题，不会被当成题目
+    paragraphs.push({ numbered: false, inlines: parseLine(n.text, figures, used, missing), floating: [], ...(n.heading ? { styleName: '物理排版 题目类型' } : {}) })
   }
   return { paragraphs, usedFigures: used, missingFigures: missing }
 }
@@ -149,7 +267,7 @@ export function importText(text: string, options: TextImportOptions = {}): TextI
   const figures = options.figures ?? new Map<number, TextFigure>()
   const preset = getPreset(options.presetId)
   const { paragraphs, usedFigures, missingFigures } = textToParagraphs(text, figures)
-  const recognized = preset.kind === 'handbook' ? recognizeHandbook(paragraphs) : recognize(paragraphs)
+  const recognized = preset.kind === 'handbook' ? recognizeHandbook(paragraphs) : recognize(paragraphs, { optionsFollowSubQuestion: true })
   const blocks = applyPresetRules(normalizeFonts(recognized.blocks), preset)
 
   const refs = collectAssetRefs({ ...createEmptyProject(), blocks })
