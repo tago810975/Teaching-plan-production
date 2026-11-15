@@ -14,6 +14,8 @@ import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { BlockQuickMenu } from './BlockQuickMenu'
+import { ImageImportDialog } from './import/ImageImportDialog'
+import { ContextMenu } from './home/ContextMenu'
 import { FigureQuickMenu, OptionImageQuickMenu } from './ImageQuickMenu'
 import type { ImageTarget } from './preview/image-menu'
 import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
@@ -264,6 +266,10 @@ function EditorBody({
     }
   }
 
+  // 从图片导入题目（识别结果由 AI 给出，见 import/ImageImportDialog.tsx）
+  const [imageImportOpen, setImageImportOpen] = useState(false)
+  const [importMenu, setImportMenu] = useState<{ x: number; y: number } | null>(null)
+
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
   return (
@@ -308,9 +314,29 @@ function EditorBody({
             </button>
           </div>
           <AddMenu onAdd={addBlock} preset={preset} projectTitle={project.meta.title} />
-          <button type="button" onClick={() => void importWord()} title="识别 Word 文档中的题目，插入到当前选中内容之后">
-            导入 Word 题目…
+          <button
+            type="button"
+            title="导入题目，插入到当前选中内容之后"
+            aria-haspopup="menu"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setImportMenu({ x: r.left, y: r.bottom + 4 })
+            }}
+          >
+            导入题目 ▾
           </button>
+          {importMenu !== null && (
+            <ContextMenu
+              x={importMenu.x}
+              y={importMenu.y}
+              label="导入题目"
+              onClose={() => setImportMenu(null)}
+              items={[
+                { label: 'Word 文档…', onSelect: () => void importWord() },
+                { label: '图片（交给 AI 识别）…', onSelect: () => setImageImportOpen(true) }
+              ]}
+            />
+          )}
           <span className="page-count">共 {pageCount} 页</span>
           <button type="button" onClick={() => onExportOpenChange(true)} title="导出教案与学案 Word 文档（Ctrl+E）">
             导出 Word…
@@ -324,6 +350,17 @@ function EditorBody({
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
       {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
+      {imageImportOpen && (
+        <ImageImportDialog
+          presetId={project.presetId}
+          onCancel={() => setImageImportOpen(false)}
+          onImport={(blocks, assets, report) => {
+            dispatch({ type: 'insert-blocks', blocks, assets, afterBlockId: insertAfter })
+            onImportReport(report)
+            setImageImportOpen(false)
+          }}
+        />
+      )}
       {quickMenu?.kind === 'figure' && quickBlock !== null && (
         <FigureQuickMenu
           block={quickBlock}
