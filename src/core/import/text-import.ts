@@ -28,12 +28,14 @@ export const FORMAT_GUIDE = `请把图片中的题目逐字转写成下面的格
 1. 逐字转写图片中的内容：不要解题、不要补全、不要改写、不要省略，也不要添加图片中没有的内容。
    图片中没有答案或解析，就不要写【答案】【解析】。
 2. 看不清的字写成【?】，不要猜。
-3. 只输出转写结果，不要输出说明、不要用代码块包起来。
+3. 把全部转写结果放在一个代码块里（以 \`\`\`text 开头、\`\`\` 结尾），代码块外不要写任何说明。
+   这样公式和填空横线不会被对话界面渲染改掉。
 
 【格式】
 - 一行一段。按阅读顺序转写；分两栏的页面先左栏、后右栏。
 - 每道题以题号开头，写成“1．”“2．”（数字加全角句点），按图片中的顺序编号。
-  “例1”“原型题11”“案例一”“(1)案例一”这类题目标签也改成“1．”这样的题号。
+  “例1”“原型题11”“案例一”“(1)案例一”这类题目标签也改成“1．”这样的题号；
+  题目来源标注（如“（P823 T1）”）不要写。题号和题干写在同一行。
 - 单选、多选等说明照原样写在题干开头，如“（多选）”。
 - 选项写成“A．”“B．”“C．”“D．”，可以写在同一行，也可以一行一个。选项本身是图时写成“A．[图2]”。
 - 小问写成“（1）”“（2）”，各占一行；圈码“①②③”作小问时也改成“（1）（2）（3）”。
@@ -225,6 +227,9 @@ function restructureInterleaved(lines: Array<{ text: string; heading: boolean }>
   return out
 }
 
+/** 题号后面的来源标注，如“（P823 T1）”“(P824 T3)” */
+const SOURCE_TAG = /^(\s*\d{1,3}\s*[．.、]\s*)[（(]\s*P\s*\d+\s*T\s*\d+\s*[）)]\s*/i
+
 /** 去掉 AI 常带的 Markdown 记号与代码块 */
 function cleanLine(line: string): string {
   return line
@@ -245,9 +250,20 @@ export function textToParagraphs(
   const paragraphs: ReadParagraph[] = []
   let hasSubQuestions = false
   const lines: Array<{ text: string; heading: boolean }> = []
+  // 单独一行的题号（“1．”下一行才是题干）与下一行合并
+  let pendingNumber = ''
   for (const raw of text.replace(/\r\n?/g, '\n').split('\n')) {
-    const cleaned = cleanLine(raw)
+    let cleaned = cleanLine(raw)
     if (cleaned.trim() === '') continue
+    if (/^\s*\d{1,3}\s*[．.、]\s*$/.test(cleaned)) {
+      pendingNumber = cleaned.trim()
+      continue
+    }
+    if (pendingNumber !== '') {
+      cleaned = pendingNumber + cleaned.trimStart()
+      pendingNumber = ''
+    }
+    cleaned = cleaned.replace(SOURCE_TAG, '$1')
     if (QUESTION_LINE.test(cleaned)) hasSubQuestions = false
     const n = normalizeLine(cleaned, hasSubQuestions)
     if (n === null) continue
@@ -255,6 +271,10 @@ export function textToParagraphs(
     if (SUB_LINE.test(cleaned)) hasSubQuestions = true
     lines.push(n)
   }
+  // 编号的短行后面紧跟着选项（“A．”）时是题目，不是小标题（“2.解题思路”后面跟“（1）……”仍是小标题）
+  lines.forEach((l, k) => {
+    if (l.heading && /^\s*\d/.test(l.text) && /^\s*A\s*[．.、]/.test(lines[k + 1]?.text ?? '')) l.heading = false
+  })
   for (const n of restructureInterleaved(lines)) {
     // 讲解中的小标题作为“题型分组”标题，不会被当成题目
     paragraphs.push({ numbered: false, inlines: parseLine(n.text, figures, used, missing), floating: [], ...(n.heading ? { styleName: '物理排版 题目类型' } : {}) })
@@ -289,6 +309,10 @@ export function importText(text: string, options: TextImportOptions = {}): TextI
   const unused = [...figures.keys()].filter((n) => !usedFigures.has(n))
   if (unused.length > 0) issues.push(`框选的图 ${unused.map((n) => `[图${n}]`).join(' ')} 在文字中没有出现，不会导入`)
   if (/【\?】/.test(text)) issues.push('有看不清的地方（【?】），请对照原图修改')
+  // 从对话气泡中复制的“渲染后”的公式：上下标、分式被拆成几行，夹着零宽字符
+  if ((text.match(/\u200b/g) ?? []).length >= 3) {
+    issues.unshift('这段文字像是从 AI 对话气泡中直接复制的显示结果：公式已被拆散变形，填空横线也会丢失。请让 AI 把结果放在代码块里（复制给 AI 的指令已经这样要求），再用代码块的“复制”按钮复制')
+  }
   if (recognized.questionCount === 0 && preset.kind !== 'handbook') issues.push('没有识别到题目：题目要以“1．”这样的题号开头')
   return { blocks, assets, questionCount: recognized.questionCount, issues }
 }

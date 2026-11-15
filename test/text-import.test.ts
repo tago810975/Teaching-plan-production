@@ -112,3 +112,26 @@ describe('真实题目图片的转写（test/fixtures/image-import，来自用�
     expect(analysis).not.toContain('线圈平面位于哪个位置')
   })
 })
+
+describe('WorkBuddy 实测的问题（2026-11-15）', () => {
+  it('从对话气泡复制的渲染结果（公式被拆散、带零宽字符）给出明确提示', () => {
+    const pasted = '1．\n根据电流瞬时值表达式 i=I \nm\n\u200b\n sinωt 可知\n由 ω= \nT\n2π\n\u200b\n  解得\n其中 k= \nnq\n1\n\u200b\n 。'
+    const r = importText(pasted)
+    expect(r.issues[0]).toMatch(/对话气泡中直接复制/)
+  })
+
+  it('单独一行的题号与下一行合并；题号后的来源标注（P823 T1）去掉', () => {
+    const r = importText('1．\n正弦交流电的电流 $i$ 随时间 $t$ 的变化规律如图所示。\n2．（P824 T1）如图所示，求有效值。')
+    const qs = r.blocks.filter((b): b is QuestionBlock => b.type === 'question')
+    expect(qs).toHaveLength(2)
+    expect(qs[0]!.question.stem).toHaveLength(1)
+    expect(plainText(qs[0]!.question.stem)).toMatch(/^正弦交流电的电流/)
+    expect(plainText(qs[1]!.question.stem)).toBe('如图所示，求有效值。')
+  })
+
+  it('格式说明要求代码块；代码块的围栏会被去掉', () => {
+    expect(FORMAT_GUIDE).toContain('代码块里')
+    const r = importText('```text\n1．题目一\nA．甲　　B．乙\n```')
+    expect(r.questionCount).toBe(1)
+  })
+})
