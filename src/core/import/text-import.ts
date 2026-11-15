@@ -45,7 +45,7 @@ export const FORMAT_GUIDE = `请把图片中的题目逐字转写成下面的格
   不要把解析夹在小问之间。
 - 填空的横线写成“______”（至少三个下划线）。
 - 讲解、笔记、知识梳理等不是题目的内容照原样转写，标题照原样写（如“一、霍尔元件”“1.模型解析”）。
-- 页面开头是上一页题目的后半部分时，照原样转写，不要编题号。
+- 一张图片开头是上一页题目的后半部分时，先单独写一行【接上页】，再照原样转写这半道题，不要编题号。
 - 不要转写：图下的说明（如“（第15题图）”“（例1图）”）、二维码及“扫码看解析”、页眉页脚、页码。
 - 所有公式、物理量符号、单位中的上下标都用 LaTeX 写在 $ 和 $ 之间，例如 $v_0$、$F=qvB$、$\\frac{mv}{qB}$、$1.6\\times10^{-19}\\,\\mathrm{C}$。
   单独成行的长公式写成 $$…$$。不要用 Unicode 上下标（如 v₀、m²）。
@@ -182,12 +182,18 @@ function restructureInterleaved(lines: Array<{ text: string; heading: boolean }>
     while (j < lines.length && !QUESTION_LINE.test(lines[j]!.text) && !lines[j]!.heading) j++
     const q = lines.slice(i, j)
     i = j
-    // 是否交错：某个小问出现在答案或解析之后
+    // 是否交错：答案或解析之后出现了**新的**小问编号。解析里用已出现过的“（1）（2）”分段（先列小问、再统一解析）不算
     let seenTeacher = false
     let interleaved = false
+    const seenSubs = new Set<number>()
     for (const l of q) {
+      const m = SUB_LINE.exec(l.text)
       if (ANSWER_LINE.test(l.text) || ANALYSIS_LINE.test(l.text)) seenTeacher = true
-      else if (seenTeacher && SUB_LINE.test(l.text)) interleaved = true
+      else if (m !== null && !seenTeacher) seenSubs.add(Number(m[1]))
+      else if (m !== null && seenTeacher && !seenSubs.has(Number(m[1]))) {
+        interleaved = true
+        seenSubs.add(Number(m[1]))
+      }
     }
     if (!interleaved) {
       out.push(...q)
@@ -228,6 +234,8 @@ function restructureInterleaved(lines: Array<{ text: string; heading: boolean }>
 }
 
 /** 题号后面的来源标注，如“（P823 T1）”“(P824 T3)” */
+/** 图片开头是上一页题目的后半部分（格式说明要求 AI 在前面写一行【接上页】） */
+const CONTINUED = /^\s*【\s*(接上页|续上页|续)\s*】\s*$/
 const SOURCE_TAG = /^(\s*\d{1,3}\s*[．.、]\s*)[（(]\s*P\s*\d+\s*T\s*\d+\s*[）)]\s*/i
 
 /** 去掉 AI 常带的 Markdown 记号与代码块 */
@@ -244,19 +252,25 @@ function cleanLine(line: string): string {
 export function textToParagraphs(
   text: string,
   figures: ReadonlyMap<number, TextFigure> = new Map()
-): { paragraphs: ReadParagraph[]; usedFigures: Set<number>; missingFigures: Set<number> } {
+): { paragraphs: ReadParagraph[]; usedFigures: Set<number>; missingFigures: Set<number>; continued: number } {
   const used = new Set<number>()
   const missing = new Set<number>()
   const paragraphs: ReadParagraph[] = []
   let hasSubQuestions = false
   const lines: Array<{ text: string; heading: boolean }> = []
-  // 单独一行的题号（“1．”下一行才是题干）与下一行合并
+  // 单独一行的题号（“1．”下一行才是题干）与下一行合并；【接上页】后面的半道题单独成题（不并进前一题的解析）
   let pendingNumber = ''
+  let continued = 0
   for (const raw of text.replace(/\r\n?/g, '\n').split('\n')) {
     let cleaned = cleanLine(raw)
     if (cleaned.trim() === '') continue
     if (/^\s*\d{1,3}\s*[．.、]\s*$/.test(cleaned)) {
       pendingNumber = cleaned.trim()
+      continue
+    }
+    if (CONTINUED.test(cleaned)) {
+      pendingNumber = '1．'
+      continued++
       continue
     }
     if (pendingNumber !== '') {
@@ -279,14 +293,14 @@ export function textToParagraphs(
     // 讲解中的小标题作为“题型分组”标题，不会被当成题目
     paragraphs.push({ numbered: false, inlines: parseLine(n.text, figures, used, missing), floating: [], ...(n.heading ? { styleName: '物理排版 题目类型' } : {}) })
   }
-  return { paragraphs, usedFigures: used, missingFigures: missing }
+  return { paragraphs, usedFigures: used, missingFigures: missing, continued }
 }
 
 /** 文字 → 题目（与导入 Word 相同的识别与整理），并列出需要留意的问题 */
 export function importText(text: string, options: TextImportOptions = {}): TextImportResult {
   const figures = options.figures ?? new Map<number, TextFigure>()
   const preset = getPreset(options.presetId)
-  const { paragraphs, usedFigures, missingFigures } = textToParagraphs(text, figures)
+  const { paragraphs, usedFigures, missingFigures, continued } = textToParagraphs(text, figures)
   const recognized = preset.kind === 'handbook' ? recognizeHandbook(paragraphs) : recognize(paragraphs, { optionsFollowSubQuestion: true })
   const blocks = applyPresetRules(normalizeFonts(recognized.blocks), preset)
 
@@ -309,6 +323,7 @@ export function importText(text: string, options: TextImportOptions = {}): TextI
   const unused = [...figures.keys()].filter((n) => !usedFigures.has(n))
   if (unused.length > 0) issues.push(`框选的图 ${unused.map((n) => `[图${n}]`).join(' ')} 在文字中没有出现，不会导入`)
   if (/【\?】/.test(text)) issues.push('有看不清的地方（【?】），请对照原图修改')
+  if (continued > 0) issues.push(`有 ${continued} 处“接上页”的半道题，已单独成题，请对照原图补全题干，或删去`)
   // 从对话气泡中复制的“渲染后”的公式：上下标、分式被拆成几行，夹着零宽字符
   if ((text.match(/\u200b/g) ?? []).length >= 3) {
     issues.unshift('这段文字像是从 AI 对话气泡中直接复制的显示结果：公式已被拆散变形，填空横线也会丢失。请让 AI 把结果放在代码块里（复制给 AI 的指令已经这样要求），再用代码块的“复制”按钮复制')

@@ -135,3 +135,43 @@ describe('WorkBuddy 实测的问题（2026-11-15）', () => {
     expect(r.questionCount).toBe(1)
   })
 })
+
+describe('WorkBuddy 实测：按代码块复制的原文（test/fixtures/image-import/WorkBuddy实测-交流电与回旋加速器.txt）', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { latexToOmml } = await import('@core/math/mathml-to-omml')
+  const png = await createAsset(new Uint8Array([9]), 'image/png')
+  const figures = new Map([1, 2, 3].map((n) => [n, { asset: { ...png, id: `${png.id}-${n}` }, widthEmu: 1e6, heightEmu: 6e5 }]))
+  const raw = readFileSync('test/fixtures/image-import/WorkBuddy实测-交流电与回旋加速器.txt', 'utf8')
+
+  it('先列小问、再统一解析（解析里用已出现的（1）（2）分段）：小问是 3 个，不把解析的分段当成小问', () => {
+    const r = importText(raw, { presetId: 'physics-v1', figures })
+    const [q] = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
+    expect(q!.subQuestions).toHaveLength(3)
+    const analysis = plainText(q!.analysis)
+    expect(analysis).toMatch(/（1）根据电流瞬时值表达式[\s\S]*（2）当[\s\S]*（3）/)
+    expect(r.issues).toEqual([])
+  })
+
+  it('67 个公式都能转为 Word 公式', () => {
+    const maths = [...raw.matchAll(/\$([^$]+)\$/g)].map((m) => m[1]!)
+    expect(maths.length).toBe(67)
+    expect(maths.filter((l) => { try { latexToOmml(l); return false } catch { return true } })).toEqual([])
+  })
+
+  it('续页的半道题前有【接上页】时单独成题，并提示补全；没有时并入前一题的解析（无法区分）', () => {
+    const marked = raw.replace('量为 $+q$', '【接上页】\n量为 $+q$')
+    const r = importText(marked, { presetId: 'physics-v1', figures })
+    const qs = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
+    expect(qs).toHaveLength(2)
+    expect(plainText(qs[1]!.stem)).toMatch(/^量为/)
+    expect(plainText(qs[1]!.analysis)).toMatch(/^【解析】若磁感应强度/)
+    expect(plainText(qs[0]!.analysis)).not.toContain('量为')
+    expect(r.issues.some((i) => i.includes('接上页'))).toBe(true)
+  })
+
+  it('\\mathrm{rad/s} 转为 Word 公式时字母之间没有空格', () => {
+    const omml = latexToOmml('\\omega=50\\pi\\,\\mathrm{rad/s}')
+    const text = [...omml.matchAll(/<m:t[^>]*>([^<]*)<\/m:t>/g)].map((m) => m[1]).join('')
+    expect(text).toContain('rad/s')
+  })
+})

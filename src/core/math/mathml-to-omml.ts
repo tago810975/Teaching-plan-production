@@ -77,8 +77,11 @@ function node(el: Element): string {
       return run(el.textContent ?? '', 'p', true)
     case 'ms':
       return run(`"${text(el)}"`, 'p', true)
-    case 'mspace':
-      return run(' ')
+    case 'mspace': {
+      // 没有宽度的 <mspace>（temml 在 \mathrm{rad} 的每个字母后都会加一个）不占位置，否则单位变成“r a d”
+      const w = el.getAttribute('width') ?? ''
+      return w === '' || /^0(\.0*)?([a-z]+)?$/.test(w) ? '' : run(' ')
+    }
     case 'mfrac': {
       const noBar = el.getAttribute('linethickness') === '0' || el.getAttribute('linethickness') === '0px'
       const pr = noBar ? '<m:fPr><m:type m:val="noBar"/></m:fPr>' : ''
