@@ -5626,6 +5626,8 @@ input[type='checkbox']:disabled {
 }
 .field-notice button {
   flex: none;
+}
+
 .svg-choice figure.is-chosen {
   border-color: #2f6fb5;
   box-shadow: 0 0 0 1px #2f6fb5;
