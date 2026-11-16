@@ -51,6 +51,9 @@ export const IPC = {
   workbuddyUpdate: 'workbuddy:update',
   workbuddyCancel: 'workbuddy:cancel',
   workbuddyResult: 'workbuddy:result',
+  workbuddyRedrawStart: 'workbuddy:redraw-start',
+  workbuddyRedrawCancel: 'workbuddy:redraw-cancel',
+  workbuddyRedrawResult: 'workbuddy:redraw-result',
   setMathUpright: 'settings:set-math-upright',
   setExportPointsDefault: 'settings:set-export-points-default',
   getTheme: 'settings:get-theme',
@@ -269,6 +272,10 @@ export interface RendererApi {
   workbuddyUpdate(taskId: string, figureCount: number): Promise<void>
   workbuddyCancel(taskId: string): Promise<void>
   onWorkbuddyResult(handler: (result: { taskId: string; text: string }) => void): () => void
+  /** 让 WorkBuddy 把插图重绘为 SVG：登记插图（图号、图片），每收到一张由 onWorkbuddyRedrawResult 送回（已检查、净化） */
+  workbuddyRedrawStart(figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize?: number; stroke?: number; thin?: number }>): Promise<string>
+  workbuddyRedrawCancel(taskId: string): Promise<void>
+  onWorkbuddyRedrawResult(handler: (result: { taskId: string; figure: number; svg: string }) => void): () => void
   setMathUpright(on: boolean): Promise<void>
   /** 设置：界面配色主题 */
   getTheme(): Promise<ThemeId>

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { FORMAT_GUIDE, importText } from '@core/import/text-import'
-import { startBridge, TOKEN_HEADER, type BridgeTask } from '../src/main/workbuddy-bridge'
+import { startBridge, TOKEN_HEADER, type BridgeTask, type RedrawTask } from '../src/main/workbuddy-bridge'
+import { REDRAW_GUIDE, validateSvg } from '@core/import/svg-redraw'
 
 const SCRIPT = 'resources/mcp/teaching-plan-mcp.cjs'
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
@@ -39,6 +40,8 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
   const infoPath = join(dir, 'workbuddy-bridge.json')
   let task: BridgeTask | null = null
   const submitted: Array<{ taskId: string; text: string }> = []
+  let redraw: RedrawTask | null = null
+  const svgs: Array<{ figure: number; svg: string }> = []
   let bridge: Awaited<ReturnType<typeof startBridge>>
 
   beforeAll(async () => {
@@ -54,6 +57,17 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
         submit: (taskId, text) => {
           submitted.push({ taskId, text })
           return true
+        },
+        redrawPending: () => redraw,
+        redrawGuide: () => REDRAW_GUIDE,
+        redrawSubmit: (_taskId, figure, svg) => {
+          const remaining = () => (redraw === null ? [] : redraw.figures.map((f) => f.n).filter((n) => !redraw!.received.includes(n)))
+          if (redraw === null || !redraw.figures.some((f) => f.n === figure)) return { ok: false, issues: [`没有图${figure}，请用 get_figures_to_redraw 中的图号`], remaining: remaining() }
+          const c = validateSvg(svg)
+          if (!c.ok) return { ok: false, issues: c.issues, remaining: remaining() }
+          svgs.push({ figure, svg: c.svg! })
+          redraw.received.push(figure)
+          return { ok: true, issues: c.issues, remaining: remaining() }
         }
       },
       infoPath
@@ -67,7 +81,7 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
   it('初始化与工具列表', async () => {
     const [init, list] = await mcp(infoPath, [{ method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }, { method: 'tools/list' }])
     expect((init!['result'] as { serverInfo: { name: string } }).serverInfo.name).toBe('teaching-plan')
-    expect((list!['result'] as { tools: Array<{ name: string }> }).tools.map((t) => t.name)).toEqual(['get_pending_images', 'check_questions', 'submit_questions'])
+    expect((list!['result'] as { tools: Array<{ name: string }> }).tools.map((t) => t.name)).toEqual(['get_pending_images', 'check_questions', 'get_figures_to_redraw', 'submit_svg', 'submit_questions'])
   })
 
   it('没有待识别的图片时，提示老师先在软件中交出图片', async () => {
@@ -111,5 +125,29 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
     expect(status).toBe(403)
     const [r] = await mcp(join(dir, 'missing.json'), [callTool('get_pending_images')])
     expect(toolText(r!)).toContain('没有在运行')
+  })
+
+  it('重绘插图：取图（说明、图号、图片）→ 提交 SVG（检查、还差几张）→ 不合格退回原因', async () => {
+    redraw = null
+    const [none] = await mcp(infoPath, [callTool('get_figures_to_redraw')])
+    expect(toolText(none!)).toContain('没有等待重绘的插图')
+    redraw = { id: 'r1', figures: [{ n: 1, mime: 'image/png', data: PNG, width: 300, height: 200 }, { n: 2, mime: 'image/png', data: PNG, width: 100, height: 100 }], received: [] }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400"><rect x="1" y="1" width="9" height="9" stroke="#000"/></svg>'
+    const [got, bad, wrongNo, ok1, ok2] = await mcp(infoPath, [
+      callTool('get_figures_to_redraw'),
+      callTool('submit_svg', { figure: 1, svg: '<svg><rect></svg>' }),
+      callTool('submit_svg', { figure: 5, svg }),
+      callTool('submit_svg', { figure: 1, svg }),
+      callTool('submit_svg', { figure: 2, svg: '```svg\n' + svg + '\n```' })
+    ])
+    const content = (got!['result'] as { content: Array<{ type: string; text?: string }> }).content
+    expect(content[0]!.text).toMatch(/第一要求是忠实还原[\s\S]*共 2 张插图：图1、图2/)
+    expect(content.filter((c) => c.type === 'image')).toHaveLength(2)
+    expect(content.some((c) => c.text === '图1（原图 300×200 像素，宽高比 1.50）：')).toBe(true)
+    expect(toolText(bad!)).toMatch(/图1 没有收下[\s\S]*不是合法的 XML/)
+    expect(toolText(wrongNo!)).toContain('没有图5')
+    expect(toolText(ok1!)).toBe('图1 已收到。还差：图2。')
+    expect(toolText(ok2!)).toBe('图2 已收到。全部插图都已交齐。')
+    expect(svgs.map((x) => x.figure)).toEqual([1, 2])
   })
 })

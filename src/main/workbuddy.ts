@@ -14,12 +14,14 @@ import { join } from 'node:path'
 import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-import'
 import { IPC, type WorkBuddyStatus, type WorkBuddyTaskInput } from '@shared/ipc'
 import { resourcesDir } from './template-io'
-import { startBridge, type BridgeTask } from './workbuddy-bridge'
+import { startBridge, type BridgeTask, type RedrawTask } from './workbuddy-bridge'
+import { REDRAW_GUIDE, validateSvg } from '@core/import/svg-redraw'
 
 /** WorkBuddy 配置中我们这一项的名字 */
 export const SERVER_NAME = 'teaching-plan'
 
 let task: (BridgeTask & { sender: number }) | null = null
+let redraw: (RedrawTask & { sender: number }) | null = null
 let seq = 0
 
 const userData = (): string => app.getPath('userData')
@@ -112,6 +114,20 @@ export async function startWorkBuddy(): Promise<void> {
         if (wc === undefined || wc.isDestroyed()) return false
         wc.send(IPC.workbuddyResult, { taskId, text })
         return true
+      },
+      redrawPending: () => redraw,
+      redrawGuide: () => REDRAW_GUIDE,
+      redrawSubmit: (taskId, figure, svg) => {
+        const remaining = (): number[] => (redraw === null ? [] : redraw.figures.map((f) => f.n).filter((n) => !redraw!.received.includes(n)))
+        if (redraw === null || redraw.id !== taskId) return { ok: false, issues: ['任务已结束'], remaining: [] }
+        if (!redraw.figures.some((f) => f.n === figure)) return { ok: false, issues: [`没有图${figure}，请用 get_figures_to_redraw 中的图号`], remaining: remaining() }
+        const check = validateSvg(svg)
+        if (!check.ok || check.svg === undefined) return { ok: false, issues: check.issues, remaining: remaining() }
+        const wc = webContents.fromId(redraw.sender)
+        if (wc === undefined || wc.isDestroyed()) return { ok: false, issues: ['教学案制作的窗口已关闭'], remaining: [] }
+        wc.send(IPC.workbuddyRedrawResult, { taskId, figure, svg: check.svg })
+        if (!redraw.received.includes(figure)) redraw.received.push(figure)
+        return { ok: true, issues: check.issues, remaining: remaining() }
       }
     },
     infoPath()
@@ -137,5 +153,12 @@ export function registerWorkBuddyIpc(): void {
   })
   ipcMain.handle(IPC.workbuddyCancel, (_event, taskId: string) => {
     if (task !== null && task.id === taskId) task = null
+  })
+  ipcMain.handle(IPC.workbuddyRedrawStart, (event, figures: RedrawTask['figures']) => {
+    redraw = { id: `redraw-${Date.now()}-${++seq}`, figures, received: [], sender: event.sender.id }
+    return redraw.id
+  })
+  ipcMain.handle(IPC.workbuddyRedrawCancel, (_event, taskId: string) => {
+    if (redraw !== null && redraw.id === taskId) redraw = null
   })
 }

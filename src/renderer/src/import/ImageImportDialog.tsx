@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { detectFigures, snapToFigure, sortReading, trimBottomLabel, type Box as Rect, type Pixels } from '@core/import/figure-detect'
 import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-import'
+import { redrawSizes } from '@core/import/svg-redraw'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, Block } from '@core/model/types'
 import type { ImportReport } from '@shared/ipc'
@@ -84,6 +85,12 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   // 插图变清晰（清理底色 + 放大），默认打开；选中的框显示处理前后对比
   const [enhanceOn, setEnhanceOn] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
+  // 让 WorkBuddy 重绘为 SVG：交出时的图号 → 框；收到的 SVG；选用 SVG 的框
+  const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
+  const [svgs, setSvgs] = useState<Map<string, string>>(new Map())
+  const [useSvg, setUseSvg] = useState<Set<string>>(new Set())
+  const redrawRef = useRef<typeof redraw>(null)
+  redrawRef.current = redraw
   // 交给 WorkBuddy 识别：等待中的任务、状态提示
   const [wb, setWb] = useState<{ state: 'idle' | 'need-connect' | 'waiting' | 'received'; taskId?: string; note?: string }>({ state: 'idle' })
   const wbTask = useRef<string | null>(null)
@@ -147,9 +154,52 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   useEffect(
     () => () => {
       if (wbTask.current !== null) void window.api.workbuddyCancel(wbTask.current)
+      if (redrawRef.current !== null) void window.api.workbuddyRedrawCancel(redrawRef.current.taskId)
     },
     []
   )
+  // WorkBuddy 交回的 SVG（已检查、净化）：默认选用，由老师与原图对照后决定
+  useEffect(
+    () =>
+      window.api.onWorkbuddyRedrawResult((r) => {
+        const cur = redrawRef.current
+        if (cur === null || r.taskId !== cur.taskId) return
+        const boxId = cur.byNumber.get(r.figure)
+        if (boxId === undefined) return
+        setSvgs((m) => new Map(m).set(boxId, r.svg))
+        setUseSvg((s) => new Set(s).add(boxId))
+      }),
+    []
+  )
+
+  const sendRedraw = async (): Promise<void> => {
+    setError(null)
+    const status = await window.api.workbuddyStatus()
+    if (!status.connected) {
+      setWb({ state: 'need-connect', note: status.found ? undefined : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）。' })
+      return
+    }
+    try {
+      const byNumber = new Map<number, string>()
+      const figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number }> = []
+      for (const b of boxes) {
+        const n = numbers.get(b.id)
+        const src = images.find((i) => i.key === b.image)
+        if (n === undefined || src === undefined) continue
+        let px = await readPixels(src.url, b)
+        if (enhanceOn) px = await enhance(px)
+        // 字号、线宽按原图换算，使重绘后文字和线条与原图的比例一致
+        figures.push({ n, mime: 'image/png', data: toBase64(await toPng(px)), width: Math.round(b.w), height: Math.round(b.h), ...redrawSizes(b.w, src.textHeight) })
+        byNumber.set(n, b.id)
+      }
+      figures.sort((a, b) => a.n - b.n)
+      if (redrawRef.current !== null) await window.api.workbuddyRedrawCancel(redrawRef.current.taskId)
+      const taskId = await window.api.workbuddyRedrawStart(figures)
+      setRedraw({ taskId, byNumber, total: figures.length })
+    } catch (e) {
+      setError(`交给 WorkBuddy 失败：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
   // 等待期间增删了插图框：告诉 WorkBuddy 插图数
   useEffect(() => {
     if (wbTask.current !== null) void window.api.workbuddyUpdate(wbTask.current, boxes.length)
@@ -231,10 +281,17 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
         if (n === undefined || src === undefined) continue
         let rect: Rect = b
         if (optionFigures.has(n) && src.pixels !== null) rect = scaleRect(trimBottomLabel(src.pixels, scaleRect(b, src.scale), src.textHeight * src.scale), 1 / src.scale)
-        let px = await readPixels(src.url, rect)
-        if (enhanceOn) px = await enhance(px)
-        const data = await toPng(px)
-        const asset = await createAsset(data, 'image/png')
+        // 选用了 WorkBuddy 重绘的 SVG：以矢量图导入（显示尺寸按原图）
+        const svg = useSvg.has(b.id) ? svgs.get(b.id) : undefined
+        let asset: Asset
+        if (svg !== undefined) {
+          rect = b
+          asset = await createAsset(new TextEncoder().encode(svg), 'image/svg+xml')
+        } else {
+          let px = await readPixels(src.url, rect)
+          if (enhanceOn) px = await enhance(px)
+          asset = await createAsset(await toPng(px), 'image/png')
+        }
         let widthEmu = rect.w * EMU_PER_PX
         let heightEmu = rect.h * EMU_PER_PX
         const max = MAX_FIGURE_CM * EMU_PER_CM
@@ -302,6 +359,11 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
                 重新自动框选
               </button>
             )}
+            {boxes.length > 0 && (
+              <button type="button" onClick={() => void sendRedraw()} title="把框好的插图交给 WorkBuddy 重绘为 SVG 矢量图；收到后与原图逐张对照，选用哪一个">
+                让 WorkBuddy 重绘插图
+              </button>
+            )}
             <label className="checkbox" title="导入时去掉插图的灰底与杂点、放大 3 倍（不改变内容），打印更清楚">
               <input type="checkbox" checked={enhanceOn} onChange={(e) => setEnhanceOn(e.target.checked)} />
               插图变清晰
@@ -337,13 +399,51 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               }}
               onChange={(id, r) => setBoxes((all) => all.map((b) => (b.id === id ? { ...b, ...r } : b)))}
               onRemove={(id) => setBoxes((all) => all.filter((b) => b.id !== id))}
+              svgBoxes={useSvg}
               selected={selected}
               onSelect={setSelected}
             />
           )}
-          {img !== null && enhanceOn && (() => {
+          {redraw !== null && (
+            <div className="image-import-wb is-waiting" role="status">
+              <span>
+                已交给 WorkBuddy 重绘 {redraw.total} 张插图，请到 WorkBuddy 里说：<strong>重绘插图</strong>（已收到 {[...redraw.byNumber.values()].filter((id) => svgs.has(id)).length}/{redraw.total}）
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void window.api.workbuddyRedrawCancel(redraw.taskId)
+                  setRedraw(null)
+                }}
+              >
+                结束
+              </button>
+            </div>
+          )}
+          {img !== null && (() => {
             const box = boxes.find((b) => b.id === selected && b.image === img.key)
-            return box !== undefined ? <EnhancePreview url={img.url} box={box} n={numbers.get(box.id)} /> : null
+            if (box === undefined) return null
+            const svg = svgs.get(box.id)
+            if (svg !== undefined) {
+              return (
+                <SvgChoice
+                  url={img.url}
+                  box={box}
+                  n={numbers.get(box.id)}
+                  svg={svg}
+                  use={useSvg.has(box.id)}
+                  onUse={(on) =>
+                    setUseSvg((s) => {
+                      const next = new Set(s)
+                      if (on) next.add(box.id)
+                      else next.delete(box.id)
+                      return next
+                    })
+                  }
+                />
+              )
+            }
+            return enhanceOn ? <EnhancePreview url={img.url} box={box} n={numbers.get(box.id)} /> : null
           })()}
         </section>
 
@@ -474,6 +574,57 @@ async function encodeForAi(url: string, width: number, height: number): Promise<
   return canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/jpeg;base64,/, '')
 }
 
+/** 收到 WorkBuddy 重绘的 SVG：与原图对照，选用哪一个 */
+function SvgChoice({ url, box, n, svg, use, onUse }: { url: string; box: Rect; n: number | undefined; svg: string; use: boolean; onUse: (on: boolean) => void }) {
+  const [before, setBefore] = useState<string | null>(null)
+  const svgUrl = useMemo(() => URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), [svg])
+  useEffect(() => () => URL.revokeObjectURL(svgUrl), [svgUrl])
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}`
+  useEffect(() => {
+    let alive = true
+    let made: string | null = null
+    void readPixels(url, box)
+      .then(toObjectUrl)
+      .then((u) => {
+        made = u
+        if (alive) setBefore(u)
+        else URL.revokeObjectURL(u)
+      })
+    return () => {
+      alive = false
+      if (made !== null) URL.revokeObjectURL(made)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return (
+    <div className="enhance-preview svg-choice" role="radiogroup" aria-label={`图${n ?? ''}用原图还是重绘的 SVG`}>
+      <figure className={use ? undefined : 'is-chosen'}>
+        <figcaption>
+          <label>
+            <input type="radio" checked={!use} onChange={() => onUse(false)} /> 图{n} 原图
+          </label>
+        </figcaption>
+        {before !== null && <img src={before} alt="" />}
+      </figure>
+      <figure className={use ? 'is-chosen' : undefined}>
+        <figcaption>
+          <label>
+            <input type="radio" checked={use} onChange={() => onUse(true)} /> WorkBuddy 重绘的 SVG（请核对是否与原图一致）
+          </label>
+        </figcaption>
+        <img src={svgUrl} alt="" />
+      </figure>
+    </div>
+  )
+}
+
+/** 字节 → base64 */
+function toBase64(bytes: Uint8Array): string {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+
 /** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
 function EnhancePreview({ url, box, n }: { url: string; box: Rect; n: number | undefined }) {
   const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
@@ -524,6 +675,7 @@ function BoxCanvas({
   onAdd,
   onChange,
   onRemove,
+  svgBoxes,
   selected,
   onSelect
 }: {
@@ -533,6 +685,8 @@ function BoxCanvas({
   onAdd: (r: Rect) => void
   onChange: (id: string, r: Rect) => void
   onRemove: (id: string) => void
+  /** 选用了 SVG 的框（标签显示“SVG”） */
+  svgBoxes: ReadonlySet<string>
   selected: string | null
   onSelect: (id: string | null) => void
 }) {
@@ -613,7 +767,7 @@ function BoxCanvas({
           const n = numbers.get(b.id)
           return (
             <div key={b.id} className={b.id === selected ? 'image-box is-selected' : 'image-box'} data-box={b.id} style={pct(r)} title="点选可查看变清晰的效果；拖动可移动，拖四角可调整大小">
-              <span className="image-box-label">图{n}</span>
+              <span className="image-box-label">图{n}{svgBoxes.has(b.id) ? ' · SVG' : ''}</span>
               <button type="button" className="image-box-remove" aria-label={`删除图${n}`} title={`删除图${n}`} onClick={() => onRemove(b.id)}>
                 ×
               </button>

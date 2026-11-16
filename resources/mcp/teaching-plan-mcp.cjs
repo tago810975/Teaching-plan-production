@@ -53,6 +53,7 @@ const NOT_RUNNING = '教学案制作没有在运行。请让用户先打开“�
 const NO_TASK = '教学案制作里现在没有等待识别的图片。请让用户在教学案制作的“导入题目 → 图片”窗口中放入图片，点“交给 WorkBuddy 识别”，然后再说“导入题目”。'
 
 const textContent = (text) => ({ content: [{ type: 'text', text }] })
+const NO_REDRAW = '教学案制作里现在没有等待重绘的插图。请让用户在教学案制作的“导入题目 → 图片”窗口中框好插图，点“让 WorkBuddy 重绘插图”，然后再说“重绘插图”。'
 
 function describeCheck(r) {
   const head = r.questionCount > 0 ? `识别到 ${r.questionCount} 道题` : '没有识别到题目（题目要以“1．”这样的题号开头）'
@@ -71,6 +72,25 @@ const TOOLS = [
     name: 'check_questions',
     description: '检查题目图片的转写结果：返回识别到几道题，以及无法转换的公式、插图编号对不上、格式不对等问题。有问题就修正后再检查，没有问题再提交。',
     inputSchema: { type: 'object', properties: { text: { type: 'string', description: '完整的转写文字（按格式说明，不要用代码块包起来）' } }, required: ['text'] }
+  },
+  {
+    name: 'get_figures_to_redraw',
+    description:
+      '取出“教学案制作”软件中老师交给你重绘为 SVG 的插图，以及重绘说明（忠实还原、统一配色）。当用户说“重绘插图”“把图画成 SVG”等时先调用本工具，' +
+      '然后逐张画好，分别调用 submit_svg 提交。',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'submit_svg',
+    description: '提交一张重绘好的插图（SVG）。软件会检查，有问题会说明原因，请修正后重新提交这一张。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        figure: { type: 'number', description: '插图编号（get_figures_to_redraw 中的“图N”的 N）' },
+        svg: { type: 'string', description: '完整的 <svg>…</svg>（不要用代码块包起来）' }
+      },
+      required: ['figure', 'svg']
+    }
   },
   {
     name: 'submit_questions',
@@ -93,6 +113,31 @@ async function runTool(name, args) {
       return {
         content: [{ type: 'text', text: r.guide + steps }, ...t.images.map((img) => ({ type: 'image', data: img.data, mimeType: img.mime }))]
       }
+    }
+    if (name === 'get_figures_to_redraw') {
+      const r = await call('/redraw/pending', {})
+      if (!r.task) return textContent(NO_REDRAW)
+      const t = r.task
+      const head =
+        r.guide +
+        `\n\n【本次任务】共 ${t.figures.length} 张插图：${t.figures.map((f) => `图${f.n}`).join('、')}。` +
+        '每张画好后调用 submit_svg 提交（figure 为图号，svg 为完整的 SVG），一张一张地交；返回有问题就修正后重交这一张。' +
+        '全部交完后简短告诉用户：已重绘几张，请回到教学案制作与原图逐张核对后再导入。SVG 全文不必在对话中显示。'
+      const content = [{ type: 'text', text: head }]
+      for (const f of t.figures) {
+        const sizes = f.fontSize ? `；viewBox 宽 600 时字号 ${f.fontSize}、主线宽 ${f.stroke}、细线宽 ${f.thin}` : ''
+        content.push({ type: 'text', text: `图${f.n}（原图 ${f.width}×${f.height} 像素，宽高比 ${(f.width / f.height).toFixed(2)}${sizes}）：` })
+        content.push({ type: 'image', data: f.data, mimeType: f.mime })
+      }
+      return { content }
+    }
+    if (name === 'submit_svg') {
+      const figure = Number(args && args.figure)
+      const r = await call('/redraw/submit', { figure, svg: String((args && args.svg) || '') })
+      if (r.reason === 'no-task') return textContent(NO_REDRAW)
+      const rest = r.remaining && r.remaining.length > 0 ? `还差：${r.remaining.map((n) => `图${n}`).join('、')}。` : '全部插图都已交齐。'
+      if (!r.ok) return textContent(`图${figure} 没有收下：\n${r.issues.map((i) => `- ${i}`).join('\n')}\n请修正后重新提交这一张。${rest}`)
+      return textContent(`图${figure} 已收到${r.issues.length > 0 ? `（${r.issues.join('；')}）` : ''}。${rest}`)
     }
     if (name === 'check_questions') {
       const r = await call('/check', { text: String((args && args.text) || '') })

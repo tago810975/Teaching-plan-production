@@ -5626,4 +5626,13 @@ input[type='checkbox']:disabled {
 }
 .field-notice button {
   flex: none;
+.svg-choice figure.is-chosen {
+  border-color: #2f6fb5;
+  box-shadow: 0 0 0 1px #2f6fb5;
+}
+.svg-choice figcaption label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
 }
