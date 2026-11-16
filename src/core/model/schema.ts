@@ -145,6 +145,8 @@ const question = z.object({
   difficultPoint: z.string().optional(),
   analysis: richText,
   review: richText.optional(),
+  answerFigures: z.array(figure).optional(),
+  analysisFigures: z.array(figure).optional(),
   important: z.boolean().optional(),
   numberStyle: z.literal('variant').optional(),
   source: z

@@ -3,7 +3,7 @@
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
-import type { OptionImageRef } from '@core/document/ir'
+import type { FigureListName, OptionImageRef } from '@core/document/ir'
 import { getPreset } from '@core/presets'
 import { resizeOptionImage, scaleOptionImages } from '@core/model/option-images'
 import type { Variant } from '@core/model/types'
@@ -225,7 +225,7 @@ function EditorBody({
   // 快捷窗口：右键内容（预览或大纲）弹出版式窗口，右键图片弹出图片窗口
   const [quickMenu, setQuickMenu] = useState<
     | { kind: 'block'; blockId: string; x: number; y: number }
-    | { kind: 'figure'; blockId: string; figureIndex: number; x: number; y: number }
+    | { kind: 'figure'; blockId: string; figureIndex: number; list?: FigureListName; x: number; y: number }
     | { kind: 'option'; blockId: string; ref: OptionImageRef; x: number; y: number }
     | null
   >(null)
@@ -241,7 +241,7 @@ function EditorBody({
       dispatch({ type: 'select', blockId: target.ref.blockId })
       setQuickMenu(
         target.kind === 'figure'
-          ? { kind: 'figure', blockId: target.ref.blockId, figureIndex: target.ref.figureIndex, x, y }
+          ? { kind: 'figure', blockId: target.ref.blockId, figureIndex: target.ref.figureIndex, ...(target.ref.list !== undefined ? { list: target.ref.list } : {}), x, y }
           : { kind: 'option', blockId: target.ref.blockId, ref: target.ref, x, y }
       )
     },
@@ -365,6 +365,7 @@ function EditorBody({
         <FigureQuickMenu
           block={quickBlock}
           figureIndex={quickMenu.figureIndex}
+          {...(quickMenu.list !== undefined ? { list: quickMenu.list } : {})}
           x={quickMenu.x}
           y={quickMenu.y}
           dispatch={dispatch}

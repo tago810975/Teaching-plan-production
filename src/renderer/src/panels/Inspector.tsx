@@ -3,9 +3,9 @@
  *
  * 过渡期用“文字 + $公式$”的文本框编辑；接入 TipTap + MathLive 后替换各个 MarkupField。
  */
-import { useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
+import { useCallback, useContext, useEffect, useId, useRef, useState, type Dispatch, type ReactNode, type RefObject } from 'react'
 import { useOpenFormulaEditor } from '../formula/context'
-import { useFieldFocus } from './fieldFocus'
+import { FieldFocusContext, useFieldFocus } from './fieldFocus'
 import { fromEditable, paragraphFromEditable, paragraphToEditable, toEditable } from '@core/model/markup'
 import { createKnowledge, createQuestion, newId, plainText } from '@core/model/factory'
 import { FigureList } from './FigureList'
@@ -19,11 +19,13 @@ import { OptionStopsEditor } from './OptionStopsEditor'
 import { DifficultyField } from './DifficultyField'
 import { AnswerPlacementControl } from './AnswerPlacementControl'
 import { difficultyOf, getPreset, resolveLineSpacing, resolveQuestionFields, type FormatPreset } from '@core/presets'
+import { hasImageParagraphs, imageParagraphsToFigures } from '@core/model/figure-lists'
 import { STYLE_SPECS } from '@core/document/styles'
 import { resolveOptionColumns } from '@core/document/build'
 import { copyStops, DEFAULT_OPTION_STOPS } from '@core/model/factory'
 import { optionImageSignature } from '@core/model/option-images'
 import type {
+  Asset,
   Block,
   FontFamily,
   Inline,
@@ -37,6 +39,7 @@ import type {
   DifficultyDisplay,
   Question,
   QuestionBlock,
+  QuestionFigure,
   RichParagraph,
   RichText
 } from '@core/model/types'
@@ -537,6 +540,7 @@ function KnowledgeForm({
       >
         <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
       </Field>
+      <ImageParagraphsNotice content={block.content} figures={block.figures} onApply={(content, figures) => set({ content, figures })} />
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
         title="插图"
@@ -698,8 +702,40 @@ function QuestionForm({
   const setLayout = (patch: Partial<Question['layout']>): void =>
     update((b) => ({ ...b, question: { ...b.question, layout: { ...b.question.layout, ...patch } } }))
 
+  const [tab, setTab] = useQuestionTab()
+
+  // 预览中点了教师版的内容（答案、解析等），自动切到“仅教师版”；点了题干、选项等切回“题目”
+  const focus = useContext(FieldFocusContext)
+  useEffect(() => {
+    if (focus === null || focus.blockId !== block.id) return
+    setTab(TEACHER_FIELDS.has(focus.field) ? 'teacher' : 'body')
+  }, [focus, setTab, block.id])
+
+  const tabs = (
+    <div className="inspector-tabs">
+      <Segmented<QuestionTab>
+        value={tab}
+        options={[
+          ['body', '题目'],
+          ['teacher', '仅教师版']
+        ]}
+        onChange={setTab}
+      />
+    </div>
+  )
+
+  if (tab === 'teacher') {
+    return (
+      <>
+        {tabs}
+        <TeacherFields q={q} set={set} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
+      </>
+    )
+  }
+
   return (
     <>
+      {tabs}
       <DifficultyField
         grade={difficultyOf(q, preset).grade}
         levels={preset.difficulty.levels}
@@ -713,12 +749,6 @@ function QuestionForm({
         />
         变式题（题号 a. b. c.）
       </label>
-      {fields.important && (
-        <label className="checkbox" title="教师版题干前显示【重点题】">
-          <input type="checkbox" checked={q.important === true} onChange={(e) => set({ important: e.target.checked ? true : undefined })} />
-          重点题
-        </label>
-      )}
       <Field
         label="题干"
         hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
@@ -860,40 +890,6 @@ function QuestionForm({
         </div>
       </fieldset>
 
-      <fieldset className="group group--teacher">
-        <legend>仅教师版</legend>
-        <Field label="答案" aside={fontSelect('答案', q.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}>
-          <RichTextField fieldId="answer" value={q.answer} rows={2} onChange={(answer) => set({ answer })} />
-        </Field>
-        <Field label="知识点" hint="多个知识点用顿号或逗号分隔">
-          <TextInput
-            fieldId="knowledgePoints"
-            value={q.knowledgePoints.join('、')}
-            onChange={(v) =>
-              set({
-                knowledgePoints: v
-                  .split(/[、,，;；]/)
-                  .map((s) => s.trim())
-                  .filter(Boolean)
-              })
-            }
-          />
-        </Field>
-        <Field label="重点">
-          <TextInput fieldId="keyPoint" value={q.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
-        </Field>
-        <Field label="难点">
-          <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
-        </Field>
-        {fields.review && (
-          <Field label="审题" hint="排在解析之前，教师版显示【审题】">
-            <RichTextField fieldId="review" value={q.review ?? []} rows={2} onChange={(review) => set({ review: review.length > 0 ? review : undefined })} />
-          </Field>
-        )}
-        <Field label="解析" aside={fontSelect('解析', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
-          <RichTextField fieldId="analysis" value={q.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
-        </Field>
-      </fieldset>
 
       <LayoutFields layout={q.layout} onChange={setLayout} keepLabel="整题同页">
         {q.options.length > 0 && (
@@ -943,6 +939,142 @@ function QuestionForm({
 }
 
 // ---------------- 通用输入控件 ----------------
+
+type QuestionTab = 'body' | 'teacher'
+
+/** 只出现在教师版中的字段（预览中点到这些内容时切到“仅教师版”） */
+const TEACHER_FIELDS = new Set(['answer', 'knowledgePoints', 'keyPoint', 'difficultPoint', 'review', 'analysis'])
+
+/** 题目属性栏当前在“题目”还是“仅教师版”：换选其他题目时保持不变 */
+let lastQuestionTab: QuestionTab = 'body'
+function useQuestionTab(): [QuestionTab, (t: QuestionTab) => void] {
+  const [tab, setTabState] = useState<QuestionTab>(lastQuestionTab)
+  const setTab = useCallback((t: QuestionTab) => {
+    lastQuestionTab = t
+    setTabState(t)
+  }, [])
+  return [tab, setTab]
+}
+
+/**
+ * 题目的“仅教师版”内容：重点题、答案（及答案插图）、知识点、重点、难点、审题、解析（及解析插图）。
+ * 答案、解析的插图与知识点插图相同，可放在某段之后、某段右侧或自由位置。
+ */
+function TeacherFields({
+  q,
+  set,
+  assetUrls,
+  dispatch,
+  fields
+}: {
+  q: Question
+  set: (patch: Partial<Question>) => void
+  assetUrls: ReadonlyMap<string, string>
+  dispatch: Dispatch<EditorAction>
+  fields: QuestionFields
+}) {
+  const addAsset = (asset: Asset): void => dispatch({ type: 'add-asset', asset })
+  return (
+    <>
+      <p className="field-hint">以下内容只出现在教师版（教案）中。</p>
+      {fields.important && (
+        <label className="checkbox" title="教师版题干前显示【重点题】">
+          <input type="checkbox" checked={q.important === true} onChange={(e) => set({ important: e.target.checked ? true : undefined })} />
+          重点题
+        </label>
+      )}
+      <Field label="答案" aside={fontSelect('答案', q.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}>
+        <RichTextField fieldId="answer" value={q.answer} rows={3} onChange={(answer) => set({ answer })} />
+      </Field>
+      <ImageParagraphsNotice
+        content={q.answer}
+        figures={q.answerFigures ?? []}
+        onApply={(answer, answerFigures) => set({ answer, answerFigures })}
+      />
+      <FigureList
+        title="答案插图"
+        kind="knowledge"
+        paragraphs={q.answer}
+        figures={q.answerFigures ?? []}
+        assetUrls={assetUrls}
+        onChange={(answerFigures) => set({ answerFigures: answerFigures.length > 0 ? answerFigures : undefined })}
+        onAddAsset={addAsset}
+      />
+      <Field label="知识点" hint="多个知识点用顿号或逗号分隔">
+        <TextInput
+          fieldId="knowledgePoints"
+          value={q.knowledgePoints.join('、')}
+          onChange={(v) =>
+            set({
+              knowledgePoints: v
+                .split(/[、,，;；]/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+            })
+          }
+        />
+      </Field>
+      <Field label="重点">
+        <TextInput fieldId="keyPoint" value={q.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
+      </Field>
+      <Field label="难点">
+        <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
+      </Field>
+      {fields.review && (
+        <Field label="审题" hint="排在解析之前，教师版显示【审题】">
+          <RichTextField fieldId="review" value={q.review ?? []} rows={2} onChange={(review) => set({ review: review.length > 0 ? review : undefined })} />
+        </Field>
+      )}
+      <Field label="解析" aside={fontSelect('解析', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
+        <RichTextField fieldId="analysis" value={q.analysis} rows={8} onChange={(analysis) => set({ analysis })} />
+      </Field>
+      <ImageParagraphsNotice
+        content={q.analysis}
+        figures={q.analysisFigures ?? []}
+        onApply={(analysis, analysisFigures) => set({ analysis, analysisFigures })}
+      />
+      <FigureList
+        title="解析插图"
+        kind="knowledge"
+        paragraphs={q.analysis}
+        figures={q.analysisFigures ?? []}
+        assetUrls={assetUrls}
+        onChange={(analysisFigures) => set({ analysisFigures: analysisFigures.length > 0 ? analysisFigures : undefined })}
+        onAddAsset={addAsset}
+      />
+    </>
+  )
+}
+
+/**
+ * 正文中有单独成段的图片（如从墨案、网页粘贴来的）时提示，可一键转为插图：
+ * 转换后在插图栏中调整位置和大小，排版效果不变。
+ */
+function ImageParagraphsNotice({
+  content,
+  figures,
+  onApply
+}: {
+  content: RichText
+  figures: QuestionFigure[]
+  onApply: (content: RichText, figures: QuestionFigure[]) => void
+}) {
+  if (!hasImageParagraphs(content)) return null
+  return (
+    <div className="field-notice">
+      <p>上面的内容中有单独成段的图片，不能在插图栏中调整大小和位置。</p>
+      <button
+        type="button"
+        onClick={() => {
+          const r = imageParagraphsToFigures(content, figures)
+          onApply(r.content, r.figures)
+        }}
+      >
+        转为插图
+      </button>
+    </div>
+  )
+}
 
 function Field({ label, hint, children, aside }: { label: string; hint?: string; children: ReactNode; aside?: ReactNode }) {
   const id = useId()

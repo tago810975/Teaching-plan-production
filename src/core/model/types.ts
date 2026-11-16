@@ -239,6 +239,12 @@ export interface Question {
   /** 重点题：教师版题干前显示【重点题】（同样由“题目可选项”决定是否使用） */
   important?: boolean
   /**
+   * 答案、解析中的插图（仅教师版）。位置选项与知识点插图相同：某段之后（below，anchorParagraph 为答案 / 解析的段落序号）、
+   * 某段右侧（right）、自由位置（free）。
+   */
+  answerFigures?: QuestionFigure[]
+  analysisFigures?: QuestionFigure[]
+  /**
    * 题号样式。不设时按 1. 2. 3. 依次编号；variant（变式题）编为 a. b. c.，接在上一道编号题之后，
    * 不占用数字题号（墨案教案的例题与变式）。
    */

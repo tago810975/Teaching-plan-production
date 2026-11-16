@@ -162,6 +162,7 @@ export const DocParagraphView = memo(function DocParagraphView({
       style={style}
       data-block-id={p.sourceBlockId}
       data-anchor-index={p.anchorIndex}
+      data-anchor-group={p.anchorGroup}
       onContextMenu={
         onBlockMenu === undefined
           ? undefined

@@ -194,3 +194,26 @@ describe('WPS 兼容：含浮动图片的段落不写“段中不分页”', asy
     expect(option).toContain('<w:keepLines/>')
   })
 })
+
+describe('答案、解析插图导出', () => {
+  it('教师版写入图片（下方与右侧环绕），学生版不写', async () => {
+    const bundle = createEmptyBundle()
+    const a = await createAsset(new Uint8Array([...PNG, 7]), 'image/png')
+    const b = await createAsset(new Uint8Array([...PNG, 8]), 'image/png')
+    bundle.assets[a.id] = a
+    bundle.assets[b.id] = b
+    bundle.project.blocks = [{
+      id: newId(), type: 'question',
+      question: createQuestion({
+        kind: 'solve', stem: [para('题干')], answer: [para('答案')], analysis: [para('解析')],
+        answerFigures: [{ assetId: a.id, widthEmu: 1800000, heightEmu: 900000, placement: 'below', anchorParagraph: 0 }],
+        analysisFigures: [{ assetId: b.id, widthEmu: 1800000, heightEmu: 900000, placement: 'right', anchorParagraph: 0 }]
+      })
+    }]
+    const t = await exportParts(bundle, 'teacher')
+    expect((t.doc.match(/<w:drawing>/g) ?? []).length).toBe(2)
+    expect(t.doc).toContain('<wp:anchor')
+    const s = await exportParts(bundle, 'student')
+    expect(s.doc).not.toContain('<w:drawing>')
+  })
+})

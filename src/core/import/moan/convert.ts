@@ -12,6 +12,7 @@
  * 富文本都是 HTML，公式写作 $…$（KaTeX），见 html.ts。
  */
 import { createKnowledge, createQuestion, newId } from '../../model/factory'
+import { imageParagraphsToFigures } from '../../model/figure-lists'
 import type { Block, ChoiceOption, ImageInline, Inline, OptionColumns, QuestionFigure, QuestionKind, RichParagraph, RichText, TableInline } from '../../model/types'
 import { htmlPlainText, htmlToRich, parseHtml, type HtmlNode } from './html'
 
@@ -147,10 +148,12 @@ export function convertMoanPlan(show: MoanPlanShow, images: ReadonlyMap<string, 
         break
       }
       case 5: {
-        const content = rich(item.name, '知识点')
+        // 单独成段的图片作为插图（插图栏中可调整位置和大小）
+        const { content, figures } = imageParagraphsToFigures(rich(item.name, '知识点'))
         blocks.push(
           createKnowledge({
             content,
+            figures,
             layout: { pageBreakBefore: pageBreak, studentSpaceLines: Math.max(0, item.blankArea ?? 0) }
           })
         )
@@ -163,9 +166,11 @@ export function convertMoanPlan(show: MoanPlanShow, images: ReadonlyMap<string, 
           section = heading
           blocks.push({ id: newId(), type: 'section', text: heading, ...(pageBreak ? { pageBreakBefore: true } : {}) })
         } else if (section === '知识梳理') {
+          const { content, figures } = imageParagraphsToFigures(rich(item.name, '知识点'))
           blocks.push(
             createKnowledge({
-              content: rich(item.name, '知识点'),
+              content,
+              figures,
               layout: { pageBreakBefore: pageBreak, studentSpaceLines: Math.max(0, item.blankArea ?? 0) }
             })
           )
@@ -208,9 +213,12 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     return true
   })
   const { stem: body, options, optionColumns } = extractOptions(stem)
-  const { review, analysis } = splitReview(rich(item.review_topic, `${where}解析`))
+  const split = splitReview(rich(item.review_topic, `${where}解析`))
+  const review = split.review
+  // 答案、解析中单独成段的图片作为答案插图 / 解析插图（先取出图片，再在解析第一段前加【解析】）
+  const { content: analysis, figures: analysisFigures } = imageParagraphsToFigures(split.analysis)
   if (analysis.length > 0) analysis[0] = { ...analysis[0]!, inlines: [{ type: 'text', text: '【解析】' }, ...analysis[0]!.inlines] }
-  const answer = rich(item.answer, `${where}答案`)
+  const { content: answer, figures: answerFigures } = imageParagraphsToFigures(rich(item.answer, `${where}答案`))
   const stars = Number(item.difficultyLevel_id)
   const questionTypeId = Number(item.questionType_id)
   const q = createQuestion({
@@ -220,6 +228,8 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     figures,
     answer,
     analysis,
+    ...(answerFigures.length > 0 ? { answerFigures } : {}),
+    ...(analysisFigures.length > 0 ? { analysisFigures } : {}),
     ...(review.length > 0 ? { review } : {}),
     ...(item.isImportant === 1 ? { important: true } : {}),
     ...(Number.isInteger(stars) && stars >= 1 && stars <= 5 ? { stars } : {}),

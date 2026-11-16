@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 17
+export const CURRENT_FORMAT_VERSION = 18
 
 /*
  * 版本记录：
@@ -49,6 +49,7 @@ export const CURRENT_FORMAT_VERSION = 17
  * 17 —— 预览中题干首段（“物理排版 题目”样式，对齐文档网格）的行高改为与 Word 一致的 15.6 磅（原为 13.65 磅）。
  *        迁移：锚定在题干首段的右侧图、自由位置图的上下偏移乘以 8/7，使图片相对题干文字的位置保持不变
  *        （此前在预览中摆好的位置，导出到 Word 后偏上）
+ * 18 —— 答案、解析中的插图 question.answerFigures / analysisFigures（仅教师版，位置同知识点插图）。只增加可选字段，无需迁移
  */
 
 export interface Manifest {

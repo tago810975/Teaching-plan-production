@@ -6,20 +6,19 @@
  * 修改都可撤销。
  */
 import { useState, type Dispatch } from 'react'
-import type { OptionImageRef } from '@core/document/ir'
+import type { FigureListName, OptionImageRef } from '@core/document/ir'
+import { figuresOf, withFigures } from '@core/model/figure-lists'
 import { optionImages, resizeOptionImage, scaleOptionImages, unifyOptionImages } from '@core/model/option-images'
 import type { Block, Question, QuestionFigure } from '@core/model/types'
 import { QuickPopover, Row } from './BlockQuickMenu'
 import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm, widthPatch } from './panels/figure-options'
 import type { EditorAction } from './state/store'
 
-function figuresOf(b: Block): QuestionFigure[] {
-  return b.type === 'question' ? b.question.figures : b.type === 'knowledge' || b.type === 'composite' ? b.figures : []
-}
-
 export function FigureQuickMenu(props: {
   block: Block
   figureIndex: number
+  /** 答案 / 解析中的插图 */
+  list?: FigureListName
   x: number
   y: number
   dispatch: Dispatch<EditorAction>
@@ -27,26 +26,21 @@ export function FigureQuickMenu(props: {
   /** 调整顺序后，窗口跟着这张图 */
   onIndexChange: (index: number) => void
 }) {
-  const { block, figureIndex, x, y, dispatch, onClose, onIndexChange } = props
-  const figures = figuresOf(block)
+  const { block, figureIndex, list, x, y, dispatch, onClose, onIndexChange } = props
+  const figures = figuresOf(block, list)
   const f = figures[figureIndex]
   if (f === undefined) return null
-  const kind = block.type === 'question' ? 'question' : 'knowledge'
-  const paragraphs = block.type === 'question' ? block.question.stem : block.type === 'knowledge' ? block.content : block.type === 'composite' ? block.background : []
+  // 答案、解析插图与知识点插图的位置选项相同（某段之后 / 某段右侧 / 自由位置）
+  const kind = block.type === 'question' && list === undefined ? 'question' : 'knowledge'
+  const paragraphs =
+    block.type === 'question'
+      ? list === 'answer' ? block.question.answer : list === 'analysis' ? block.question.analysis : block.question.stem
+      : block.type === 'knowledge' ? block.content : block.type === 'composite' ? block.background : []
   const subCount = block.type === 'question' ? block.question.subQuestions.length : 0
-  const name = block.type === 'question' ? '题图' : block.type === 'composite' ? '背景配图' : '插图'
+  const name = list === 'answer' ? '答案插图' : list === 'analysis' ? '解析插图' : block.type === 'question' ? '题图' : block.type === 'composite' ? '背景配图' : '插图'
 
   const setFigures = (fn: (figs: QuestionFigure[]) => QuestionFigure[]): void =>
-    dispatch({
-      type: 'update-block',
-      blockId: block.id,
-      update: (b) =>
-        b.type === 'question'
-          ? { ...b, question: { ...b.question, figures: fn(b.question.figures) } }
-          : b.type === 'knowledge' || b.type === 'composite'
-            ? ({ ...b, figures: fn(b.figures) } as Block)
-            : b
-    })
+    dispatch({ type: 'update-block', blockId: block.id, update: (b) => withFigures(b, list, fn) })
   const patch = (p: Partial<QuestionFigure>): void => setFigures((figs) => figs.map((g, i) => (i === figureIndex ? { ...g, ...p } : g)))
   const move = (delta: number): void => {
     const to = figureIndex + delta

@@ -74,7 +74,12 @@ export interface OptionImageRef {
 export interface FigureRef {
   blockId: string
   figureIndex: number
+  /** 答案 / 解析中的插图（question.answerFigures / analysisFigures）；不写为 figures */
+  list?: FigureListName
 }
+
+/** 题目中除题图外的两组插图 */
+export type FigureListName = 'answer' | 'analysis'
 
 /** 表格单元格中的一段：文字等内容与对齐 */
 export interface DocCellParagraph {
@@ -174,6 +179,8 @@ export interface DocParagraph {
    * 预览中拖动图片越过段落边界时，据此改换锚定段落。
    */
   anchorIndex?: number
+  /** 可锚定段落所属的一组（答案 / 解析）；题干、知识点正文等不写 */
+  anchorGroup?: FigureListName
 }
 
 export interface EditTarget {

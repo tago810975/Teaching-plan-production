@@ -8,6 +8,7 @@
 import { createEmptyBundle } from '@core/model/factory'
 import type { FigureRef, InlineRef } from '@core/document/ir'
 import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
+import { withFigures } from '@core/model/figure-lists'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
 import { moveQuestion, moveQuestionAt, moveQuestionTo, type QuestionDrop } from '@core/model/move-question'
@@ -383,13 +384,9 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
     case 'update-figure': {
       const { ref, patch } = action
       const next = withBlocks(state, (blocks) =>
-        mapBlockById(blocks, ref.blockId, (b) => {
-          const apply = (figs: QuestionFigure[]): QuestionFigure[] =>
-            figs.map((f, i) => (i === ref.figureIndex ? { ...f, ...patch } : f))
-          if (b.type === 'question') return { ...b, question: { ...b.question, figures: apply(b.question.figures) } }
-          if (b.type === 'knowledge' || b.type === 'composite') return { ...b, figures: apply(b.figures) }
-          return b
-        })
+        mapBlockById(blocks, ref.blockId, (b) =>
+          withFigures(b, ref.list, (figs: QuestionFigure[]) => figs.map((f, i) => (i === ref.figureIndex ? { ...f, ...patch } : f)))
+        )
       )
       // 属性面板中的宽度等数值随之更新
       return { ...next, revision: state.revision + 1 }

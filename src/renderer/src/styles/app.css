@@ -5591,3 +5591,39 @@ input[type='checkbox']:disabled {
   object-fit: contain;
   image-rendering: auto;
 }
+
+/* 题目属性栏顶部的“题目 / 仅教师版”切换：滚动时留在顶部 */
+.inspector-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -4px 0 4px;
+  padding: 4px 0 8px;
+  background: var(--panel);
+}
+.inspector-tabs .segmented {
+  width: 100%;
+}
+.inspector-tabs .segmented > * {
+  flex: 1;
+}
+
+/* 属性栏中的提示条（如“有单独成段的图片，可转为插图”） */
+.field-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  border: var(--hairline) solid var(--info-rule);
+  border-radius: 6px;
+  background: var(--info-bg);
+  font-size: 12px;
+}
+.field-notice p {
+  margin: 0;
+  flex: 1;
+}
+.field-notice button {
+  flex: none;
+}

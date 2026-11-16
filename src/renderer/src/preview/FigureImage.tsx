@@ -190,7 +190,10 @@ function placeAfterDrag(box: HTMLElement, ref: FigureRef, float: FloatingImage, 
   let anchor: HTMLElement | null = host
   if (canReanchor) {
     const candidates = Array.from(
-      document.querySelectorAll<HTMLElement>(`.page [data-block-id="${CSS.escape(ref.blockId)}"][data-anchor-index]`)
+      // 只在同一组段落中换锚定：题图在题干中，答案插图在答案中，解析插图在解析中
+      document.querySelectorAll<HTMLElement>(
+        `.page [data-block-id="${CSS.escape(ref.blockId)}"][data-anchor-index]` + (ref.list !== undefined ? `[data-anchor-group="${ref.list}"]` : ':not([data-anchor-group])')
+      )
     )
     for (const c of candidates) {
       if (c.getBoundingClientRect().top <= rect.top + 1) anchor = c

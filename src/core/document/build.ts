@@ -25,7 +25,7 @@ import type {
   Variant
 } from '../model/types'
 import { bodyTopTwip } from './header'
-import type { DocIR, DocParagraph, DocRun, DocTable, FloatingImage } from './ir'
+import type { DocIR, DocParagraph, DocRun, DocTable, FigureListName, FloatingImage } from './ir'
 import { columnWidths } from '../model/table'
 import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
@@ -434,16 +434,18 @@ function buildQuestion(
   // 教师版内容
   if (variant === 'teacher') {
     const teacherStart = paras.length
-    q.answer.forEach((p, i) => {
-      push({
-        key: key(`ans${i}`),
-        style: 'answer',
-        ...(i === 0 ? { label: '【答案】' } : {}),
-        ...fontProp(p),
-        editTarget: { field: 'answer', paragraph: i },
-        runs: toRuns(p, at('answer', i))
-      })
-    })
+    const answerParas = q.answer.map((p, i): DocParagraph => ({
+      key: key(`ans${i}`),
+      sourceBlockId: blockId,
+      style: 'answer',
+      ...(i === 0 ? { label: '【答案】' } : {}),
+      ...fontProp(p),
+      anchorIndex: i,
+      anchorGroup: 'answer',
+      editTarget: { field: 'answer', paragraph: i },
+      runs: toRuns(p, at('answer', i))
+    }))
+    paras.push(...placeFigures(answerParas, q.answerFigures ?? [], blockId, 'answer', key('ansfig')))
     if (q.knowledgePoints.length > 0) {
       push({ ...fixedLabelPara(key('kp'), 'knowledge', q.knowledgePoints.join('；')), editTarget: { field: 'knowledgePoints', paragraph: 0 } })
     }
@@ -461,9 +463,17 @@ function buildQuestion(
         push({ key: key(`rev${i}`), style: 'analysis', ...formatProps(p), editTarget: { field: 'review', paragraph: i }, runs })
       })
     }
-    q.analysis.forEach((p, i) => {
-      push({ key: key(`ana${i}`), style: 'analysis', ...formatProps(p), editTarget: { field: 'analysis', paragraph: i }, runs: toRuns(p, at('analysis', i)) })
-    })
+    const analysisParas = q.analysis.map((p, i): DocParagraph => ({
+      key: key(`ana${i}`),
+      sourceBlockId: blockId,
+      style: 'analysis',
+      ...formatProps(p),
+      anchorIndex: i,
+      anchorGroup: 'analysis',
+      editTarget: { field: 'analysis', paragraph: i },
+      runs: toRuns(p, at('analysis', i))
+    }))
+    paras.push(...placeFigures(analysisParas, q.analysisFigures ?? [], blockId, 'analysis', key('anafig')))
     for (let i = teacherStart; i < paras.length; i++) paras[i]!.shaded = true
   }
 
@@ -575,6 +585,35 @@ function contentWithFigures(
   if (paras.length === 0) {
     const figsAfter = after.get(0)
     if (figsAfter !== undefined) out.push(imageParagraph(key('fig0'), figsAfter, blockId))
+  }
+  return out
+}
+
+/**
+ * 答案 / 解析中的插图：与知识点插图相同的规则——右侧环绕、自由位置挂在锚定段落上，
+ * “某段之后”的图紧跟该段（同一位置的多张并排）。paras 与答案 / 解析的段落一一对应。
+ * 答案 / 解析为空而有图时，图单独成段。
+ */
+function placeFigures(paras: DocParagraph[], figures: QuestionFigure[], blockId: string, list: FigureListName, keyPrefix: string): DocParagraph[] {
+  if (figures.length === 0) return paras
+  const last = Math.max(0, paras.length - 1)
+  const after = new Map<number, FigItem[]>()
+  for (const [index, fig] of figures.entries()) {
+    const anchor = Math.min(fig.anchorParagraph ?? last, last)
+    const host = paras[anchor]
+    if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) addFloating(host, rightFloating(fig, blockId, index, 'vertical', list))
+    else if (fig.placement === 'free' && host !== undefined) addFloating(host, freeFloating(fig, blockId, index, list))
+    else after.set(anchor, [...(after.get(anchor) ?? []), { fig, index }])
+  }
+  const out: DocParagraph[] = []
+  paras.forEach((p, i) => {
+    out.push(p)
+    const figs = after.get(i)
+    if (figs !== undefined) out.push(imageParagraph(`${keyPrefix}${i}`, figs, blockId, list))
+  })
+  if (paras.length === 0) {
+    const figs = after.get(0)
+    if (figs !== undefined) out.push(imageParagraph(`${keyPrefix}0`, figs, blockId, list))
   }
   return out
 }
@@ -795,7 +834,7 @@ interface FigItem {
 const COLUMN_EMU = contentWidthTwip(A4_PAGE) * 635
 
 /** 靠右的图（题干右侧、选项/小问右侧）：贴栏右边，可上下移动 */
-function rightFloating(fig: QuestionFigure, blockId: string, figureIndex: number, movable: FloatingImage['movable']): FloatingImage {
+function rightFloating(fig: QuestionFigure, blockId: string, figureIndex: number, movable: FloatingImage['movable'], list?: FigureListName): FloatingImage {
   return {
     assetId: fig.assetId,
     widthEmu: fig.widthEmu,
@@ -804,7 +843,7 @@ function rightFloating(fig: QuestionFigure, blockId: string, figureIndex: number
     edgeEmu: 0,
     offsetYEmu: Math.max(0, fig.offsetYEmu ?? 0),
     movable,
-    ref: { blockId, figureIndex }
+    ref: { blockId, figureIndex, ...(list !== undefined ? { list } : {}) }
   }
 }
 
@@ -812,7 +851,7 @@ function rightFloating(fig: QuestionFigure, blockId: string, figureIndex: number
  * 自由位置的图：文字绕开图片。图片中心在栏的右半边时靠右（文字在左），否则靠左（文字在右），
  * 与 Word“四周型环绕、文字只在较宽一侧”的效果一致。
  */
-function freeFloating(fig: QuestionFigure, blockId: string, figureIndex: number): FloatingImage {
+function freeFloating(fig: QuestionFigure, blockId: string, figureIndex: number, list?: FigureListName): FloatingImage {
   const x = Math.max(0, Math.min(fig.offsetXEmu ?? 0, COLUMN_EMU - fig.widthEmu))
   const right = x + fig.widthEmu / 2 > COLUMN_EMU / 2
   return {
@@ -823,7 +862,7 @@ function freeFloating(fig: QuestionFigure, blockId: string, figureIndex: number)
     edgeEmu: Math.round(right ? Math.max(0, COLUMN_EMU - x - fig.widthEmu) : x),
     offsetYEmu: Math.max(0, fig.offsetYEmu ?? 0),
     movable: 'free',
-    ref: { blockId, figureIndex }
+    ref: { blockId, figureIndex, ...(list !== undefined ? { list } : {}) }
   }
 }
 
@@ -837,11 +876,11 @@ function hasRightAligned(p: DocParagraph): boolean {
 }
 
 /** 同一位置的一张或多张图：放在同一段里并排显示 */
-function imageParagraph(key: string, items: FigItem[], blockId: string): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
+function imageParagraph(key: string, items: FigItem[], blockId: string, list?: FigureListName): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
   const runs: DocRun[] = []
   items.forEach(({ fig, index }, j) => {
     if (j > 0) runs.push({ kind: 'text', text: '\u3000' })
-    runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index } })
+    runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index, ...(list !== undefined ? { list } : {}) } })
   })
   return { key, sourceBlockId: blockId, style: 'body', runs }
 }

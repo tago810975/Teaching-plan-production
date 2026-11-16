@@ -331,3 +331,26 @@ describe('不认识的标签', () => {
     expect(warns.filter((w) => w.includes('<mjx-frac>'))).toHaveLength(1)
   })
 })
+
+describe('知识点、答案、解析中的图片', () => {
+  it('单独成段的图片导入为插图', () => {
+    const show = {
+      teachingPlan: { id: 1, name: '测试' },
+      mainTeachingPlanExtra: [
+        { id: 1, type_id: 5, sort_id: 1, name: '<p>洛伦兹力方向</p><p><img src="https://x/a.png"></p><p>左手定则</p>' },
+        { id: 2, type_id: 1, sort_id: 2, name: '<p>求力</p>', answer: '<p>F=qvB</p><p><img src="https://x/b.png"></p>', review_topic: '<p><img src="https://x/c.png"></p><p>讲解提要：</p>' }
+      ],
+      childTeachingPlanExtra: {}
+    } as unknown as MoanPlanShow
+    const images = new Map([['https://x/a.png', { assetId: 'A', width: 100, height: 50 }], ['https://x/b.png', { assetId: 'B', width: 100, height: 50 }], ['https://x/c.png', { assetId: 'C', width: 100, height: 50 }]])
+    const r = convertMoanPlan(show, images, [])
+    const k = r.blocks.find((b) => b.type === 'knowledge')!
+    expect(k.type === 'knowledge' && k.figures.map((f) => [f.assetId, f.anchorParagraph])).toEqual([['A', 0]])
+    expect(k.type === 'knowledge' && k.content.map((p) => plainText([p]))).toEqual(['洛伦兹力方向', '左手定则'])
+    const q = r.blocks.find((b) => b.type === 'question')!
+    if (q.type !== 'question') throw new Error()
+    expect(q.question.answerFigures?.map((f) => f.assetId)).toEqual(['B'])
+    expect(q.question.analysisFigures?.map((f) => f.assetId)).toEqual(['C'])
+    expect(plainText(q.question.analysis)).toBe('【解析】讲解提要：')
+  })
+})
