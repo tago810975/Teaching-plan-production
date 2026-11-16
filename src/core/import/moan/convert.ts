@@ -12,7 +12,7 @@
  * 富文本都是 HTML，公式写作 $…$（KaTeX），见 html.ts。
  */
 import { createKnowledge, createQuestion, newId } from '../../model/factory'
-import type { Block, ChoiceOption, ImageInline, Inline, QuestionFigure, QuestionKind, RichParagraph, RichText } from '../../model/types'
+import type { Block, ChoiceOption, ImageInline, Inline, OptionColumns, QuestionFigure, QuestionKind, RichParagraph, RichText, TableInline } from '../../model/types'
 import { htmlPlainText, htmlToRich, parseHtml, type HtmlNode } from './html'
 
 export interface MoanItem {
@@ -207,7 +207,7 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     }
     return true
   })
-  const { stem: body, options } = extractOptions(stem)
+  const { stem: body, options, optionColumns } = extractOptions(stem)
   const { review, analysis } = splitReview(rich(item.review_topic, `${where}解析`))
   if (analysis.length > 0) analysis[0] = { ...analysis[0]!, inlines: [{ type: 'text', text: '【解析】' }, ...analysis[0]!.inlines] }
   const answer = rich(item.answer, `${where}答案`)
@@ -232,7 +232,7 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
         ...(Number.isInteger(questionTypeId) && questionTypeId > 0 ? { questionTypeId } : {})
       }
     },
-    layout: { studentSpaceLines: Math.max(0, item.blankArea ?? 0), pageBreakBefore: item.paging === 1 }
+    layout: { studentSpaceLines: Math.max(0, item.blankArea ?? 0), pageBreakBefore: item.paging === 1, ...(optionColumns !== undefined ? { optionColumns } : {}) }
   })
   return { id: newId(), type: 'question', question: q }
 }
@@ -271,8 +271,14 @@ export function splitReview(text: RichText): { review: RichText; analysis: RichT
 
 const OPTION_START = /^\s*([A-H])\s*[.．、:：]\s*/
 
-/** 题干末尾依次以 A. B. C. … 开头的段落是选项 */
-export function extractOptions(stem: RichText): { stem: RichText; options: ChoiceOption[] } {
+/**
+ * 题干末尾依次以 A. B. C. … 开头的段落是选项。
+ * 墨案中从 Word 粘贴的题目，选项常排在一张无框表格里（一行四格、两行两格或一列四行）：
+ * 题干最后一段只有一张表格、各格依次以 A. B. C. … 开头时，按格取出选项，并按表格的列数设定选项排列（4 / 2 / 1 列）。
+ */
+export function extractOptions(stem: RichText): { stem: RichText; options: ChoiceOption[]; optionColumns?: OptionColumns } {
+  const fromTable = optionsFromTable(stem)
+  if (fromTable !== null) return fromTable
   let start = stem.length
   for (let i = stem.length - 1; i >= 0; i--) {
     const label = optionLabel(stem[i]!)
@@ -285,6 +291,26 @@ export function extractOptions(stem: RichText): { stem: RichText; options: Choic
   if (!sequential || start === 0) return { stem, options: [] }
   const options = tail.map((p, k): ChoiceOption => ({ label: String.fromCharCode(65 + k), content: stripLabel(p) }))
   return { stem: stem.slice(0, start), options }
+}
+
+function optionsFromTable(stem: RichText): { stem: RichText; options: ChoiceOption[]; optionColumns?: OptionColumns } | null {
+  // 去掉末尾的空段，取最后一段
+  let end = stem.length
+  while (end > 0 && stem[end - 1]!.inlines.length === 0) end--
+  const last = stem[end - 1]
+  if (end < 2 || last === undefined || last.inlines.length !== 1 || last.inlines[0]!.type !== 'table') return null
+  const table = last.inlines[0] as TableInline
+  // 按阅读顺序（逐行、从左到右）取出非空的格
+  const cells = table.rows.flatMap((r) => r.cells).map((c) => c.content.filter((p) => p.inlines.length > 0)).filter((c) => c.length > 0)
+  if (cells.length < 2 || !cells.every((c, k) => optionLabel(c[0]!) === String.fromCharCode(65 + k))) return null
+  // 一格多段时并成一段（选项只有一段），段间空一格
+  const options = cells.map((c, k): ChoiceOption => {
+    const first = stripLabel(c[0]!)
+    return { label: String.fromCharCode(65 + k), content: { ...first, inlines: [...first.inlines, ...c.slice(1).flatMap((p): Inline[] => [{ type: 'text', text: ' ' }, ...p.inlines])] } }
+  })
+  const perRow = Math.max(...table.rows.map((r) => r.cells.filter((c) => c.content.some((p) => p.inlines.length > 0)).length))
+  const optionColumns: OptionColumns | undefined = perRow === 1 || perRow === 2 || perRow === 4 ? perRow : undefined
+  return { stem: stem.slice(0, end - 1), options, ...(optionColumns !== undefined ? { optionColumns } : {}) }
 }
 
 function optionLabel(p: RichParagraph): string | null {

@@ -169,6 +169,31 @@ describe('墨案教案 → 教学案', () => {
   })
 })
 
+describe('表格形式的选项', () => {
+  const opts = (r: ReturnType<typeof extractOptions>) => r.options.map((o) => o.label + ':' + plainText([o.content]))
+  it('一行四格 → 4 列', () => {
+    const r = extractOptions(htmlToRich('<p>则拉力（　　）</p><table><tr><td><p>A. <i>T</i><sub>2</sub>=<i>T</i><sub>1</sub></p></td><td><p>B. 0</p></td><td><p>C. 1</p></td><td><p>D. 2</p></td></tr></table>'))
+    expect(r.stem.map((p) => plainText([p]))).toEqual(['则拉力（　　）'])
+    expect(opts(r)).toEqual(['A:T2=T1', 'B:0', 'C:1', 'D:2'])
+    expect(r.optionColumns).toBe(4)
+  })
+  it('两行两格 → 2 列；一列四行 → 1 列；空格与末尾空段忽略', () => {
+    const two = extractOptions(htmlToRich('<p>题干</p><table><tr><td>A. 甲</td><td>B. 乙</td></tr><tr><td>C. 丙</td><td>D. 丁</td></tr></table><p></p>'))
+    expect(opts(two)).toEqual(['A:甲', 'B:乙', 'C:丙', 'D:丁'])
+    expect(two.optionColumns).toBe(2)
+    const one = extractOptions(htmlToRich('<p>题干</p><table><tr><td>A. 甲</td><td></td></tr><tr><td>B. 乙</td></tr><tr><td>C. 丙</td></tr><tr><td>D. 丁</td></tr></table>'))
+    expect(opts(one)).toEqual(['A:甲', 'B:乙', 'C:丙', 'D:丁'])
+    expect(one.optionColumns).toBe(1)
+  })
+  it('普通表格（不是依次以 A. B. 开头）留在题干里', () => {
+    const r = extractOptions(htmlToRich('<p>下表为实验数据</p><table><tr><td>电流 I</td><td>0.1</td></tr><tr><td>拉力 F</td><td>0.2</td></tr></table>'))
+    expect(r.options).toEqual([])
+    expect(r.stem).toHaveLength(2)
+    const notSeq = extractOptions(htmlToRich('<p>题干</p><table><tr><td>A. 甲</td><td>C. 丙</td></tr></table>'))
+    expect(notSeq.options).toEqual([])
+  })
+})
+
 describe('拆出审题', () => {
   it('“审题：”一段放进审题，其余为解析；同一段中的“讲解提要”归还解析', () => {
     const a = splitReview(htmlToRich('<p><br></p><p>审题：倾斜角与斜率</p><p>讲解提要：</p><p>A1：$k=-2$</p>'))
