@@ -6,6 +6,7 @@
  * 选型与对比见 docs/图片导入.md（矢量描摹会丢细线和文字，AI 重绘不能保证还原，大型模型太慢）。
  */
 import { fsrcnnY } from './fsrcnn'
+import { lineArt } from './lineart'
 
 export interface Pixels {
   data: Uint8Array | Uint8ClampedArray
@@ -150,8 +151,13 @@ export function upscale3(img: Pixels): Pixels {
 /** 放大前的最大像素数：更大的图本身已足够清楚，只清理不放大（也避免太慢） */
 export const MAX_UPSCALE_PIXELS = 400 * 400
 
-/** 插图变清晰：清理底色，较小的图再放大 3 倍 */
-export function enhanceFigure(img: Pixels): Pixels {
+/** 处理方式：普通（清理 + 放大）或线稿（再把线条压成纯黑 / 本色、纸张纯白） */
+export type EnhanceMode = 'normal' | 'lineart'
+
+/** 插图变清晰：清理底色，较小的图再放大 3 倍；线稿模式再压成线稿 */
+export function enhanceFigure(img: Pixels, mode: EnhanceMode = 'normal'): Pixels {
   const cleaned = cleanBackground(img)
-  return img.width * img.height <= MAX_UPSCALE_PIXELS ? upscale3(cleaned) : cleaned
+  const up = img.width * img.height <= MAX_UPSCALE_PIXELS
+  const out = up ? upscale3(cleaned) : cleaned
+  return mode === 'lineart' ? lineArt(out, up ? 3 : 1) : out
 }

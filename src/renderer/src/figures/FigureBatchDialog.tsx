@@ -76,7 +76,7 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
   const assetOf = (e: FigureEntry): Asset | undefined => assets[e.figure.assetId]
   const selected = entries.filter((e) => picked.has(keyOf(e.ref)) && !isVector(assetOf(e)))
 
-  const sharpen = async (): Promise<void> => {
+  const sharpen = async (mode: 'normal' | 'lineart'): Promise<void> => {
     setNote(null)
     const newAssets: Asset[] = []
     const changes: Array<{ ref: FigureRef; assetId: string }> = []
@@ -84,12 +84,12 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
     const done = new Map<string, Asset>()
     for (let k = 0; k < selected.length; k++) {
       const e = selected[k]!
-      setProgress(`正在变清晰 ${k + 1}/${selected.length}…`)
+      setProgress(`正在${mode === 'lineart' ? '处理为线稿' : '变清晰'} ${k + 1}/${selected.length}…`)
       const asset = assetOf(e)
       if (asset === undefined) continue
       let next = done.get(asset.id)
       if (next === undefined) {
-        const r = await sharpenAsset(asset)
+        const r = await sharpenAsset(asset, mode)
         if (r === null) continue
         next = r
         done.set(asset.id, r)
@@ -99,7 +99,7 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
     }
     dispatch({ type: 'replace-figure-assets', assets: newAssets, changes })
     setProgress(null)
-    setNote(`已把 ${changes.length} 张插图变清晰（可用 Ctrl+Z 撤销）。`)
+    setNote(`已把 ${changes.length} 张插图${mode === 'lineart' ? '处理为线稿' : '变清晰'}（可用 Ctrl+Z 撤销）。`)
   }
 
   const sendRedraw = async (only?: FigureEntry[]): Promise<void> => {
@@ -248,8 +248,16 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
       )}
       {(progress ?? note) !== null && <p className="field-hint" role="status">{progress ?? note}</p>}
       <div className="dialog-actions">
-        <button type="button" disabled={progress !== null || selected.length === 0} onClick={() => void sharpen()} title="去掉灰底与杂点、放大（不改变内容）">
+        <button type="button" disabled={progress !== null || selected.length === 0} onClick={() => void sharpen('normal')} title="去掉灰底与杂点、放大（不改变内容）">
           变清晰（{selected.length}）
+        </button>
+        <button
+          type="button"
+          disabled={progress !== null || selected.length === 0}
+          onClick={() => void sharpen('lineart')}
+          title="变清晰后再把线条压成纯黑（彩色线条保持原色）、纸张纯白；成片的填充保持原样。适合黑白线条图"
+        >
+          线稿（{selected.length}）
         </button>
         <button type="button" disabled={progress !== null || selected.length === 0} onClick={() => void sendRedraw()} title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个">
           让 WorkBuddy 重绘（{selected.length}）

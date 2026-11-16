@@ -5749,3 +5749,16 @@ input[type='checkbox']:disabled {
   border-color: #2f6fb5;
   box-shadow: 0 0 0 1px #2f6fb5;
 }
+
+.enhance-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+}
+.enhance-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}

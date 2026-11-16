@@ -84,6 +84,10 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   const [error, setError] = useState<string | null>(null)
   // 插图变清晰（清理底色 + 放大），默认打开；选中的框显示处理前后对比
   const [enhanceOn, setEnhanceOn] = useState(true)
+  // 处理方式：默认（普通 / 线稿），单张可另选
+  const [mode, setMode] = useState<'normal' | 'lineart'>('normal')
+  const [boxMode, setBoxMode] = useState<Map<string, 'normal' | 'lineart'>>(new Map())
+  const modeOf = (id: string): 'normal' | 'lineart' => boxMode.get(id) ?? mode
   const [selected, setSelected] = useState<string | null>(null)
   // 让 WorkBuddy 重绘为 SVG：交出时的图号 → 框；收到的 SVG；选用 SVG 的框
   const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
@@ -291,7 +295,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
           asset = await createAsset(new TextEncoder().encode(svg), 'image/svg+xml')
         } else {
           let px = await readPixels(src.url, rect)
-          if (enhanceOn) px = await enhance(px)
+          if (enhanceOn) px = await enhance(px, modeOf(b.id))
           asset = await createAsset(await toPng(px), 'image/png')
         }
         let widthEmu = rect.w * EMU_PER_PX
@@ -375,6 +379,16 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               <input type="checkbox" checked={enhanceOn} onChange={(e) => setEnhanceOn(e.target.checked)} />
               插图变清晰
             </label>
+            <select
+              aria-label="变清晰的方式"
+              value={mode}
+              disabled={!enhanceOn}
+              onChange={(e) => setMode(e.target.value as 'normal' | 'lineart')}
+              title="普通：去灰底、放大锐化；线稿：再把线条压成纯黑（彩色线条保持原色）、纸张纯白，成片的填充保持原样，适合黑白线条图。点选插图可单独改"
+            >
+              <option value="normal">普通</option>
+              <option value="lineart">线稿</option>
+            </select>
             <span className="field-hint">
               {images.length === 0 ? '也可以 Ctrl+V 粘贴截图，或把图片拖到这里' : `共框选 ${figureCount} 张插图`}
             </span>
@@ -459,7 +473,15 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
                 />
               )
             }
-            return enhanceOn ? <EnhancePreview url={img.url} box={box} n={numbers.get(box.id)} /> : null
+            return enhanceOn ? (
+              <EnhancePreview
+                url={img.url}
+                box={box}
+                n={numbers.get(box.id)}
+                mode={modeOf(box.id)}
+                onMode={(m) => setBoxMode((all) => new Map(all).set(box.id, m))}
+              />
+            ) : null
           })()}
         </section>
 
@@ -642,9 +664,9 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
-function EnhancePreview({ url, box, n }: { url: string; box: Rect; n: number | undefined }) {
+function EnhancePreview({ url, box, n, mode, onMode }: { url: string; box: Rect; n: number | undefined; mode: 'normal' | 'lineart'; onMode: (m: 'normal' | 'lineart') => void }) {
   const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
-  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}`
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${mode}`
   useEffect(() => {
     let alive = true
     const made: string[] = []
@@ -654,7 +676,7 @@ function EnhancePreview({ url, box, n }: { url: string; box: Rect; n: number | u
       made.push(before)
       if (!alive) return
       setPair({ before, after: null })
-      const after = await toObjectUrl(await enhance(px))
+      const after = await toObjectUrl(await enhance(px, mode))
       made.push(after)
       if (alive) setPair({ before, after })
     })()
@@ -671,7 +693,15 @@ function EnhancePreview({ url, box, n }: { url: string; box: Rect; n: number | u
         {pair !== null && <img src={pair.before} alt="" />}
       </figure>
       <figure>
-        <figcaption>处理后（导入时使用）</figcaption>
+        <figcaption className="enhance-mode">
+          处理后（导入时使用）：
+          {(['normal', 'lineart'] as const).map((m) => (
+            <label key={m}>
+              <input type="radio" name={`mode-${n ?? ''}`} checked={mode === m} onChange={() => onMode(m)} />
+              {m === 'normal' ? '普通' : '线稿'}
+            </label>
+          ))}
+        </figcaption>
         {pair?.after != null ? <img src={pair.after} alt="" /> : <span className="field-hint">正在处理…</span>}
       </figure>
     </div>

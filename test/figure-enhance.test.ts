@@ -56,3 +56,43 @@ describe('清理纸张底色', () => {
     expect([eb.width, eb.height]).toEqual([side, side])
   }, 20000)
 })
+
+describe('线稿模式', async () => {
+  const { lineArt, fillRatio } = await import('@core/image/lineart')
+  // 已放大 3 倍的图：白底上一条灰色细线（6 像素宽）、一个浅灰色实心圆（半径 30）、一条红线、一个 2×2 的噪点
+  const W = 300
+  const H = 200
+  const img = { data: new Uint8ClampedArray(W * H * 4).fill(255), width: W, height: H }
+  const set = (x: number, y: number, c: [number, number, number]): void => img.data.set([...c, 255], (y * W + x) * 4)
+  for (let x = 10; x < 290; x++) for (let y = 20; y < 26; y++) set(x, y, [120, 120, 120])
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - 80) ** 2 + (y - 120) ** 2 <= 30 * 30) set(x, y, [190, 190, 190])
+  for (let x = 160; x < 280; x++) for (let y = 100; y < 106; y++) set(x, y, [233, 82, 131])
+  for (let y = 170; y < 172; y++) for (let x = 250; x < 252; x++) set(x, y, [60, 60, 60])
+  const px = (p: { data: ArrayLike<number>; width: number }, x: number, y: number): number[] => [0, 1, 2].map((k) => p.data[(y * p.width + x) * 4 + k]!)
+
+  it('灰色细线压成纯黑；纸张纯白；成片的浅灰填充保持原样；红线保持红色；噪点去掉', () => {
+    const r = lineArt(img, 3)
+    expect(px(r, 150, 22).every((v) => v < 20)).toBe(true)
+    expect(px(r, 150, 60)).toEqual([255, 255, 255])
+    expect(px(r, 80, 120)).toEqual([190, 190, 190])
+    const red = px(r, 220, 102)
+    expect(red[0]! > 200 && red[1]! < 110 && red[2]! < 160).toBe(true)
+    expect(px(r, 250, 170).every((v) => v > 240)).toBe(true)
+  })
+
+  it('填充比例：成片的中间调才算（线条边缘不算）', () => {
+    expect(fillRatio(img)).toBeGreaterThan(0.5)
+    const lines = { data: new Uint8ClampedArray(W * H * 4).fill(255), width: W, height: H }
+    for (let x = 10; x < 290; x++) for (let y = 20; y < 22; y++) lines.data.set([150, 150, 150, 255], (y * W + x) * 4)
+    expect(fillRatio(lines)).toBe(0)
+  })
+
+  it('enhanceFigure 的线稿方式：放大 3 倍后压成线稿', () => {
+    const small = { data: new Uint8ClampedArray(60 * 40 * 4).fill(235), width: 60, height: 40 }
+    for (let x = 5; x < 55; x++) small.data.set([110, 110, 110, 255], (20 * 60 + x) * 4)
+    const r = enhanceFigure(small, 'lineart')
+    expect([r.width, r.height]).toEqual([180, 120])
+    expect(px(r, 90, 61).every((v) => v < 40)).toBe(true)
+    expect(px(r, 90, 20)).toEqual([255, 255, 255])
+  })
+})

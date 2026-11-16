@@ -281,7 +281,7 @@ function EditorBody({
   stateRef.current = state
   const figureActions = useMemo<FigureActions>(
     () => ({
-      sharpen: async (refs) => {
+      sharpen: async (refs, mode = 'normal') => {
         const { bundle } = stateRef.current
         const keys = new Set(refs.map((r) => `${r.blockId}|${r.list ?? ''}|${r.figureIndex}`))
         const entries = listFigures(bundle.project.blocks).filter((e) => keys.has(`${e.ref.blockId}|${e.ref.list ?? ''}|${e.ref.figureIndex}`))
@@ -290,7 +290,7 @@ function EditorBody({
         let skipped = 0
         for (const e of entries) {
           const asset = bundle.assets[e.figure.assetId]
-          const next = asset !== undefined ? await sharpenAsset(asset) : null
+          const next = asset !== undefined ? await sharpenAsset(asset, mode) : null
           if (next === null) {
             skipped++
             continue
