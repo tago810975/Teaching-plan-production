@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/model/types'
 import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm } from './figure-options'
+import { enhance, readPixels, toPng } from '../import/enhance-client'
+import { assetMime } from '../preview/assets'
 
 interface Props {
   /** 分组标题，默认“题图” */
@@ -46,6 +48,30 @@ export function FigureList({
     const f = figures[i]!
     const widthEmu = Math.round(cm * EMU_PER_CM)
     update(i, { widthEmu, heightEmu: Math.round((f.heightEmu * widthEmu) / f.widthEmu) })
+  }
+
+  // 变清晰：清理底色、放大（后台处理），换成处理后的图片，显示尺寸不变；矢量图（SVG）本来就清晰，不处理
+  const [sharpening, setSharpening] = useState<number | null>(null)
+  const sharpen = async (i: number): Promise<void> => {
+    const f = figures[i]
+    const url = f !== undefined ? assetUrls.get(f.assetId) : undefined
+    if (f === undefined || url === undefined) return
+    setError(null)
+    setSharpening(i)
+    try {
+      if ((assetMime(f.assetId) ?? '').includes('svg')) {
+        setError('这是矢量图，本来就清晰，不需要处理。')
+        return
+      }
+      const png = await toPng(await enhance(await readPixels(url)))
+      const asset = await createAsset(png, 'image/png')
+      onAddAsset(asset)
+      onChange(figures.map((g, k) => (k === i ? { ...g, assetId: asset.id } : g)))
+    } catch {
+      setError('处理失败，图片可能已损坏。')
+    } finally {
+      setSharpening(null)
+    }
   }
 
   const add = async (file: File): Promise<void> => {
@@ -187,6 +213,15 @@ export function FigureList({
                 onClick={() => onChange(swap(figures, i, i + 1))}
               >
                 下移
+              </button>
+              <button
+                type="button"
+                className="link"
+                disabled={sharpening !== null}
+                onClick={() => void sharpen(i)}
+                title="去掉灰底与杂点、放大 3 倍（不改变内容），打印更清楚；可撤销"
+              >
+                {sharpening === i ? '处理中…' : '变清晰'}
               </button>
               <button type="button" className="link danger" onClick={() => onChange(figures.filter((_, j) => j !== i))}>
                 删除

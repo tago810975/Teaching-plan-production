@@ -10,8 +10,15 @@ import type { Asset } from '@core/model/types'
  * URL 在本次运行期间不回收（内容与工程中的图片数据相同，数量有限）。
  */
 const urls = new Map<string, string>()
+const mimes = new Map<string, string>()
+
+/** 资源的格式（如 image/svg+xml）；页面的安全策略不允许 fetch blob 地址，所以在生成地址时记下 */
+export function assetMime(id: string): string | undefined {
+  return mimes.get(id)
+}
 
 function urlOf(asset: Asset): string {
+  mimes.set(asset.id, asset.mime)
   let url = urls.get(asset.id)
   if (url === undefined) {
     url = URL.createObjectURL(new Blob([asset.data as Uint8Array<ArrayBuffer>], { type: asset.mime }))

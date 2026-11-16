@@ -11,6 +11,7 @@ import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-imp
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, Block } from '@core/model/types'
 import type { ImportReport } from '@shared/ipc'
+import { enhance, readPixels, toObjectUrl, toPng } from './enhance-client'
 
 interface SourceImage {
   key: string
@@ -80,6 +81,9 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 插图变清晰（清理底色 + 放大），默认打开；选中的框显示处理前后对比
+  const [enhanceOn, setEnhanceOn] = useState(true)
+  const [selected, setSelected] = useState<string | null>(null)
   // 交给 WorkBuddy 识别：等待中的任务、状态提示
   const [wb, setWb] = useState<{ state: 'idle' | 'need-connect' | 'waiting' | 'received'; taskId?: string; note?: string }>({ state: 'idle' })
   const wbTask = useRef<string | null>(null)
@@ -227,7 +231,9 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
         if (n === undefined || src === undefined) continue
         let rect: Rect = b
         if (optionFigures.has(n) && src.pixels !== null) rect = scaleRect(trimBottomLabel(src.pixels, scaleRect(b, src.scale), src.textHeight * src.scale), 1 / src.scale)
-        const data = await crop(src.url, rect)
+        let px = await readPixels(src.url, rect)
+        if (enhanceOn) px = await enhance(px)
+        const data = await toPng(px)
         const asset = await createAsset(data, 'image/png')
         let widthEmu = rect.w * EMU_PER_PX
         let heightEmu = rect.h * EMU_PER_PX
@@ -296,6 +302,10 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
                 重新自动框选
               </button>
             )}
+            <label className="checkbox" title="导入时去掉插图的灰底与杂点、放大 3 倍（不改变内容），打印更清楚">
+              <input type="checkbox" checked={enhanceOn} onChange={(e) => setEnhanceOn(e.target.checked)} />
+              插图变清晰
+            </label>
             <span className="field-hint">
               {images.length === 0 ? '也可以 Ctrl+V 粘贴截图，或把图片拖到这里' : `共框选 ${figureCount} 张插图`}
             </span>
@@ -327,8 +337,14 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               }}
               onChange={(id, r) => setBoxes((all) => all.map((b) => (b.id === id ? { ...b, ...r } : b)))}
               onRemove={(id) => setBoxes((all) => all.filter((b) => b.id !== id))}
+              selected={selected}
+              onSelect={setSelected}
             />
           )}
+          {img !== null && enhanceOn && (() => {
+            const box = boxes.find((b) => b.id === selected && b.image === img.key)
+            return box !== undefined ? <EnhancePreview url={img.url} box={box} n={numbers.get(box.id)} /> : null
+          })()}
         </section>
 
         <section className="image-import-right" aria-label="识别结果">
@@ -458,6 +474,43 @@ async function encodeForAi(url: string, width: number, height: number): Promise<
   return canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/jpeg;base64,/, '')
 }
 
+/** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
+function EnhancePreview({ url, box, n }: { url: string; box: Rect; n: number | undefined }) {
+  const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}`
+  useEffect(() => {
+    let alive = true
+    const made: string[] = []
+    void (async () => {
+      const px = await readPixels(url, box)
+      const before = await toObjectUrl(px)
+      made.push(before)
+      if (!alive) return
+      setPair({ before, after: null })
+      const after = await toObjectUrl(await enhance(px))
+      made.push(after)
+      if (alive) setPair({ before, after })
+    })()
+    return () => {
+      alive = false
+      made.forEach((u) => URL.revokeObjectURL(u))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return (
+    <div className="enhance-preview" aria-label={`图${n ?? ''}变清晰的效果`}>
+      <figure>
+        <figcaption>图{n} 处理前</figcaption>
+        {pair !== null && <img src={pair.before} alt="" />}
+      </figure>
+      <figure>
+        <figcaption>处理后（导入时使用）</figcaption>
+        {pair?.after != null ? <img src={pair.after} alt="" /> : <span className="field-hint">正在处理…</span>}
+      </figure>
+    </div>
+  )
+}
+
 type Drag =
   | { kind: 'new'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'move'; id: string; dx: number; dy: number; start: Rect }
@@ -470,7 +523,9 @@ function BoxCanvas({
   numbers,
   onAdd,
   onChange,
-  onRemove
+  onRemove,
+  selected,
+  onSelect
 }: {
   image: SourceImage
   boxes: Box[]
@@ -478,6 +533,8 @@ function BoxCanvas({
   onAdd: (r: Rect) => void
   onChange: (id: string, r: Rect) => void
   onRemove: (id: string) => void
+  selected: string | null
+  onSelect: (id: string | null) => void
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -519,6 +576,7 @@ function BoxCanvas({
       setDrag({ kind: 'resize', id: b.id, corner: handle.dataset['corner'] as 'nw', start: b })
     } else if (boxEl !== null) {
       const b = boxes.find((x) => x.id === boxEl.dataset['box'])!
+      onSelect(b.id)
       setDrag({ kind: 'move', id: b.id, dx: p.x - b.x, dy: p.y - b.y, start: b })
     } else setDrag({ kind: 'new', x0: p.x, y0: p.y, x1: p.x, y1: p.y })
   }
@@ -554,7 +612,7 @@ function BoxCanvas({
           const r = live?.id === b.id ? live.r : b
           const n = numbers.get(b.id)
           return (
-            <div key={b.id} className="image-box" data-box={b.id} style={pct(r)} title="拖动可移动，拖四角可调整大小">
+            <div key={b.id} className={b.id === selected ? 'image-box is-selected' : 'image-box'} data-box={b.id} style={pct(r)} title="点选可查看变清晰的效果；拖动可移动，拖四角可调整大小">
               <span className="image-box-label">图{n}</span>
               <button type="button" className="image-box-remove" aria-label={`删除图${n}`} title={`删除图${n}`} onClick={() => onRemove(b.id)}>
                 ×
@@ -571,20 +629,4 @@ function BoxCanvas({
       <p className="field-hint">插图已自动框出，请检查：框错的点 × 删除，漏掉的在图上拖一个框（会自动收紧到图的边缘），框可以拖动、拖四角调整。</p>
     </div>
   )
-}
-
-/** 从图片中裁出矩形，返回 PNG 数据 */
-async function crop(url: string, b: Rect): Promise<Uint8Array> {
-  const img = new Image()
-  img.src = url
-  await img.decode()
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(b.w))
-  canvas.height = Math.max(1, Math.round(b.h))
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(img, b.x, b.y, b.w, b.h, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((x) => (x !== null ? resolve(x) : reject(new Error('无法生成图片'))), 'image/png'))
-  return new Uint8Array(await blob.arrayBuffer())
 }
