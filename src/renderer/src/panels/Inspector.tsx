@@ -724,11 +724,59 @@ function QuestionForm({
     </div>
   )
 
+  // 版式：“题目”与“仅教师版”两页都显示，改的是同一份设置，两处同步
+  const layoutSection = (
+    <LayoutFields layout={q.layout} onChange={setLayout} keepLabel="整题同页">
+      {q.options.length > 0 && (
+        <Field label="选项排列">
+          <Segmented<OptionColumns>
+            value={q.layout.optionColumns}
+            options={[
+              ['auto', '自动'],
+              [1, '每行 1 项'],
+              [2, '每行 2 项'],
+              [4, '每行 4 项']
+            ]}
+            onChange={(optionColumns) => setLayout({ optionColumns })}
+          />
+        </Field>
+      )}
+      {q.options.length > 0 && (
+        <Field
+          label="选项位置"
+          hint={(() => {
+            const n = resolveOptionColumns(q.options, q.layout.optionColumns, q.layout.optionStops ?? projectStops)
+            return n === 1 ? '现在每行 1 项，不用设置位置。' : `现在每行 ${n} 项。`
+          })()}
+        >
+          <label className="checkbox checkbox--inline">
+            <input
+              type="checkbox"
+              checked={q.layout.optionStops !== undefined}
+              onChange={(e) => {
+                if (e.target.checked) setLayout({ optionStops: copyStops(projectStops) })
+                else update((b) => {
+                  const { optionStops: _s, ...layout } = b.question.layout
+                  return { ...b, question: { ...b.question, layout } }
+                })
+              }}
+            />
+            本题单独设置（否则用“版式设置”中的位置）
+          </label>
+          {q.layout.optionStops !== undefined && (
+            <OptionStopsEditor stops={q.layout.optionStops} onChange={(optionStops) => setLayout({ optionStops })} />
+          )}
+        </Field>
+      )}
+    </LayoutFields>
+  )
+
   if (tab === 'teacher') {
     return (
       <>
         {tabs}
         <TeacherFields q={q} set={set} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
+        {layoutSection}
       </>
     )
   }
@@ -891,49 +939,7 @@ function QuestionForm({
       </fieldset>
 
 
-      <LayoutFields layout={q.layout} onChange={setLayout} keepLabel="整题同页">
-        {q.options.length > 0 && (
-          <Field label="选项排列">
-            <Segmented<OptionColumns>
-              value={q.layout.optionColumns}
-              options={[
-                ['auto', '自动'],
-                [1, '每行 1 项'],
-                [2, '每行 2 项'],
-                [4, '每行 4 项']
-              ]}
-              onChange={(optionColumns) => setLayout({ optionColumns })}
-            />
-          </Field>
-        )}
-        {q.options.length > 0 && (
-          <Field
-            label="选项位置"
-            hint={(() => {
-              const n = resolveOptionColumns(q.options, q.layout.optionColumns, q.layout.optionStops ?? projectStops)
-              return n === 1 ? '现在每行 1 项，不用设置位置。' : `现在每行 ${n} 项。`
-            })()}
-          >
-            <label className="checkbox checkbox--inline">
-              <input
-                type="checkbox"
-                checked={q.layout.optionStops !== undefined}
-                onChange={(e) => {
-                  if (e.target.checked) setLayout({ optionStops: copyStops(projectStops) })
-                  else update((b) => {
-                    const { optionStops: _s, ...layout } = b.question.layout
-                    return { ...b, question: { ...b.question, layout } }
-                  })
-                }}
-              />
-              本题单独设置（否则用“版式设置”中的位置）
-            </label>
-            {q.layout.optionStops !== undefined && (
-              <OptionStopsEditor stops={q.layout.optionStops} onChange={(optionStops) => setLayout({ optionStops })} />
-            )}
-          </Field>
-        )}
-      </LayoutFields>
+      {layoutSection}
     </>
   )
 }
