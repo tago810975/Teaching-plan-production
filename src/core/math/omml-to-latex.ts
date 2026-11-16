@@ -234,7 +234,7 @@ function run(r: Element): string {
   return out
 }
 
-function textCmd(s: string): string {
+export function textCmd(s: string): string {
   return s === '' ? '' : `\\text{${s.replace(/[{}\\]/g, (c) => `\\${c === '\\' ? 'backslash ' : c}`)}}`
 }
 
@@ -327,11 +327,11 @@ const SYMBOLS: Record<string, string> = {
   'Ω': '\\Omega '
 }
 
-function escapeChar(c: string): string {
+export function escapeChar(c: string): string {
   return SYMBOLS[c] ?? c
 }
 
-const ACCENTS: Record<string, string> = {
+export const ACCENTS: Record<string, string> = {
   '\u20D7': '\\vec',
   '\u0302': '\\hat',
   '\u0303': '\\tilde',
@@ -346,7 +346,7 @@ const ACCENTS: Record<string, string> = {
   '→': '\\vec'
 }
 
-const NARY: Record<string, string> = {
+export const NARY: Record<string, string> = {
   '∑': '\\sum',
   '∏': '\\prod',
   '∐': '\\coprod',
@@ -358,12 +358,12 @@ const NARY: Record<string, string> = {
   '⋂': '\\bigcap'
 }
 
-const FUNCTIONS = new Set([
+export const FUNCTIONS = new Set([
   'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'arcsin', 'arccos', 'arctan',
   'sinh', 'cosh', 'tanh', 'ln', 'lg', 'log', 'exp', 'lim', 'max', 'min', 'det'
 ])
 
-function fence(c: string): string {
+export function fence(c: string): string {
   if (c === '') return '.'
   const map: Record<string, string> = {
     '{': '\\{',
@@ -389,6 +389,6 @@ function textOf(el: Element): string {
 }
 
 /** 去掉命令后多余的空格（如“\times }”→“\times}”），保持输出整洁 */
-function tidy(s: string): string {
+export function tidy(s: string): string {
   return s.replace(/ +(?=[}^_)\]|,.;:!?=+\-*/&\\])/g, '').replace(/ {2,}/g, ' ').trim()
 }

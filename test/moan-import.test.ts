@@ -293,3 +293,41 @@ describe('图片尺寸', () => {
     expect(readImageInfo(new Uint8Array([1, 2, 3]))).toBeNull()
   })
 })
+
+describe('墨案中的 MathML 公式（从 Word 粘贴）', () => {
+  const latexOf = (html: string): string[] => htmlToRich(html).flatMap((p) => p.inlines).flatMap((i) => (i.type === 'math' ? [i.latex ?? ''] : []))
+  it('分数、根号、科学计数法', () => {
+    expect(latexOf('<p>B. <math><mfrac><mi>π</mi><mn>2</mn></mfrac><mi>I</mi></math></p>')).toEqual(['\\frac{\\pi}{2}I'])
+    expect(latexOf('<p>D. <math><mfrac><mrow><mn>2</mn><mi>π</mi></mrow><mn>3</mn></mfrac><mi>I</mi></math></p>')).toEqual(['\\frac{2\\pi}{3}I'])
+    expect(latexOf('<p>C. <math><msqrt><mn>2</mn></msqrt><mi>B</mi><mi>I</mi><mi>l</mi></math></p>')).toEqual(['\\sqrt{2}BIl'])
+    expect(latexOf('<p>A. <math><mn>2.4</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>3</mn></mrow></msup></math>N，竖直向上</p>')).toEqual(['2.4\\times {10}^{-3}'])
+  })
+  it('选项表格中的公式：文字与公式都留在选项里', () => {
+    const r = extractOptions(htmlToRich('<p>则电流为（　　）</p><table><tr><td>A. <math><mi>I</mi></math></td><td>B. <math><mfrac><mi>π</mi><mn>2</mn></mfrac><mi>I</mi></math></td><td>C. <math><mi>π</mi><mi>I</mi></math></td><td>D. <math><mfrac><mrow><mn>2</mn><mi>π</mi></mrow><mn>3</mn></mfrac><mi>I</mi></math></td></tr></table>'))
+    expect(r.options.map((o) => o.content.inlines.map((i) => (i.type === 'math' ? `$${i.latex}$` : i.type === 'text' ? i.text : '')).join(''))).toEqual(['$I$', '$\\frac{\\pi}{2}I$', '$\\pi I$', '$\\frac{2\\pi}{3}I$'])
+  })
+  it('命名空间前缀、函数名、下标、向量、TeX 注释、KaTeX 渲染结果', () => {
+    expect(latexOf('<p><m:math><m:msub><m:mi>F</m:mi><m:mn>1</m:mn></m:msub></m:math></p>')).toEqual(['F_{1}'])
+    expect(latexOf('<p><math><mi>sin</mi><mo>\u2061</mo><mi>θ</mi></math></p>')).toEqual(['\\sin\\theta'])
+    expect(latexOf('<p><math><mover><mi>F</mi><mo>→</mo></mover></math></p>')).toEqual(['\\overrightarrow{F}'])
+    expect(latexOf('<p><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">\\dfrac{1}{2}mv^2</annotation></semantics></math></p>')).toEqual(['\\dfrac{1}{2}mv^2'])
+    const katex = '<p>由 <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">\\frac{a}{b}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span>ab</span></span></span> 得</p>'
+    expect(latexOf(katex)).toEqual(['\\frac{a}{b}'])
+    expect(plainText(htmlToRich(katex))).toBe('由 $\\frac{a}{b}$ 得')
+  })
+  it('不认识的结构按文字导入并提示', () => {
+    const warns: string[] = []
+    const r = htmlToRich('<p><math><mfoo><mi>x</mi></mfoo></math></p>', { warn: (m) => warns.push(m) })
+    expect(r[0]!.inlines[0]).toMatchObject({ type: 'math', latex: 'x' })
+    expect(warns[0]).toContain('mfoo')
+  })
+})
+
+describe('不认识的标签', () => {
+  it('按文字导入，每种标签提示一次', () => {
+    const warns: string[] = []
+    const r = htmlToRich('<p>由<mjx-frac><mjx-num>1</mjx-num><mjx-den>2</mjx-den></mjx-frac>得<mjx-frac>3</mjx-frac></p>', { warn: (m) => warns.push(m) })
+    expect(plainText(r)).toBe('由12得3')
+    expect(warns.filter((w) => w.includes('<mjx-frac>'))).toHaveLength(1)
+  })
+})

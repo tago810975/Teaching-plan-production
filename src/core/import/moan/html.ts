@@ -5,6 +5,7 @@
  * 公式写作 $…$（也见到 $$…$$、\(…\)、\[…\]），网页用 KaTeX 显示；另有加粗、颜色、上下标、图片、表格。
  * 这里不依赖浏览器 DOM：先用宽松的解析器建一棵简单的树，再转换。公式原样保存为 LaTeX。
  */
+import { localName, mathmlToLatex, type MathmlLatex } from './mathml'
 import type { ImageInline, Inline, ParagraphFormat, RichParagraph, RichText, TableCell, TableInline, TableRow, TextMarks } from '../../model/types'
 
 // ---------- 简单的 HTML 树 ----------
@@ -25,7 +26,7 @@ const VOID_TAGS = new Set(['br', 'img', 'hr', 'input', 'meta', 'link', 'col', 'w
 /** 遇到这些开始标签时，未闭合的 <p> 自动结束（与浏览器一致） */
 const CLOSES_P = new Set(['p', 'div', 'table', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'hr'])
 
-const TOKEN = /<!--[\s\S]*?-->|<\/\s*([a-zA-Z][\w-]*)\s*>|<([a-zA-Z][\w-]*)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>|[^<]+|</g
+const TOKEN = /<!--[\s\S]*?-->|<\/\s*([a-zA-Z][\w:.-]*)\s*>|<([a-zA-Z][\w:.-]*)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>|[^<]+|</g
 const ATTR = /([^\s=>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g
 
 export function parseHtml(html: string): HtmlElement {
@@ -99,6 +100,14 @@ export function htmlPlainText(html: string): string {
   return out.join('').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim()
 }
 
+/** 墨案富文本中常见、能正确处理的 HTML 标签 */
+const KNOWN_TAGS = new Set([
+  'p', 'div', 'span', 'br', 'img', 'table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th', 'colgroup', 'col', 'caption',
+  'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del', 'ins', 'sub', 'sup', 'font', 'a', 'ul', 'ol', 'li',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code', 'hr', 'small', 'big', 'mark', 'label',
+  'section', 'article', 'header', 'footer', 'figure', 'figcaption', 'center', 'o:p', 'script', 'style'
+])
+
 // ---------- 公式 ----------
 
 /** 把一段文字按公式分隔符拆开：$$…$$、\[…\] 为行间公式；$…$、\(…\) 为行内公式 */
@@ -138,6 +147,7 @@ export function htmlToRich(html: string, options: HtmlConvertOptions = {}): Rich
   const paras: RichParagraph[] = []
   let current: RichParagraph | null = null
   const ctx0: Ctx = { marks: {}, options }
+  const warned = new Set<string>()
 
   const cur = (format?: ParagraphFormat): RichParagraph => {
     if (current === null) {
@@ -158,6 +168,13 @@ export function htmlToRich(html: string, options: HtmlConvertOptions = {}): Rich
       return
     }
     const tag = node.tag
+    // 公式：MathML（从 Word 粘贴）、KaTeX / MathJax 渲染后的 HTML
+    const formula = formulaOf(node)
+    if (formula !== null) {
+      if (formula.unknown.length > 0) ctx.options.warn?.(`公式中有未识别的结构（${formula.unknown.join('、')}），已按文字导入：${formula.latex}`)
+      if (formula.latex !== '') addMath(cur(format), formula.latex, formula.display, ctx.marks)
+      return
+    }
     if (tag === 'script' || tag === 'style') return
     if (tag === 'br') {
       // 换行：另起一段（工程的段落里没有软换行）。<p><br></p> 由所在段落处理成空段落
@@ -179,6 +196,11 @@ export function htmlToRich(html: string, options: HtmlConvertOptions = {}): Rich
       flush()
       return
     }
+    // 不认识的标签（多半是某种公式或特殊排版）：按文字导入，并提示一次，便于发现转换遗漏
+    if (!KNOWN_TAGS.has(tag) && !warned.has(tag)) {
+      warned.add(tag)
+      ctx.options.warn?.(`有未识别的标签 <${tag}>，其中的内容按普通文字导入，可能丢失格式（如分数、根号）`)
+    }
     const block = tag === 'p' || tag === 'div' || tag === 'li' || /^h[1-6]$/.test(tag) || tag === 'blockquote' || tag === 'pre'
     const marks = { ...ctx.marks, ...marksOf(node) }
     const childCtx: Ctx = { ...ctx, marks }
@@ -199,15 +221,49 @@ export function htmlToRich(html: string, options: HtmlConvertOptions = {}): Rich
   return tidy(paras)
 }
 
+/**
+ * 认出一个元素是否整个是一条公式：
+ * - <math>（MathML，可带命名空间前缀）；
+ * - KaTeX 渲染结果 <span class="katex">：取其中 MathML 的 TeX 注释；
+ * - MathJax：<script type="math/tex">、<mjx-container>（取其中的 MathML）。
+ */
+function formulaOf(node: HtmlElement): MathmlLatex | null {
+  const name = localName(node.tag)
+  if (name === 'math') return mathmlToLatex(node, decodeEntities)
+  const cls = ` ${node.attrs['class'] ?? ''} `
+  if (node.tag === 'script' && /math\/tex/i.test(node.attrs['type'] ?? '')) {
+    const latex = decodeEntities(node.children.map((c) => (c.kind === 'text' ? c.text : '')).join('')).trim()
+    return { latex, display: /mode=display/i.test(node.attrs['type'] ?? ''), unknown: [] }
+  }
+  if (/ katex(-display)? /.test(cls) || node.tag === 'mjx-container') {
+    const math = findMath(node)
+    if (math !== null) return { ...mathmlToLatex(math, decodeEntities), ...(/katex-display/.test(cls) || node.attrs['display'] === 'true' ? { display: true } : {}) }
+  }
+  return null
+}
+
+function findMath(node: HtmlElement): HtmlElement | null {
+  for (const c of node.children) {
+    if (c.kind !== 'element') continue
+    if (localName(c.tag) === 'math') return c
+    const found = findMath(c)
+    if (found !== null) return found
+  }
+  return null
+}
+
+function addMath(p: RichParagraph, latex: string, display: boolean, marks: TextMarks): void {
+  const m: Inline = { type: 'math', latex, ...(display ? { display: true } : {}) }
+  if (marks.bold === true) m.bold = true
+  if (marks.underline === true) m.underline = true
+  if (marks.color !== undefined) m.color = marks.color
+  p.inlines.push(m)
+}
+
 function addText(p: RichParagraph, text: string, marks: TextMarks): void {
   for (const part of splitMath(text)) {
-    if ('latex' in part) {
-      const m: Inline = { type: 'math', latex: part.latex, ...(part.display ? { display: true } : {}) }
-      if (marks.bold === true) m.bold = true
-      if (marks.underline === true) m.underline = true
-      if (marks.color !== undefined) m.color = marks.color
-      p.inlines.push(m)
-    } else if (part.text !== '') {
+    if ('latex' in part) addMath(p, part.latex, part.display, marks)
+    else if (part.text !== '') {
       const prev = p.inlines[p.inlines.length - 1]
       if (prev !== undefined && prev.type === 'text' && sameMarks(prev.marks, marks)) prev.text += part.text
       else p.inlines.push({ type: 'text', text: part.text, ...(Object.keys(marks).length > 0 ? { marks: { ...marks } } : {}) })
