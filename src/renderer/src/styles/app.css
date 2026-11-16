@@ -5482,3 +5482,47 @@ input[type='checkbox']:disabled {
 .image-import-ok {
   color: #2e7d32;
 }
+
+.image-box[data-box] {
+  cursor: move;
+}
+.image-box-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 2px solid #2f6fb5;
+}
+.image-box-handle.is-nw {
+  left: -6px;
+  top: -6px;
+  cursor: nwse-resize;
+}
+.image-box-handle.is-ne {
+  right: -6px;
+  top: -6px;
+  cursor: nesw-resize;
+}
+.image-box-handle.is-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+.image-box-handle.is-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+.image-box-label {
+  pointer-events: none;
+}
+.image-box-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  color: #2f6fb5;
+  font-size: 15px;
+}
