@@ -21,6 +21,9 @@ import { DocParagraphView, type MathRun, type OptionImageHandlers, type Paragrap
 import type { FigureChangeHandler } from './FigureImage'
 import { PageHeaderView, PageWatermark } from './PageHeaderView'
 
+/** 从大纲选中内容时，内容第一行在预览窗中的位置（自上而下的比例） */
+const REVEAL_AT = 0.2
+
 const PT_TO_PX = 96 / 72
 
 interface Props {
@@ -155,7 +158,8 @@ export function Preview({
     return () => observer.disconnect()
   }, [pageWidthPt])
 
-  // 在大纲中选中（或新添加）内容时，把它滚动到可见位置。
+  // 在大纲中选中（或新添加）内容时，把它的第一行滚动到预览窗约 20% 高度处（靠上，便于往下查看整题）；
+  // 到了文档开头或末尾滚不动时，尽量靠近。
   // 新内容要等重新排版后才出现在页面上，所以选中变化时先记下，排版完成后再滚动。
   const pendingScrollRef = useRef<string | null>(null)
   /** 在预览中点击选中的内容：用户正看着它，不应把预览滚走 */
@@ -178,9 +182,11 @@ export function Preview({
   useEffect(() => {
     const id = pendingScrollRef.current
     if (id === null) return
-    const target = scrollRef.current?.querySelector(`.page [data-block-id="${CSS.escape(id)}"]`)
-    if (target !== null && target !== undefined) {
-      target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const container = scrollRef.current
+    const target = container?.querySelector(`.page [data-block-id="${CSS.escape(id)}"]`)
+    if (container !== null && container !== undefined && target !== null && target !== undefined) {
+      const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top
+      container.scrollTo({ top: container.scrollTop + offset - container.clientHeight * REVEAL_AT, behavior: 'smooth' })
       pendingScrollRef.current = null
     }
   }, [selectedBlockId, layout])
