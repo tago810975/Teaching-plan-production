@@ -12,6 +12,7 @@ import { withFigures } from '@core/model/figure-lists'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
 import { moveQuestion, moveQuestionAt, moveQuestionTo, type QuestionDrop } from '@core/model/move-question'
+import { replaceFigureAssets, type FigureAssetChange } from '@core/model/figure-refs'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -125,6 +126,8 @@ export type EditorAction =
   | { type: 'replace-inline'; ref: InlineRef; inline: Inline | null }
   /** 添加图片资源（题图等），不改变内容 */
   | { type: 'add-asset'; asset: Asset }
+  /** 批量替换插图的图片（变清晰、换成重绘的 SVG）：一步撤销 */
+  | { type: 'replace-figure-assets'; assets: Asset[]; changes: FigureAssetChange[] }
   /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
   | { type: 'insert-blocks'; blocks: Block[]; assets?: Record<string, Asset>; afterBlockId: string | null }
   /**
@@ -365,6 +368,13 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       }
       const next = touch(state, { ...project, header })
       return { ...next, bundle: { ...next.bundle, assets: nextAssets } }
+    }
+    case 'replace-figure-assets': {
+      if (action.changes.length === 0) return state
+      const next = withBlocks(state, (blocks) => replaceFigureAssets(blocks, action.changes))
+      const assets = { ...next.bundle.assets }
+      for (const a of action.assets) assets[a.id] = a
+      return { ...next, bundle: { ...next.bundle, assets } }
     }
     case 'add-asset':
       return { ...state, bundle: { ...state.bundle, assets: { ...state.bundle.assets, [action.asset.id]: action.asset } } }

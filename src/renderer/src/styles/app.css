@@ -1142,7 +1142,12 @@ button.link.danger {
 }
 .figure-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+/* 按钮多（上移、下移、变清晰、WorkBuddy 重绘、删除）：文字不折断，放不下时整体换行 */
+.figure-actions button {
+  white-space: nowrap;
 }
 
 /* ---------- 导入说明、添加菜单 ---------- */
@@ -5637,4 +5642,110 @@ input[type='checkbox']:disabled {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+
+.image-box-redraw {
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+  padding: 0 5px;
+  border: none;
+  border-radius: 0;
+  background: rgba(47, 111, 181, 0.75);
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+  cursor: pointer;
+}
+.image-box-redraw.is-on {
+  background: #e0782b;
+}
+.figure-row.is-located {
+  animation: located-flash 1.6s ease-out;
+}
+@keyframes located-flash {
+  0%,
+  40% {
+    background: rgba(224, 120, 43, 0.22);
+  }
+  100% {
+    background: transparent;
+  }
+}
+/* ---------- 批量处理插图 ---------- */
+.figure-batch {
+  width: min(1100px, 95vw);
+  max-height: 92vh;
+}
+.figure-batch-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.figure-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  max-height: 62vh;
+  overflow: auto;
+  padding: 2px;
+}
+.figure-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+}
+.figure-card.is-picked {
+  border-color: #2f6fb5;
+  box-shadow: 0 0 0 1px #2f6fb5;
+}
+.figure-card.has-svg {
+  grid-column: span 2;
+}
+.figure-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.figure-card-tag {
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #eef1f4;
+  color: #666;
+  font-size: 11px;
+}
+.figure-card img {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  align-self: center;
+}
+.figure-card-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.figure-card-compare label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.figure-card-compare label.is-chosen {
+  border-color: #2f6fb5;
+  box-shadow: 0 0 0 1px #2f6fb5;
 }

@@ -6,7 +6,7 @@ import { buildDocument } from '@core/document/build'
 import type { FigureListName, OptionImageRef } from '@core/document/ir'
 import { getPreset } from '@core/presets'
 import { resizeOptionImage, scaleOptionImages } from '@core/model/option-images'
-import type { Variant } from '@core/model/types'
+import type { Variant, Asset } from '@core/model/types'
 import { AddMenu } from './AddMenu'
 import { Splitter } from './layout/Splitter'
 import { usePanelWidths } from './layout/usePanelWidths'
@@ -16,6 +16,11 @@ import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { BlockQuickMenu } from './BlockQuickMenu'
 import { ImageImportDialog } from './import/ImageImportDialog'
 import { ContextMenu } from './home/ContextMenu'
+import { FigureBatchDialog } from './figures/FigureBatchDialog'
+import { FigureActionsContext, sharpenAsset, type FigureActions } from './figures/figure-actions'
+import { FigureClickContext } from './preview/image-menu'
+import { figureFieldId, listFigures, listKeyOf } from '@core/model/figure-refs'
+import type { FigureRef } from '@core/document/ir'
 import { FigureQuickMenu, OptionImageQuickMenu } from './ImageQuickMenu'
 import type { ImageTarget } from './preview/image-menu'
 import { FormulaEditorProvider, useOpenFormulaEditor } from './formula/context'
@@ -270,10 +275,48 @@ function EditorBody({
   const [imageImportOpen, setImageImportOpen] = useState(false)
   const [importMenu, setImportMenu] = useState<{ x: number; y: number } | null>(null)
 
+  // 插图：批量处理窗口、变清晰（属性栏、右键快捷栏共用）、点击预览中的插图定位到属性栏
+  const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const figureActions = useMemo<FigureActions>(
+    () => ({
+      sharpen: async (refs) => {
+        const { bundle } = stateRef.current
+        const keys = new Set(refs.map((r) => `${r.blockId}|${r.list ?? ''}|${r.figureIndex}`))
+        const entries = listFigures(bundle.project.blocks).filter((e) => keys.has(`${e.ref.blockId}|${e.ref.list ?? ''}|${e.ref.figureIndex}`))
+        const newAssets: Asset[] = []
+        const changes: Array<{ ref: FigureRef; assetId: string }> = []
+        let skipped = 0
+        for (const e of entries) {
+          const asset = bundle.assets[e.figure.assetId]
+          const next = asset !== undefined ? await sharpenAsset(asset) : null
+          if (next === null) {
+            skipped++
+            continue
+          }
+          newAssets.push(next)
+          changes.push({ ref: e.ref, assetId: next.id })
+        }
+        dispatch({ type: 'replace-figure-assets', assets: newAssets, changes })
+        return { done: changes.length, skipped }
+      },
+      openBatch: (options) => setFigureBatch(options ?? {})
+    }),
+    [dispatch]
+  )
+  const onFigureClick = useCallback(
+    (ref: FigureRef) =>
+      dispatch({ type: 'select', blockId: ref.blockId, focus: { field: figureFieldId(listKeyOf(ref), ref.figureIndex), paragraph: 0, before: '', after: '' } }),
+    [dispatch]
+  )
+
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
   return (
     <div className={inactive ? 'app is-inactive' : 'app'} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
+      <FigureActionsContext.Provider value={figureActions}>
+      <FigureClickContext.Provider value={onFigureClick}>
       <header className="toolbar">
         <div className="toolbar-doc">
           <button type="button" className="toolbar-home" onClick={files.goHome} title="回到首页（教学案保持打开，可在上方标签页中切换回来）">
@@ -414,6 +457,7 @@ function EditorBody({
           dispatch={dispatch}
           preset={preset}
           onBlockMenu={openQuickMenu}
+          onOpenFigureBatch={() => setFigureBatch({})}
         />
         <Preview
           ir={ir}
@@ -464,6 +508,18 @@ function EditorBody({
           onReset={() => resetPanel('right')}
         />
       </main>
+      {figureBatch !== null && (
+        <FigureBatchDialog
+          blocks={project.blocks}
+          assets={state.bundle.assets}
+          questionNumbers={questionNumbers}
+          dispatch={dispatch}
+          initial={figureBatch}
+          onClose={() => setFigureBatch(null)}
+        />
+      )}
+      </FigureClickContext.Provider>
+      </FigureActionsContext.Provider>
     </div>
   )
 }

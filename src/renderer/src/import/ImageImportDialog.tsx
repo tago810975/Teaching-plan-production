@@ -89,6 +89,8 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
   const [svgs, setSvgs] = useState<Map<string, string>>(new Map())
   const [useSvg, setUseSvg] = useState<Set<string>>(new Set())
+  // 要交给 WorkBuddy 重绘的框（在框上点“重绘”勾选；本来就清晰的图不用重绘）
+  const [redrawPick, setRedrawPick] = useState<Set<string>>(new Set())
   const redrawRef = useRef<typeof redraw>(null)
   redrawRef.current = redraw
   // 交给 WorkBuddy 识别：等待中的任务、状态提示
@@ -182,7 +184,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
     try {
       const byNumber = new Map<number, string>()
       const figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number }> = []
-      for (const b of boxes) {
+      for (const b of boxes.filter((x) => redrawPick.has(x.id))) {
         const n = numbers.get(b.id)
         const src = images.find((i) => i.key === b.image)
         if (n === undefined || src === undefined) continue
@@ -360,8 +362,13 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               </button>
             )}
             {boxes.length > 0 && (
-              <button type="button" onClick={() => void sendRedraw()} title="把框好的插图交给 WorkBuddy 重绘为 SVG 矢量图；收到后与原图逐张对照，选用哪一个">
-                让 WorkBuddy 重绘插图
+              <button
+                type="button"
+                disabled={boxes.every((b) => !redrawPick.has(b.id))}
+                onClick={() => void sendRedraw()}
+                title={boxes.some((b) => redrawPick.has(b.id)) ? '把勾选的插图交给 WorkBuddy 重绘为 SVG；收到后与原图逐张对照，选用哪一个' : '先在框上点“重绘”勾选要重绘的插图（本来就清晰的图不用重绘）'}
+              >
+                让 WorkBuddy 重绘（{boxes.filter((b) => redrawPick.has(b.id)).length}）
               </button>
             )}
             <label className="checkbox" title="导入时去掉插图的灰底与杂点、放大 3 倍（不改变内容），打印更清楚">
@@ -400,6 +407,15 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               onChange={(id, r) => setBoxes((all) => all.map((b) => (b.id === id ? { ...b, ...r } : b)))}
               onRemove={(id) => setBoxes((all) => all.filter((b) => b.id !== id))}
               svgBoxes={useSvg}
+              redrawPick={redrawPick}
+              onToggleRedraw={(id) =>
+                setRedrawPick((s) => {
+                  const next = new Set(s)
+                  if (next.has(id)) next.delete(id)
+                  else next.add(id)
+                  return next
+                })
+              }
               selected={selected}
               onSelect={setSelected}
             />
@@ -676,6 +692,8 @@ function BoxCanvas({
   onChange,
   onRemove,
   svgBoxes,
+  redrawPick,
+  onToggleRedraw,
   selected,
   onSelect
 }: {
@@ -687,6 +705,9 @@ function BoxCanvas({
   onRemove: (id: string) => void
   /** 选用了 SVG 的框（标签显示“SVG”） */
   svgBoxes: ReadonlySet<string>
+  /** 勾选了“重绘”的框 */
+  redrawPick: ReadonlySet<string>
+  onToggleRedraw: (id: string) => void
   selected: string | null
   onSelect: (id: string | null) => void
 }) {
@@ -719,7 +740,7 @@ function BoxCanvas({
   }
   const onDown = (e: ReactPointerEvent<HTMLDivElement>): void => {
     const t = e.target as HTMLElement
-    if (t.closest('.image-box-remove') !== null) return
+    if (t.closest('.image-box-remove, .image-box-redraw') !== null) return
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     const p = toImage(e)
@@ -770,6 +791,15 @@ function BoxCanvas({
               <span className="image-box-label">图{n}{svgBoxes.has(b.id) ? ' · SVG' : ''}</span>
               <button type="button" className="image-box-remove" aria-label={`删除图${n}`} title={`删除图${n}`} onClick={() => onRemove(b.id)}>
                 ×
+              </button>
+              <button
+                type="button"
+                className={redrawPick.has(b.id) ? 'image-box-redraw is-on' : 'image-box-redraw'}
+                aria-pressed={redrawPick.has(b.id)}
+                title="勾选后，点“让 WorkBuddy 重绘”时交出这张图"
+                onClick={() => onToggleRedraw(b.id)}
+              >
+                {redrawPick.has(b.id) ? '☑ 重绘' : '☐ 重绘'}
               </button>
               {(['nw', 'ne', 'sw', 'se'] as const).map((c) => (
                 <span key={c} className={`image-box-handle is-${c}`} data-corner={c} aria-hidden="true" />

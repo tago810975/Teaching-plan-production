@@ -7,3 +7,6 @@ import type { FigureRef, OptionImageRef } from '@core/document/ir'
 export type ImageTarget = { kind: 'figure'; ref: FigureRef } | { kind: 'option'; ref: OptionImageRef }
 
 export const ImageMenuContext = createContext<((target: ImageTarget, x: number, y: number) => void) | null>(null)
+
+/** 左键点击题图 / 插图：属性栏定位到这张图的设置 */
+export const FigureClickContext = createContext<((ref: FigureRef) => void) | null>(null)

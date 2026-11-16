@@ -19,9 +19,11 @@ interface Props {
   preset: FormatPreset
   /** 右键内容：弹出快捷版式窗口 */
   onBlockMenu?: (blockId: string, x: number, y: number) => void
+  /** 打开“批量处理插图” */
+  onOpenFigureBatch?: () => void
 }
 
-export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu }: Props) {
+export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu, onOpenFigureBatch }: Props) {
   const menu = (id: string) => (e: ReactMouseEvent): void => {
     if (onBlockMenu === undefined) return
     e.preventDefault()
@@ -56,6 +58,11 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
         >
           <span className="outline-text">版式设置</span>
         </button>
+        {onOpenFigureBatch !== undefined && (
+          <button type="button" className="outline-item outline-item--header" onClick={onOpenFigureBatch} title="勾选多张插图，一起变清晰或交给 WorkBuddy 重绘">
+            <span className="outline-text">批量处理插图…</span>
+          </button>
+        )}
       </div>
       {blocks.length === 0 ? (
         <p className="panel-empty">还没有内容。导入题目文档的功能完成后，可以从这里开始。</p>

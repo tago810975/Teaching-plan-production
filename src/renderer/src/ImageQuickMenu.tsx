@@ -5,7 +5,9 @@
  * - 选项图片：这张的宽度、全部一起缩小 / 放大、以这张为准统一大小。
  * 修改都可撤销。
  */
-import { useState, type Dispatch } from 'react'
+import { useContext, useState, type Dispatch } from 'react'
+import { FigureActionsContext } from './figures/figure-actions'
+import { assetMime } from './preview/assets'
 import type { FigureListName, OptionImageRef } from '@core/document/ir'
 import { figuresOf, withFigures } from '@core/model/figure-lists'
 import { optionImages, resizeOptionImage, scaleOptionImages, unifyOptionImages } from '@core/model/option-images'
@@ -27,6 +29,9 @@ export function FigureQuickMenu(props: {
   onIndexChange: (index: number) => void
 }) {
   const { block, figureIndex, list, x, y, dispatch, onClose, onIndexChange } = props
+  const actions = useContext(FigureActionsContext)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
   const figures = figuresOf(block, list)
   const f = figures[figureIndex]
   if (f === undefined) return null
@@ -37,6 +42,8 @@ export function FigureQuickMenu(props: {
       ? list === 'answer' ? block.question.answer : list === 'analysis' ? block.question.analysis : block.question.stem
       : block.type === 'knowledge' ? block.content : block.type === 'composite' ? block.background : []
   const subCount = block.type === 'question' ? block.question.subQuestions.length : 0
+  const ref = { blockId: block.id, figureIndex, ...(list !== undefined ? { list } : {}) }
+  const vector = (assetMime(f.assetId) ?? '').includes('svg')
   const name = list === 'answer' ? '答案插图' : list === 'analysis' ? '解析插图' : block.type === 'question' ? '题图' : block.type === 'composite' ? '背景配图' : '插图'
 
   const setFigures = (fn: (figs: QuestionFigure[]) => QuestionFigure[]): void =>
@@ -95,6 +102,37 @@ export function FigureQuickMenu(props: {
       <Row label="宽度">
         <CmStepper label="图片宽度" value={toCm(f.widthEmu)} min={1} max={18} onChange={(cm) => patch(widthPatch(f, cm))} />
       </Row>
+      {actions !== null && (
+        <div className="quick-menu-actions">
+          <button
+            type="button"
+            disabled={busy || vector}
+            title={vector ? '矢量图本来就清晰' : '去掉灰底与杂点、放大（不改变内容）；可撤销'}
+            onClick={() => {
+              setBusy(true)
+              void actions.sharpen([ref]).then((r) => {
+                setBusy(false)
+                if (r.done > 0) onClose()
+                else setNote('这张图没有处理（矢量图本来就清晰）。')
+              })
+            }}
+          >
+            {busy ? '处理中…' : '变清晰'}
+          </button>
+          <button
+            type="button"
+            disabled={vector}
+            title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
+            onClick={() => {
+              actions.openBatch({ refs: [ref], redraw: true })
+              onClose()
+            }}
+          >
+            WorkBuddy 重绘
+          </button>
+        </div>
+      )}
+      {note !== null && <p className="field-hint">{note}</p>}
       <div className="quick-menu-actions">
         <button type="button" disabled={figureIndex === 0} onClick={() => move(-1)} title="与前一张图交换顺序">
           ↑ 前移

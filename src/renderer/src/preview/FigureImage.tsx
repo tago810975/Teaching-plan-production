@@ -12,7 +12,7 @@ import { useContext, useRef, useState, type CSSProperties, type PointerEvent } f
 import type { FigureRef, OptionImageRef, FloatingImage } from '@core/document/ir'
 import { emuToPt } from '@core/document/units'
 import { FLOAT_GAP_EMU } from '@core/document/styles'
-import { ImageMenuContext, type ImageTarget } from './image-menu'
+import { FigureClickContext, ImageMenuContext, type ImageTarget } from './image-menu'
 
 export interface FigurePatch {
   widthEmu?: number
@@ -63,6 +63,9 @@ export function previewZoom(el: Element): number {
 export function FigureImage(props: Props) {
   const { src, widthEmu, heightEmu, figureRef, active, onChange, float, className, style, onResizeEnd, onResizeDraft, groupByDefault = false, groupScale, optionRef } = props
   const openMenu = useContext(ImageMenuContext)
+  const onFigureClick = useContext(FigureClickContext)
+  // 左键点一下（不是拖动、缩放）：属性栏定位到这张图的设置
+  const downAt = useRef<{ x: number; y: number } | null>(null)
   const target: ImageTarget | null = figureRef !== undefined ? { kind: 'figure', ref: figureRef } : optionRef !== undefined ? { kind: 'option', ref: optionRef } : null
   const [draft, setDraft] = useState<{ widthEmu?: number; heightEmu?: number; dx?: number; dy?: number } | null>(null)
   const start = useRef<{ x: number; y: number; zoom: number; mode: 'move' | 'resize'; group: boolean } | null>(null)
@@ -135,6 +138,20 @@ export function FigureImage(props: Props) {
       ref={boxRef}
       className={[className, 'figure', interactive ? 'figure--active' : '', float !== undefined ? 'figure--movable' : ''].filter(Boolean).join(' ')}
       style={boxStyle}
+      onPointerDownCapture={(e) => {
+        downAt.current = { x: e.clientX, y: e.clientY }
+      }}
+      onClick={
+        figureRef === undefined || onFigureClick === null
+          ? undefined
+          : (e) => {
+              // 不再冒泡到所在段落（否则会定位到题干等输入框）
+              e.stopPropagation()
+              const d = downAt.current
+              if (d !== null && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return
+              onFigureClick(figureRef)
+            }
+      }
       onPointerDown={float !== undefined ? (e) => begin(e, 'move') : undefined}
       onPointerMove={move}
       onPointerUp={end}

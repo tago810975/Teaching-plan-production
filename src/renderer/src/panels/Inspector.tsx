@@ -462,6 +462,7 @@ function CompositeForm({
         <RichTextField fieldId="background" value={block.background} rows={6} onChange={(background) => set({ background })} />
       </Field>
       <FigureList
+        blockId={block.id}
         title="背景配图"
         kind="knowledge"
         paragraphs={block.background}
@@ -543,6 +544,7 @@ function KnowledgeForm({
       <ImageParagraphsNotice content={block.content} figures={block.figures} onApply={(content, figures) => set({ content, figures })} />
       <ParagraphSettings block={block} update={update} dispatch={dispatch} />
       <FigureList
+        blockId={block.id}
         title="插图"
         kind="knowledge"
         paragraphs={block.content}
@@ -708,7 +710,8 @@ function QuestionForm({
   const focus = useContext(FieldFocusContext)
   useEffect(() => {
     if (focus === null || focus.blockId !== block.id) return
-    setTab(TEACHER_FIELDS.has(focus.field) ? 'teacher' : 'body')
+    // 答案、解析插图也在“仅教师版”中
+    setTab(TEACHER_FIELDS.has(focus.field) || /^figure:(answer|analysis):/.test(focus.field) ? 'teacher' : 'body')
   }, [focus, setTab, block.id])
 
   const tabs = (
@@ -775,7 +778,7 @@ function QuestionForm({
     return (
       <>
         {tabs}
-        <TeacherFields q={q} set={set} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
+        <TeacherFields blockId={block.id} q={q} set={set} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
         {layoutSection}
       </>
     )
@@ -806,6 +809,7 @@ function QuestionForm({
       </Field>
 
       <FigureList
+        blockId={block.id}
         kind="question"
         paragraphs={q.stem}
         subQuestionCount={q.subQuestions.length}
@@ -967,12 +971,14 @@ function useQuestionTab(): [QuestionTab, (t: QuestionTab) => void] {
  * 答案、解析的插图与知识点插图相同，可放在某段之后、某段右侧或自由位置。
  */
 function TeacherFields({
+  blockId,
   q,
   set,
   assetUrls,
   dispatch,
   fields
 }: {
+  blockId: string
   q: Question
   set: (patch: Partial<Question>) => void
   assetUrls: ReadonlyMap<string, string>
@@ -998,6 +1004,8 @@ function TeacherFields({
         onApply={(answer, answerFigures) => set({ answer, answerFigures })}
       />
       <FigureList
+        blockId={blockId}
+        list="answer"
         title="答案插图"
         kind="knowledge"
         paragraphs={q.answer}
@@ -1040,6 +1048,8 @@ function TeacherFields({
         onApply={(analysis, analysisFigures) => set({ analysis, analysisFigures })}
       />
       <FigureList
+        blockId={blockId}
+        list="analysis"
         title="解析插图"
         kind="knowledge"
         paragraphs={q.analysis}

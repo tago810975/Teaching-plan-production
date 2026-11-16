@@ -1,14 +1,20 @@
 /**
  * 题图管理：添加、删除、调整位置（题干下方 / 右侧环绕）与宽度。
  */
-import { useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/model/types'
 import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm } from './figure-options'
-import { enhance, readPixels, toPng } from '../import/enhance-client'
 import { assetMime } from '../preview/assets'
+import { FigureActionsContext } from '../figures/figure-actions'
+import { FieldFocusContext } from './fieldFocus'
+import type { FigureListName, FigureRef } from '@core/document/ir'
 
 interface Props {
+  /** 所在内容（题目、知识点、综合题）的 ID：用于定位、变清晰、WorkBuddy 重绘 */
+  blockId?: string
+  /** 答案 / 解析插图 */
+  list?: FigureListName
   /** 分组标题，默认“题图” */
   title?: string
   /** 题目与知识点可选的位置不同 */
@@ -29,6 +35,8 @@ const DEFAULT_WIDTH_CM = 5
 
 
 export function FigureList({
+  blockId,
+  list,
   title = '题图',
   kind,
   paragraphs,
@@ -50,29 +58,40 @@ export function FigureList({
     update(i, { widthEmu, heightEmu: Math.round((f.heightEmu * widthEmu) / f.widthEmu) })
   }
 
-  // 变清晰：清理底色、放大（后台处理），换成处理后的图片，显示尺寸不变；矢量图（SVG）本来就清晰，不处理
+  // 变清晰、WorkBuddy 重绘（与右键快捷栏、“批量处理插图”共用）；矢量图（SVG）本来就清晰，不处理
+  const actions = useContext(FigureActionsContext)
   const [sharpening, setSharpening] = useState<number | null>(null)
+  const refOf = (i: number): FigureRef => ({ blockId: blockId ?? '', figureIndex: i, ...(list !== undefined ? { list } : {}) })
   const sharpen = async (i: number): Promise<void> => {
-    const f = figures[i]
-    const url = f !== undefined ? assetUrls.get(f.assetId) : undefined
-    if (f === undefined || url === undefined) return
+    if (actions === null || blockId === undefined) return
     setError(null)
     setSharpening(i)
     try {
-      if ((assetMime(f.assetId) ?? '').includes('svg')) {
-        setError('这是矢量图，本来就清晰，不需要处理。')
-        return
-      }
-      const png = await toPng(await enhance(await readPixels(url)))
-      const asset = await createAsset(png, 'image/png')
-      onAddAsset(asset)
-      onChange(figures.map((g, k) => (k === i ? { ...g, assetId: asset.id } : g)))
+      const r = await actions.sharpen([refOf(i)])
+      if (r.done === 0) setError('这是矢量图，本来就清晰，不需要处理。')
     } catch {
       setError('处理失败，图片可能已损坏。')
     } finally {
       setSharpening(null)
     }
   }
+
+  // 预览中点了这张图：滚动到它的设置并短暂高亮
+  const focus = useContext(FieldFocusContext)
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([])
+  const handled = useRef(0)
+  useEffect(() => {
+    if (focus === null || blockId === undefined || focus.blockId !== blockId || focus.nonce === handled.current) return
+    const m = /^figure:(\w+):(\d+)$/.exec(focus.field)
+    if (m === null || m[1] !== (list ?? 'figures')) return
+    handled.current = focus.nonce
+    const row = rowRefs.current[Number(m[2])]
+    if (row === null || row === undefined) return
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    row.classList.remove('is-located')
+    void row.offsetWidth
+    row.classList.add('is-located')
+  }, [focus, blockId, list])
 
   const add = async (file: File): Promise<void> => {
     setError(null)
@@ -99,7 +118,13 @@ export function FigureList({
       <legend>{title}</legend>
       {figures.length === 0 && <p className="field-hint">没有{title}。</p>}
       {figures.map((f, i) => (
-        <div key={`${f.assetId}-${i}`} className="figure-row">
+        <div
+          key={`${f.assetId}-${i}`}
+          className="figure-row"
+          ref={(el) => {
+            rowRefs.current[i] = el
+          }}
+        >
           <div className="figure-thumb">
             <img src={assetUrls.get(f.assetId)} alt={`${title} ${i + 1}`} />
           </div>
@@ -217,11 +242,20 @@ export function FigureList({
               <button
                 type="button"
                 className="link"
-                disabled={sharpening !== null}
+                disabled={sharpening !== null || actions === null || blockId === undefined}
                 onClick={() => void sharpen(i)}
                 title="去掉灰底与杂点、放大 3 倍（不改变内容），打印更清楚；可撤销"
               >
                 {sharpening === i ? '处理中…' : '变清晰'}
+              </button>
+              <button
+                type="button"
+                className="link"
+                disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
+                onClick={() => actions?.openBatch({ refs: [refOf(i)], redraw: true })}
+                title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
+              >
+                WorkBuddy 重绘
               </button>
               <button type="button" className="link danger" onClick={() => onChange(figures.filter((_, j) => j !== i))}>
                 删除
