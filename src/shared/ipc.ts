@@ -44,6 +44,13 @@ export const IPC = {
   exportCheck: 'export:check',
   getExportPointsDefault: 'settings:get-export-points-default',
   getMathUpright: 'settings:get-math-upright',
+  workbuddyStatus: 'workbuddy:status',
+  workbuddyConnect: 'workbuddy:connect',
+  workbuddyDisconnect: 'workbuddy:disconnect',
+  workbuddyStart: 'workbuddy:start',
+  workbuddyUpdate: 'workbuddy:update',
+  workbuddyCancel: 'workbuddy:cancel',
+  workbuddyResult: 'workbuddy:result',
   setMathUpright: 'settings:set-math-upright',
   setExportPointsDefault: 'settings:set-export-points-default',
   getTheme: 'settings:get-theme',
@@ -85,6 +92,22 @@ export interface SaveRequest {
 }
 
 /** 导入 Word 的结果说明 */
+/** WorkBuddy 连接的状态 */
+export interface WorkBuddyStatus {
+  /** 找到了 WorkBuddy（用户目录下有 .workbuddy） */
+  found: boolean
+  /** WorkBuddy 的 mcp.json 中已有教学案制作的连接 */
+  connected: boolean
+  configPath: string
+}
+
+/** 交给 WorkBuddy 识别的一批图片 */
+export interface WorkBuddyTaskInput {
+  images: Array<{ name: string; mime: string; data: string }>
+  figureCount: number
+  presetId?: string
+}
+
 export interface ImportReport {
   fileNames: string[]
   questionCount: number
@@ -237,6 +260,15 @@ export interface RendererApi {
   setExportPointsDefault(on: boolean): Promise<void>
   /** 设置：公式中的字母用正体（不倾斜），预览与导出都按它；默认是 */
   getMathUpright(): Promise<boolean>
+  /** WorkBuddy 自动识别：连接状态、写入 / 移除连接配置 */
+  workbuddyStatus(): Promise<WorkBuddyStatus>
+  workbuddyConnect(): Promise<Result<WorkBuddyStatus>>
+  workbuddyDisconnect(): Promise<WorkBuddyStatus>
+  /** 登记待识别的图片（同一时间一批），返回任务 ID；结果由 onWorkbuddyResult 送回 */
+  workbuddyStart(input: WorkBuddyTaskInput): Promise<string>
+  workbuddyUpdate(taskId: string, figureCount: number): Promise<void>
+  workbuddyCancel(taskId: string): Promise<void>
+  onWorkbuddyResult(handler: (result: { taskId: string; text: string }) => void): () => void
   setMathUpright(on: boolean): Promise<void>
   /** 设置：界面配色主题 */
   getTheme(): Promise<ThemeId>

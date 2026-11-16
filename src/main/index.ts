@@ -5,6 +5,7 @@
  * 内容编辑与排版全部在渲染进程完成，主进程不持有工程数据。
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
+import { registerWorkBuddyIpc, startWorkBuddy } from './workbuddy'
 import { basename, dirname, join } from 'node:path'
 import { ProjectFileError } from '@core/project-file/codec'
 import { DocxReadError } from '@core/import/docx-reader'
@@ -83,6 +84,9 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     registerIpc()
+    registerWorkBuddyIpc()
+    // 与 WorkBuddy 的本机服务（WorkBuddy 识别题目图片后把结果交回“从图片导入”窗口）
+    void startWorkBuddy().catch((err) => console.error('WorkBuddy 本机服务启动失败', err))
     // 先读取用户模板（“教学案库\模板”），新建、打开教学案时才找得到自制的预设
     try {
       await loadUserTemplates()

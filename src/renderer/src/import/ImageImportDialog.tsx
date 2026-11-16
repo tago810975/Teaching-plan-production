@@ -80,6 +80,9 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 交给 WorkBuddy 识别：等待中的任务、状态提示
+  const [wb, setWb] = useState<{ state: 'idle' | 'need-connect' | 'waiting' | 'received'; taskId?: string; note?: string }>({ state: 'idle' })
+  const wbTask = useRef<string | null>(null)
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -124,6 +127,55 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
     setImages((all) => [...all, ...added])
     setCurrent((c) => c ?? added[0]!.key)
     for (const img of added) await autoDetect(img)
+  }
+
+  // WorkBuddy 送回的识别结果
+  useEffect(
+    () =>
+      window.api.onWorkbuddyResult((r) => {
+        if (r.taskId !== wbTask.current) return
+        setText(r.text)
+        setWb({ state: 'received', taskId: r.taskId })
+      }),
+    []
+  )
+  // 关闭窗口时取消任务
+  useEffect(
+    () => () => {
+      if (wbTask.current !== null) void window.api.workbuddyCancel(wbTask.current)
+    },
+    []
+  )
+  // 等待期间增删了插图框：告诉 WorkBuddy 插图数
+  useEffect(() => {
+    if (wbTask.current !== null) void window.api.workbuddyUpdate(wbTask.current, boxes.length)
+  }, [boxes.length])
+
+  const sendToWorkBuddy = async (): Promise<void> => {
+    setError(null)
+    const status = await window.api.workbuddyStatus()
+    if (!status.connected) {
+      setWb({ state: 'need-connect', note: status.found ? undefined : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）。' })
+      return
+    }
+    try {
+      const encoded = await Promise.all(images.map((i) => encodeForAi(i.url, i.width, i.height).then((data) => ({ name: i.name, mime: 'image/jpeg', data }))))
+      if (wbTask.current !== null) await window.api.workbuddyCancel(wbTask.current)
+      const taskId = await window.api.workbuddyStart({ images: encoded, figureCount: boxes.length, ...(presetId !== undefined ? { presetId } : {}) })
+      wbTask.current = taskId
+      setWb({ state: 'waiting', taskId })
+    } catch (e) {
+      setError(`交给 WorkBuddy 失败：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  const connectWorkBuddy = async (): Promise<void> => {
+    const r = await window.api.workbuddyConnect()
+    if (!r.ok) {
+      setWb({ state: 'need-connect', note: r.error })
+      return
+    }
+    setWb({ state: 'idle', note: '已连接。如果 WorkBuddy 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用（或重启 WorkBuddy），然后再点“交给 WorkBuddy 识别”。' })
   }
 
   // Ctrl+V 粘贴截图
@@ -293,8 +345,19 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
             >
               {copied ? '已复制 ✓' : '复制给 AI 的指令'}
             </button>
-            <span className="field-hint">指令连同图片发给 AI，再用代码块的“复制”按钮复制回复，粘贴到下面</span>
+            <button type="button" disabled={images.length === 0} onClick={() => void sendToWorkBuddy()} title="把图片交给 WorkBuddy 识别，结果自动回到这里">
+              交给 WorkBuddy 识别
+            </button>
           </div>
+          <WorkBuddyNotice
+            wb={wb}
+            onConnect={() => void connectWorkBuddy()}
+            onCancel={() => {
+              if (wbTask.current !== null) void window.api.workbuddyCancel(wbTask.current)
+              wbTask.current = null
+              setWb({ state: 'idle' })
+            }}
+          />
           <textarea
             className="image-import-text"
             aria-label="识别结果"
@@ -333,6 +396,66 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
       </div>
     </dialog>
   )
+}
+
+/** WorkBuddy 状态提示 */
+function WorkBuddyNotice({ wb, onConnect, onCancel }: { wb: { state: string; note?: string }; onConnect: () => void; onCancel: () => void }) {
+  const [copied, setCopied] = useState(false)
+  if (wb.state === 'idle') return wb.note !== undefined ? <p className="image-import-wb">{wb.note}</p> : null
+  if (wb.state === 'need-connect') {
+    return (
+      <div className="image-import-wb" role="status">
+        {wb.note ?? '还没有连接 WorkBuddy。连接一次后，就可以把图片直接交给 WorkBuddy 识别，结果自动回到这里。'}
+        <button type="button" onClick={onConnect}>
+          连接 WorkBuddy
+        </button>
+      </div>
+    )
+  }
+  if (wb.state === 'waiting') {
+    return (
+      <div className="image-import-wb is-waiting" role="status">
+        <span>
+          已交给 WorkBuddy。请到 WorkBuddy 里说：<strong>导入题目</strong>
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText('导入题目').then(() => {
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            })
+          }}
+        >
+          {copied ? '已复制 ✓' : '复制这句话'}
+        </button>
+        <button type="button" onClick={onCancel}>
+          取消
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="image-import-wb is-received" role="status">
+      已收到 WorkBuddy 的识别结果，请对照原图检查文字和插图，然后导入。
+    </div>
+  )
+}
+
+/** 交给 AI 的图片：长边不超过 2000 像素，JPEG */
+async function encodeForAi(url: string, width: number, height: number): Promise<string> {
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const k = Math.min(1, 2000 / Math.max(width, height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(width * k))
+  canvas.height = Math.max(1, Math.round(height * k))
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/jpeg;base64,/, '')
 }
 
 type Drag =

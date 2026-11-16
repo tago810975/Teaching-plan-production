@@ -285,9 +285,9 @@ export function textToParagraphs(
     if (SUB_LINE.test(cleaned)) hasSubQuestions = true
     lines.push(n)
   }
-  // 编号的短行后面紧跟着选项（“A．”）时是题目，不是小标题（“2.解题思路”后面跟“（1）……”仍是小标题）
+  // 编号的短行后面紧跟着选项（“A．”）或插图（“[图1]”）时是题目，不是小标题（“2.解题思路”后面跟“（1）……”仍是小标题）
   lines.forEach((l, k) => {
-    if (l.heading && /^\s*\d/.test(l.text) && /^\s*A\s*[．.、]/.test(lines[k + 1]?.text ?? '')) l.heading = false
+    if (l.heading && /^\s*\d/.test(l.text) && /^\s*(A\s*[．.、]|\[\s*图\s*\d+\s*\])/.test(lines[k + 1]?.text ?? '')) l.heading = false
   })
   for (const n of restructureInterleaved(lines)) {
     // 讲解中的小标题作为“题型分组”标题，不会被当成题目

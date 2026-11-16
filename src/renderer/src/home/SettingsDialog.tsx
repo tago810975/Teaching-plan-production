@@ -107,6 +107,8 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
         </label>
         <p className="field-hint">预览与导出的 Word 都按这里显示；不改动公式本身，随时可以切换。关闭时为 Word 默认的数学斜体。</p>
       </fieldset>
+      <WorkBuddySetting />
+
       <fieldset className="group">
         <legend>导出 Word</legend>
         <label className="checkbox">
@@ -134,5 +136,64 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
         </button>
       </div>
     </dialog>
+  )
+}
+
+/** WorkBuddy 自动识别：连接后，在“从图片导入”中可以把图片交给 WorkBuddy 识别，结果自动回到软件 */
+function WorkBuddySetting() {
+  const [status, setStatus] = useState<{ found: boolean; connected: boolean; configPath: string } | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.workbuddyStatus().then(setStatus)
+  }, [])
+  return (
+    <fieldset className="group">
+      <legend>WorkBuddy 自动识别</legend>
+      <p className="field-hint">
+        连接后，在“导入题目 → 图片”中点“交给 WorkBuddy 识别”，再到 WorkBuddy 里说“导入题目”，识别结果会自动回到软件。
+        连接会在 WorkBuddy 的配置中加入“teaching-plan”一项（其他连接器不受影响）。
+      </p>
+      <div className="settings-row">
+        <span>
+          {status === null
+            ? '正在检查…'
+            : status.connected
+              ? '已连接'
+              : status.found
+                ? '未连接'
+                : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）'}
+        </span>
+        {status !== null && !status.connected && (
+          <button
+            type="button"
+            disabled={!status.found}
+            onClick={() => {
+              void window.api.workbuddyConnect().then((r) => {
+                if (r.ok) {
+                  setStatus(r.value)
+                  setNote('已连接。如果 WorkBuddy 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用，或重启 WorkBuddy。')
+                } else setNote(r.error)
+              })
+            }}
+          >
+            连接 WorkBuddy
+          </button>
+        )}
+        {status?.connected === true && (
+          <button
+            type="button"
+            onClick={() => {
+              void window.api.workbuddyDisconnect().then((s) => {
+                setStatus(s)
+                setNote('已断开。')
+              })
+            }}
+          >
+            断开
+          </button>
+        )}
+      </div>
+      {note !== null && <p className="field-hint">{note}</p>}
+    </fieldset>
   )
 }

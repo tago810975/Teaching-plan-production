@@ -5526,3 +5526,35 @@ input[type='checkbox']:disabled {
   color: #2f6fb5;
   font-size: 15px;
 }
+
+.image-import-wb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 12.5px;
+}
+.image-import-wb.is-waiting {
+  border-color: #2f6fb5;
+  background: rgba(47, 111, 181, 0.08);
+}
+.image-import-wb.is-received {
+  border-color: #2e7d32;
+  background: rgba(46, 125, 50, 0.08);
+}
+.image-import-wb button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
