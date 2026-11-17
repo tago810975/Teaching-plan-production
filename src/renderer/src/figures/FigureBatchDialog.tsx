@@ -22,8 +22,8 @@ interface Props {
   onClose: () => void
 }
 
-const opName = (mode: 'normal' | 'lineart' | 'none', transparent: boolean): string =>
-  mode === 'none' ? (transparent ? '去白底' : '处理') : `${mode === 'lineart' ? '处理为线稿' : '变清晰'}${transparent ? '并去白底' : ''}`
+const opName = (mode: 'normal' | 'none', transparent: boolean): string =>
+  mode === 'none' ? (transparent ? '去白底' : '处理') : `变清晰${transparent ? '并去白底' : ''}`
 
 const keyOf = (ref: FigureRef): string => `${ref.blockId}|${ref.list ?? 'figures'}|${ref.figureIndex}`
 
@@ -79,7 +79,7 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
   const assetOf = (e: FigureEntry): Asset | undefined => assets[e.figure.assetId]
   const selected = entries.filter((e) => picked.has(keyOf(e.ref)) && !isVector(assetOf(e)))
 
-  const sharpen = async (mode: 'normal' | 'lineart' | 'none', transparent = false): Promise<void> => {
+  const sharpen = async (mode: 'normal' | 'none', transparent = false): Promise<void> => {
     setNote(null)
     const newAssets: Asset[] = []
     const changes: Array<{ ref: FigureRef; assetId: string }> = []
@@ -253,14 +253,6 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
       <div className="dialog-actions">
         <button type="button" disabled={progress !== null || selected.length === 0} onClick={() => void sharpen('normal')} title="去掉灰底与杂点、放大（不改变内容）">
           变清晰（{selected.length}）
-        </button>
-        <button
-          type="button"
-          disabled={progress !== null || selected.length === 0}
-          onClick={() => void sharpen('lineart')}
-          title="变清晰后再把线条压成纯黑（彩色线条保持原色）、纸张纯白；成片的填充保持原样。适合黑白线条图"
-        >
-          线稿（{selected.length}）
         </button>
         <button
           type="button"

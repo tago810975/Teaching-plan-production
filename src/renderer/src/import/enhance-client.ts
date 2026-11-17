@@ -24,8 +24,8 @@ function getWorker(): Worker {
   return worker
 }
 
-/** 变清晰：清理底色，较小的图放大 3 倍；线稿方式再把线条压实；mode 为 'none' 时不处理。transparent：去白底 */
-export function enhance(px: Rgba, mode: 'normal' | 'lineart' | 'none' = 'normal', transparent = false): Promise<Rgba> {
+/** 变清晰：清理底色，较小的图放大 3 倍；mode 为 'none' 时不处理。transparent：去白底 */
+export function enhance(px: Rgba, mode: 'normal' | 'none' = 'normal', transparent = false): Promise<Rgba> {
   const id = ++seq
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject })

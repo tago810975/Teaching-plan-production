@@ -12,7 +12,7 @@ import { enhance, toPng, type Rgba } from '../import/enhance-client'
 
 export interface FigureActions {
   /**
-   * 变清晰（一步撤销；矢量图跳过）；mode 为线稿时把线条压成纯黑 / 本色，为 'none' 时不处理；
+   * 变清晰（一步撤销；矢量图跳过）；mode 为 'none' 时不处理；
    * transparent：去白底（白色变透明）。返回处理与跳过的张数
    */
   sharpen: (refs: FigureRef[], mode?: EnhanceMode, transparent?: boolean) => Promise<{ done: number; skipped: number }>

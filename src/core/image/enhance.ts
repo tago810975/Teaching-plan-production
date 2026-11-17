@@ -6,7 +6,7 @@
  * 选型与对比见 docs/图片导入.md（矢量描摹会丢细线和文字，AI 重绘不能保证还原，大型模型太慢）。
  */
 import { fsrcnnY } from './fsrcnn'
-import { lineArt, whiteToAlpha } from './lineart'
+import { whiteToAlpha } from './transparent'
 
 export interface Pixels {
   data: Uint8Array | Uint8ClampedArray
@@ -151,59 +151,20 @@ export function upscale3(img: Pixels): Pixels {
 /** 放大前的最大像素数：更大的图本身已足够清楚，只清理不放大（也避免太慢） */
 export const MAX_UPSCALE_PIXELS = 400 * 400
 
-/** 处理方式：普通（清理 + 放大）、线稿（再把线条压成纯黑 / 本色、纸张纯白）、不处理（只去白底时用） */
-export type EnhanceMode = 'normal' | 'lineart' | 'none'
+/** 处理方式：普通（清理 + 放大）或不处理（只去白底时用） */
+export type EnhanceMode = 'normal' | 'none'
 
 export interface EnhanceOptions {
   /** 去白底：白色变为透明 */
   transparent?: boolean
 }
 
-/** 双线性放大 f 倍（大图做线稿前用：FSRCNN 太慢，在更高的分辨率下压成黑白，边缘更细腻） */
-export function upscaleBilinear(img: Pixels, f: number): Pixels {
-  const { data, width: W, height: H } = img
-  const OW = Math.round(W * f)
-  const OH = Math.round(H * f)
-  const out = new Uint8ClampedArray(OW * OH * 4)
-  for (let y = 0; y < OH; y++) {
-    const fy = Math.min(H - 1, Math.max(0, (y + 0.5) / f - 0.5))
-    const y0 = Math.floor(fy)
-    const y1 = Math.min(H - 1, y0 + 1)
-    const ay = fy - y0
-    for (let x = 0; x < OW; x++) {
-      const fx = Math.min(W - 1, Math.max(0, (x + 0.5) / f - 0.5))
-      const x0 = Math.floor(fx)
-      const x1 = Math.min(W - 1, x0 + 1)
-      const ax = fx - x0
-      for (let c = 0; c < 4; c++) {
-        const v =
-          (data[(y0 * W + x0) * 4 + c]! * (1 - ax) + data[(y0 * W + x1) * 4 + c]! * ax) * (1 - ay) +
-          (data[(y1 * W + x0) * 4 + c]! * (1 - ax) + data[(y1 * W + x1) * 4 + c]! * ax) * ay
-        out[(y * OW + x) * 4 + c] = v
-      }
-    }
-  }
-  return { data: out, width: OW, height: OH }
-}
-
-/** 大图做线稿前放大 2 倍的上限（放大后的像素数） */
-const MAX_LINEART_PIXELS = 2600 * 1000
-
-/**
- * 插图变清晰：清理底色，较小的图再 FSRCNN 放大 3 倍；线稿方式再压成线稿（大图先放大 2 倍）；
- * 去白底时最后把白色变为透明。mode 为 'none' 时只去白底。
- */
+/** 插图变清晰：清理底色，较小的图再 FSRCNN 放大 3 倍；去白底时最后把白色变为透明。mode 为 'none' 时只去白底 */
 export function enhanceFigure(img: Pixels, mode: EnhanceMode = 'normal', options: EnhanceOptions = {}): Pixels {
-  let out: Pixels
-  if (mode === 'none') out = img
-  else {
+  let out: Pixels = img
+  if (mode === 'normal') {
     const cleaned = cleanBackground(img)
-    const up = img.width * img.height <= MAX_UPSCALE_PIXELS
-    out = up ? upscale3(cleaned) : cleaned
-    if (mode === 'lineart') {
-      if (!up && out.width * out.height * 4 <= MAX_LINEART_PIXELS) out = lineArt(upscaleBilinear(out, 2), 2)
-      else out = lineArt(out, up ? 3 : 1)
-    }
+    out = img.width * img.height <= MAX_UPSCALE_PIXELS ? upscale3(cleaned) : cleaned
   }
   return options.transparent === true ? whiteToAlpha(out) : out
 }

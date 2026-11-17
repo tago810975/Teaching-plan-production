@@ -122,21 +122,6 @@ export function FigureQuickMenu(props: {
           <button
             type="button"
             disabled={busy || vector}
-            title={vector ? '矢量图本来就清晰' : '变清晰后把线条压成纯黑、纸张纯白（填充保持原样）；适合黑白线条图；可撤销'}
-            onClick={() => {
-              setBusy(true)
-              void actions.sharpen([ref], 'lineart').then((r) => {
-                setBusy(false)
-                if (r.done > 0) onClose()
-                else setNote('这张图没有处理（矢量图本来就清晰）。')
-              })
-            }}
-          >
-            线稿
-          </button>
-          <button
-            type="button"
-            disabled={busy || vector}
             title={vector ? '矢量图不需要处理' : '白色底色变为透明（放在任何底色上都没有白边）；可撤销'}
             onClick={() => {
               setBusy(true)

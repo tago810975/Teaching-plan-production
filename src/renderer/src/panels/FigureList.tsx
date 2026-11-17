@@ -62,7 +62,7 @@ export function FigureList({
   const actions = useContext(FigureActionsContext)
   const [sharpening, setSharpening] = useState<number | null>(null)
   const refOf = (i: number): FigureRef => ({ blockId: blockId ?? '', figureIndex: i, ...(list !== undefined ? { list } : {}) })
-  const sharpen = async (i: number, mode: 'normal' | 'lineart' | 'none' = 'normal', transparent = false): Promise<void> => {
+  const sharpen = async (i: number, mode: 'normal' | 'none' = 'normal', transparent = false): Promise<void> => {
     if (actions === null || blockId === undefined) return
     setError(null)
     setSharpening(i)
@@ -247,15 +247,6 @@ export function FigureList({
                 title="去掉灰底与杂点、放大 3 倍（不改变内容），打印更清楚；可撤销"
               >
                 {sharpening === i ? '处理中…' : '变清晰'}
-              </button>
-              <button
-                type="button"
-                className="link"
-                disabled={sharpening !== null || actions === null || blockId === undefined}
-                onClick={() => void sharpen(i, 'lineart')}
-                title="变清晰后把线条压成纯黑、纸张纯白（填充保持原样）；适合黑白线条图；可撤销"
-              >
-                线稿
               </button>
               <button
                 type="button"

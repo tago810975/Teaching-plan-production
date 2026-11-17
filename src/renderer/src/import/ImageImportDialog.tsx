@@ -89,12 +89,8 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
   const [error, setError] = useState<string | null>(null)
   // 插图变清晰（清理底色 + 放大），默认打开；选中的框显示处理前后对比
   const [enhanceOn, setEnhanceOn] = useState(true)
-  // 处理方式：默认（普通 / 线稿），单张可另选
-  const [mode, setMode] = useState<'normal' | 'lineart'>('normal')
-  // 去白底（白色变透明），与“普通 / 线稿”搭配
+  // 去白底（白色变透明），可与变清晰搭配
   const [transparent, setTransparent] = useState(false)
-  const [boxMode, setBoxMode] = useState<Map<string, 'normal' | 'lineart'>>(new Map())
-  const modeOf = (id: string): 'normal' | 'lineart' => boxMode.get(id) ?? mode
   const [selected, setSelected] = useState<string | null>(null)
   // 让 WorkBuddy 重绘为 SVG：交出时的图号 → 框；收到的 SVG；选用 SVG 的框
   const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
@@ -303,7 +299,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
           asset = await createAsset(new TextEncoder().encode(svg), 'image/svg+xml')
         } else {
           let px = await readPixels(src.url, rect)
-          if (enhanceOn || transparent) px = await enhance(px, enhanceOn ? modeOf(b.id) : 'none', transparent)
+          if (enhanceOn || transparent) px = await enhance(px, enhanceOn ? 'normal' : 'none', transparent)
           asset = await createAsset(await toPng(px), 'image/png')
         }
         let widthEmu = rect.w * EMU_PER_PX
@@ -387,16 +383,6 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
               <input type="checkbox" checked={enhanceOn} onChange={(e) => setEnhanceOn(e.target.checked)} />
               插图变清晰
             </label>
-            <select
-              aria-label="变清晰的方式"
-              value={mode}
-              disabled={!enhanceOn}
-              onChange={(e) => setMode(e.target.value as 'normal' | 'lineart')}
-              title="普通：去灰底、放大锐化；线稿：再把线条压成纯黑（彩色线条保持原色）、纸张纯白，成片的填充保持原样，适合黑白线条图。点选插图可单独改"
-            >
-              <option value="normal">普通</option>
-              <option value="lineart">线稿</option>
-            </select>
             <label className="checkbox" title="白色底色变为透明（线条边缘半透明，放在任何底色上都没有白边）">
               <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} />
               去白底
@@ -495,8 +481,6 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
                 url={img.url}
                 box={box}
                 n={numbers.get(box.id)}
-                mode={modeOf(box.id)}
-                onMode={(m) => setBoxMode((all) => new Map(all).set(box.id, m))}
               />
             ) : null
           })()}
@@ -690,25 +674,9 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
-function EnhancePreview({
-  url,
-  box,
-  n,
-  mode,
-  onMode,
-  enhanceOn,
-  transparent
-}: {
-  url: string
-  box: Rect
-  n: number | undefined
-  mode: 'normal' | 'lineart'
-  onMode: (m: 'normal' | 'lineart') => void
-  enhanceOn: boolean
-  transparent: boolean
-}) {
+function EnhancePreview({ url, box, n, enhanceOn, transparent }: { url: string; box: Rect; n: number | undefined; enhanceOn: boolean; transparent: boolean }) {
   const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
-  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${mode}|${enhanceOn}|${transparent}`
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${enhanceOn}|${transparent}`
   useEffect(() => {
     let alive = true
     const made: string[] = []
@@ -718,7 +686,7 @@ function EnhancePreview({
       made.push(before)
       if (!alive) return
       setPair({ before, after: null })
-      const after = await toObjectUrl(await enhance(px, enhanceOn ? mode : 'none', transparent))
+      const after = await toObjectUrl(await enhance(px, enhanceOn ? 'normal' : 'none', transparent))
       made.push(after)
       if (alive) setPair({ before, after })
     })()
@@ -735,15 +703,7 @@ function EnhancePreview({
         {pair !== null && <img src={pair.before} alt="" />}
       </figure>
       <figure>
-        <figcaption className="enhance-mode">
-          处理后（导入时使用）：
-          {enhanceOn && (['normal', 'lineart'] as const).map((m) => (
-            <label key={m}>
-              <input type="radio" name={`mode-${n ?? ''}`} checked={mode === m} onChange={() => onMode(m)} />
-              {m === 'normal' ? '普通' : '线稿'}
-            </label>
-          ))}
-        </figcaption>
+        <figcaption>处理后（导入时使用）</figcaption>
         {pair?.after != null ? <img src={pair.after} alt="" className={transparent ? 'checker' : undefined} /> : <span className="field-hint">正在处理…</span>}
       </figure>
     </div>
