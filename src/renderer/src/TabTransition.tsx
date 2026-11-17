@@ -23,6 +23,8 @@ function enabled(): boolean {
   const root = document.documentElement
   // 带页面切换幕布的风格主题
   if (root.dataset['theme'] !== 'noir' && root.dataset['theme'] !== 'tide') return false
+  // 设置里关掉了这个主题的过场
+  if ((root.dataset['fxOff'] ?? '').split(' ').includes('wipe')) return false
   if (root.dataset['reduceMotion'] === 'true') return false
   return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

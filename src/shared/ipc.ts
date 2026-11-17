@@ -3,7 +3,7 @@
  *
  * 渲染进程不直接接触文件系统，所有磁盘操作经由这里定义的接口交给主进程。
  */
-import type { ThemeId } from './themes'
+import type { ThemeEffectsOff, ThemeId } from './themes'
 import type { Asset, Block, ProjectBundle, Variant } from '@core/model/types'
 import type { OptionStopScheme } from '@core/model/option-stop-schemes'
 import type { ProjectSummary } from '@core/project-file/codec'
@@ -58,6 +58,8 @@ export const IPC = {
   setExportPointsDefault: 'settings:set-export-points-default',
   getTheme: 'settings:get-theme',
   setTheme: 'settings:set-theme',
+  getThemeEffectsOff: 'settings:get-theme-effects-off',
+  setThemeEffectsOff: 'settings:set-theme-effects-off',
   exportWord: 'export:word',
   defaultExportDir: 'export:default-dir',
   openPath: 'shell:open-path',
@@ -285,6 +287,9 @@ export interface RendererApi {
   /** 设置：界面配色主题 */
   getTheme(): Promise<ThemeId>
   setTheme(id: ThemeId): Promise<void>
+  /** 设置：风格主题中关掉的动效 */
+  getThemeEffectsOff(): Promise<ThemeEffectsOff>
+  setThemeEffectsOff(value: ThemeEffectsOff): Promise<void>
   exportWord(request: ExportRequest): Promise<Result<ExportResult>>
   /** 用系统默认程序打开文件（如 Word） */
   openPath(path: string): Promise<string | null>

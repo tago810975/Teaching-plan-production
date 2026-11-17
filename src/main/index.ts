@@ -40,6 +40,8 @@ import {
   setExportPointsDefault,
   getTheme,
   setTheme,
+  getThemeEffectsOff,
+  setThemeEffectsOff,
   getOptionStopSchemes,
   getLibraryDir,
   listProjects,
@@ -111,6 +113,8 @@ async function createWindow(): Promise<void> {
   closeConfirmed = false
   // 先读出配色主题：窗口底色与界面一致，打开时不闪；主题通过地址参数交给界面，首帧就是对的颜色
   const theme = await getTheme()
+  // 当前主题关掉的动效也一并交给界面，首帧就不播放
+  const fxOff = ((await getThemeEffectsOff())[theme] ?? []).join(' ')
 
   const win = new BrowserWindow({
     width: 1440,
@@ -173,9 +177,10 @@ async function createWindow(): Promise<void> {
   if (!app.isPackaged && devUrl !== undefined) {
     const url = new URL(devUrl)
     url.searchParams.set('theme', theme)
+    url.searchParams.set('fxoff', fxOff)
     void win.loadURL(url.toString())
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme } })
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme, fxoff: fxOff } })
   }
 }
 
@@ -304,6 +309,8 @@ function registerIpc(): void {
     await setTheme(id)
     BrowserWindow.fromWebContents(event.sender)?.setBackgroundColor(themeInfo(id).windowBackground)
   })
+  ipcMain.handle(IPC.getThemeEffectsOff, () => getThemeEffectsOff())
+  ipcMain.handle(IPC.setThemeEffectsOff, (_event, value: unknown) => setThemeEffectsOff(value))
 
   ipcMain.handle(IPC.exportWord, async (_event, req: ExportRequest) => {
     try {

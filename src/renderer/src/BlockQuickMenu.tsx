@@ -28,11 +28,13 @@ interface Props {
   preset: FormatPreset
   dispatch: Dispatch<EditorAction>
   onClose: () => void
+  /** 从预览中打开（风格主题可用更张扬的样式） */
+  stage?: boolean
 }
 
 type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pick<QuestionLayout, 'optionColumns'>>
 
-export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blocks = [], x, y, preset, dispatch, onClose }: Props) {
+export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blocks = [], x, y, preset, dispatch, onClose, stage = false }: Props) {
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -54,7 +56,7 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blo
   const unit = isQuestion ? '题' : '块'
 
   return (
-    <QuickPopover x={x} y={y} title={title(block, number)} label="快捷版式" onClose={onClose}>
+    <QuickPopover x={x} y={y} title={title(block, number)} label="快捷版式" onClose={onClose} stage={stage}>
 
       {block.type === 'question' && (
         <Row label="难度">
@@ -263,7 +265,24 @@ export function Stepper({ label, value, onChange }: { label: string; value: numb
 /**
  * 快捷窗口的外壳：在鼠标位置弹出，靠近窗口边缘时向内收；Esc、点窗口外、窗口失去焦点时关闭。
  */
-export function QuickPopover({ x, y, title, label, onClose, children }: { x: number; y: number; title: string; label: string; onClose: () => void; children: ReactNode }) {
+export function QuickPopover({
+  x,
+  y,
+  title,
+  label,
+  onClose,
+  children,
+  stage = false
+}: {
+  x: number
+  y: number
+  title: string
+  label: string
+  onClose: () => void
+  children: ReactNode
+  /** 从预览中打开：加 quick-menu--stage，“赤黑”主题下画成战斗指令式的菜单 */
+  stage?: boolean
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ left: x, top: y })
   useLayoutEffect(() => {
@@ -295,7 +314,7 @@ export function QuickPopover({ x, y, title, label, onClose, children }: { x: num
     }
   }, [onClose])
   return (
-    <div ref={ref} className="quick-menu" role="dialog" aria-label={label} style={{ left: pos.left, top: pos.top }}>
+    <div ref={ref} className={stage ? 'quick-menu quick-menu--stage' : 'quick-menu'} role="dialog" aria-label={label} style={{ left: pos.left, top: pos.top }}>
       <div className="quick-menu-head">
         <span className="quick-menu-title">{title}</span>
         <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>

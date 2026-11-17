@@ -5899,3 +5899,381 @@ canvas.checker {
     outline-offset: 2px;
   }
 }
+
+/* ---------- 设置：风格主题的动效开关 ---------- */
+.theme-effects {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: var(--hairline) solid var(--rule-soft);
+}
+.theme-effects-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.theme-effects-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
+}
+.theme-effects-list .checkbox {
+  margin: 4px 0;
+}
+
+/* ====================================================================
+ * 赤黑：预览中右键的“战斗指令”式菜单（.quick-menu--stage）
+ * 没有外框：身后一团红色的尖刺爆炸，每一行是一块各自歪着、直接压在红色上的黑色厚板，
+ * 字段名是粗斜体白字、首字反白；各行错落着依次甩进来，悬停的那块翻成白底。
+ * 大纲里右键打开的菜单没有 --stage，保持紧凑的常规样式。
+ * 设置里关掉“预览中右键的战斗指令式菜单”（data-fx-off~='stage'）时不生效。
+ * ==================================================================== */
+@keyframes noir-burst-in {
+  from {
+    opacity: 0;
+    transform: rotate(-24deg) scale(0.3);
+  }
+}
+@keyframes noir-cmd-in {
+  from {
+    opacity: 0;
+    transform: translateX(-46px) rotate(-14deg) scale(0.9);
+  }
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage {
+  width: 380px;
+  padding: 16px 22px 18px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  isolation: isolate;
+}
+/* 身后的红色尖刺爆炸 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::before {
+  content: '';
+  position: absolute;
+  inset: -34px -46px -38px -40px;
+  z-index: -2;
+  background: var(--red-pen);
+  clip-path: polygon(
+    8% 18%, 0% 2%, 22% 12%, 30% 0%, 38% 10%, 55% 1%, 60% 11%, 82% 0%, 78% 14%, 100% 10%,
+    90% 30%, 100% 44%, 89% 52%, 99% 72%, 86% 74%, 96% 100%, 70% 88%, 58% 99%, 50% 88%,
+    30% 100%, 28% 86%, 4% 96%, 12% 76%, 0% 64%, 10% 52%, 1% 34%
+  );
+  transform: rotate(-4deg);
+  animation: noir-burst-in 240ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+/* 标题：白色斜切厚板、黑色粗斜体 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-head {
+  margin: -4px -6px 10px -10px;
+  padding: 4px 8px 4px 14px;
+  border: none;
+  background: #f4f4f4;
+  clip-path: polygon(0 0, 100% 6%, calc(100% - 12px) 100%, 2% 92%);
+  transform: rotate(-3deg);
+  animation: noir-cmd-in 220ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-title {
+  color: #0b0b0b;
+  font-size: var(--fs-title);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-head .icon-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid #0b0b0b;
+  border-radius: 50% !important;
+  background: #0b0b0b;
+  color: #f4f4f4;
+  font-weight: 900;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-head .icon-button:hover {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+}
+/* 每一行：一块各自歪着、左右错落的黑色厚板 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check) {
+  position: relative;
+  margin: 7px 0;
+  padding: 6px 12px 6px 10px;
+  background: #0b0b0b;
+  outline: 2px solid #0b0b0b;
+  clip-path: polygon(0 4%, 100% 0, calc(100% - 8px) 100%, 6px 96%);
+  transition:
+    background-color 80ms linear,
+    transform 200ms var(--ease-spring);
+  animation: noir-cmd-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):nth-of-type(odd) {
+  transform: rotate(-2.2deg) translateX(-8px);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):nth-of-type(even) {
+  transform: rotate(1.6deg) translateX(10px);
+}
+/* 依次甩进来 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(2) { animation-delay: 30ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(3) { animation-delay: 60ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4) { animation-delay: 90ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(5) { animation-delay: 120ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(6) { animation-delay: 150ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(7) { animation-delay: 180ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(n + 8) { animation-delay: 210ms; }
+/* 字段名：粗斜体白字，首字反白 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label {
+  width: auto;
+  min-width: 3.2em;
+  color: #f4f4f4;
+  font-size: var(--fs-title);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  transform: none !important;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label::first-letter {
+  padding: 0 2px;
+  background: #f4f4f4;
+  color: #0b0b0b;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check {
+  color: #f4f4f4;
+  font-weight: 700;
+}
+/* 悬停的那块：回正、略放大，翻成白底黑字，首字变红 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):hover {
+  z-index: 1;
+  background: #f4f4f4;
+  transform: rotate(-1deg) translateX(4px) scale(1.03);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-controls,
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-label,
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check:hover {
+  color: #0b0b0b !important;
+  font-style: italic;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-label::first-letter {
+  background: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check:hover input[type='checkbox']:not(:checked) {
+  border-color: #0b0b0b;
+}
+/* 白底上的控件改成黑框，免得看不见 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover :is(.segmented, select, input[type='number'], input[type='text']) {
+  border-color: #0b0b0b;
+}
+/* 底部动作：小号黑板，悬停变红；删除是白底红字 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: none;
+  animation: noir-cmd-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1) 160ms both;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button {
+  padding: 4px 14px;
+  border: 2px solid #f4f4f4;
+  background: #0b0b0b;
+  color: #f4f4f4;
+  font-weight: 900;
+  font-style: italic;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button:hover:not(:disabled) {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+  color: #fff;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions .danger {
+  background: #f4f4f4;
+  color: var(--red-pen);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions .danger:hover:not(:disabled) {
+  background: #0b0b0b;
+  border-color: var(--red-pen);
+  color: var(--red-pen);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-note {
+  margin-left: 0;
+  color: #d0d0d0;
+}
+/* 战斗菜单已有自己的入场，不再叠加浮层的倾斜甩入 */
+@starting-style {
+  :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ====================================================================
+ * 风格主题的动效开关：设置里关掉某项（根元素 data-fx-off 含该编号）时，
+ * 把对应效果换回常规主题的样子。规则都比原规则多一个属性选择器，按特异性压过原规则。
+ * ==================================================================== */
+
+/* ---- 两个主题通用：过场关掉后，首页照常规主题淡入 ---- */
+:root[data-theme][data-fx-off~='wipe'] .app-shell-body > .home {
+  animation: view-enter 200ms var(--ease-out);
+}
+
+/* ---- 赤黑：拼贴标题 → 普通标题（标题仍是白底黑字的斜切标签） ---- */
+:root[data-theme='noir'][data-fx-off~='collage'] .collage-chars {
+  display: inline;
+}
+:root[data-theme='noir'][data-fx-off~='collage'] .collage-char {
+  display: inline;
+  padding: 0;
+  background: none;
+  color: inherit;
+  outline: none;
+  clip-path: none;
+  font-family: inherit;
+  font-weight: inherit;
+  transform: none;
+}
+:root[data-theme='noir'][data-fx-off~='collage'] .home-view-title:has(.collage),
+:root[data-theme='noir'][data-fx-off~='collage'] .dialog h2:has(.collage) {
+  padding: 3px 26px 3px 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  clip-path: var(--cut-right);
+}
+
+/* ---- 赤黑：悬停四边形 → 常规的悬停底色 ---- */
+:root[data-theme='noir'][data-fx-off~='quad'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible)::before,
+:root[data-theme='noir'][data-fx-off~='quad'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible)::after {
+  content: none !important;
+}
+:root[data-theme='noir'][data-fx-off~='quad'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled) {
+  background-color: var(--hover) !important;
+  color: var(--ink) !important;
+  font-style: normal;
+}
+:root[data-theme='noir'][data-fx-off~='quad'] :is(.home-nav-item, .folder-row, .outline-item):hover :is(*:not(.outline-grade)) {
+  color: inherit !important;
+}
+:root[data-theme='noir'][data-fx-off~='quad'] .context-menu button.is-danger:hover:not(:disabled) {
+  color: var(--red-pen) !important;
+}
+
+/* ---- 赤黑：倾斜抖动 → 不倾斜、不抖动（反色等颜色变化保留） ---- */
+:root[data-theme='noir'][data-fx-off~='tilt'] :is(button, .tab, .checkbox, .stars .star, .home-row-main, .theme-swatch-chip):hover,
+:root[data-theme='noir'][data-fx-off~='tilt'] :is(.field:hover > .field-label, .field:hover > .field-label-row > .field-label, .group:hover > legend, .quick-menu-row:hover > .quick-menu-label) {
+  transform: none !important;
+  animation: none !important;
+}
+:root[data-theme='noir'][data-fx-off~='tilt'] :is(.home-nav-item, .folder-row, .outline-item):hover {
+  transform: none !important;
+}
+:root[data-theme='noir'][data-fx-off~='tilt'] .checkbox:hover input[type='checkbox'],
+:root[data-theme='noir'][data-fx-off~='tilt'] input[type='checkbox']:hover {
+  transform: skewX(-10deg) !important;
+}
+:root[data-theme='noir'][data-fx-off~='tilt'] .segmented button.is-active {
+  animation: seg-pick 220ms var(--ease-spring) !important;
+}
+:root[data-theme='noir'][data-fx-off~='tilt'] .collage-char {
+  transition: none;
+}
+:root[data-theme='noir'][data-fx-off~='tilt'] :is(.home-view-title, .dialog h2, .panel-title):hover .collage-char {
+  transform: translateY(var(--dy)) rotate(var(--r)) scale(var(--s));
+}
+
+/* ---- 两个主题：浮层的入场 → 常规的淡入落位 ---- */
+@starting-style {
+  :root[data-theme][data-fx-off~='popin'] :is(.menu-popup, .ftb-panel) {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  :root[data-theme][data-fx-off~='popin'] :is(.context-menu, .quick-menu:not(.quick-menu--stage)) {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  :root[data-theme][data-fx-off~='popin'] .selection-toolbar {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  :root[data-theme][data-fx-off~='popin'] .dialog[open] {
+    opacity: 0;
+    filter: none;
+    transform: translateY(6px) scale(0.985);
+  }
+  :root[data-theme][data-fx-off~='popin'] .export-toast {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+:root[data-theme][data-fx-off~='popin'] .export-toast.is-leaving {
+  transform: translateY(8px);
+}
+
+/* ---- 月潮：标题浮起漂动 → 静止 ---- */
+:root[data-theme='tide'][data-fx-off~='rise'] .collage-char {
+  animation: none;
+}
+
+/* ---- 月潮：悬停反色加边框 → 常规的悬停底色 ---- */
+:root[data-theme='tide'][data-fx-off~='invert'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible)::before,
+:root[data-theme='tide'][data-fx-off~='invert'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible)::after {
+  content: none !important;
+}
+:root[data-theme='tide'][data-fx-off~='invert'] :is(
+    .home-nav-item:not(.is-active),
+    .folder-row:not(.is-active),
+    .outline-item:not(.is-selected),
+    .context-menu button,
+    .menu-popup button,
+    .export-toast-file
+  ):is(:hover, :focus-visible):not(:disabled) {
+  background-color: var(--hover) !important;
+  color: var(--ink) !important;
+  font-weight: inherit;
+  font-style: normal;
+}
+:root[data-theme='tide'][data-fx-off~='invert'] :is(.home-nav-item, .folder-row, .outline-item):not(.is-active, .is-selected):hover :is(.folder-name, .folder-toggle, .outline-no, .outline-text, .nav-icon) {
+  color: inherit !important;
+}
+:root[data-theme='tide'][data-fx-off~='invert'] .context-menu button.is-danger:hover:not(:disabled) {
+  color: var(--keypoint) !important;
+}
+
+/* ---- 月潮：按钮流光与上浮 → 只亮边框 ---- */
+:root[data-theme='tide'][data-fx-off~='sheen'] button {
+  background-image: none !important;
+}
+:root[data-theme='tide'][data-fx-off~='sheen'] :is(button, .tab, .segmented button, .icon-button, .format-button, .sel-btn):hover {
+  transform: none !important;
+}

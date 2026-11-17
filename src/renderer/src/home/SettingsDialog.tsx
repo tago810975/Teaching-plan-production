@@ -5,6 +5,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { allPresets } from '@core/presets'
 import { ThemePicker } from './ThemePicker'
+import { themeInfo } from '@shared/themes'
+import { effectOn, setEffect, useEffectsVersion, useTheme } from '../theme/theme'
 import { useDefaultPreset } from './PresetSelect'
 import { setMathUpright, useMathUpright } from '../state/mathUpright'
 import { CollageText } from '../theme/CollageText'
@@ -56,6 +58,7 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
       <fieldset className="group">
         <legend>配色</legend>
         <ThemePicker label="配色" />
+        <ThemeEffects />
       </fieldset>
 
       <fieldset className="group">
@@ -195,5 +198,27 @@ function WorkBuddySetting() {
       </div>
       {note !== null && <p className="field-hint">{note}</p>}
     </fieldset>
+  )
+}
+
+/** 当前主题若是风格主题：逐项开关它的动效；关掉的改用常规主题的效果 */
+function ThemeEffects() {
+  const theme = useTheme()
+  useEffectsVersion()
+  const info = themeInfo(theme)
+  if (info.effects === undefined) return null
+  return (
+    <div className="theme-effects">
+      <p className="theme-effects-title">“{info.name}”的动效</p>
+      <div className="theme-effects-list">
+        {info.effects.map((fx) => (
+          <label key={fx.id} className="checkbox">
+            <input type="checkbox" checked={effectOn(theme, fx.id)} onChange={(e) => setEffect(theme, fx.id, e.target.checked)} />
+            {fx.name}
+          </label>
+        ))}
+      </div>
+      <p className="field-hint">关掉的一项改用常规主题的效果。系统开启“减弱动态效果”时，所有动效都会关闭。</p>
+    </div>
   )
 }

@@ -230,7 +230,7 @@ function EditorBody({
   }, [travel, inactive])
   // 快捷窗口：右键内容（预览或大纲）弹出版式窗口，右键图片弹出图片窗口
   const [quickMenu, setQuickMenu] = useState<
-    | { kind: 'block'; blockId: string; x: number; y: number }
+    | { kind: 'block'; blockId: string; x: number; y: number; stage?: boolean }
     | { kind: 'figure'; blockId: string; figureIndex: number; list?: FigureListName; x: number; y: number }
     | { kind: 'option'; blockId: string; ref: OptionImageRef; x: number; y: number }
     | null
@@ -239,6 +239,14 @@ function EditorBody({
     (blockId: string, x: number, y: number) => {
       dispatch({ type: 'select', blockId })
       setQuickMenu({ kind: 'block', blockId, x, y })
+    },
+    [dispatch]
+  )
+  // 在预览中右键：空间大，风格主题可以用更张扬的样式（stage）；大纲里右键保持紧凑的常规样式
+  const openStageMenu = useCallback(
+    (blockId: string, x: number, y: number) => {
+      dispatch({ type: 'select', blockId })
+      setQuickMenu({ kind: 'block', blockId, x, y, stage: true })
     },
     [dispatch]
   )
@@ -445,11 +453,12 @@ function EditorBody({
           y={quickMenu.y}
           dispatch={dispatch}
           onClose={closeQuickMenu}
+          stage
           onIndexChange={(figureIndex) => setQuickMenu({ ...quickMenu, figureIndex })}
         />
       )}
       {quickMenu?.kind === 'option' && quickBlock !== null && (
-        <OptionImageQuickMenu block={quickBlock} optionRef={quickMenu.ref} x={quickMenu.x} y={quickMenu.y} dispatch={dispatch} onClose={closeQuickMenu} />
+        <OptionImageQuickMenu block={quickBlock} optionRef={quickMenu.ref} x={quickMenu.x} y={quickMenu.y} dispatch={dispatch} onClose={closeQuickMenu} stage />
       )}
       {quickMenu?.kind === 'block' && quickBlock !== null && (
         <BlockQuickMenu
@@ -463,6 +472,7 @@ function EditorBody({
           preset={preset}
           dispatch={dispatch}
           onClose={closeQuickMenu}
+          stage={quickMenu.stage === true}
         />
       )}
       {exportOpen && (
@@ -507,7 +517,7 @@ function EditorBody({
           onFormatRange={(ranges, op) => dispatch({ type: 'format-range', ranges, op })}
           onAlignRanges={(ranges, align) => dispatch({ type: 'set-align', align, paragraphs: ranges.map((r) => ({ blockId: r.blockId, path: r.path })) })}
           onTableWidths={(ref, widths) => dispatch({ type: 'set-table-widths', ref, widths })}
-          onBlockMenu={openQuickMenu}
+          onBlockMenu={openStageMenu}
           onImageMenu={openImageMenu}
           formatColors={preset.textColors}
           keyPoint={preset.keyPoint}

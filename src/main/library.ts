@@ -19,7 +19,7 @@ import { isProjectFilePath, sanitizeFileName, writeProjectFile } from './project
 import { readTemplateDefaults } from './template-io'
 import { getPreset } from '@core/presets'
 import { sanitizeSchemes, type OptionStopScheme } from '@core/model/option-stop-schemes'
-import { DEFAULT_THEME, isThemeId, type ThemeId } from '@shared/themes'
+import { DEFAULT_THEME, isThemeId, sanitizeEffectsOff, type ThemeEffectsOff, type ThemeId } from '@shared/themes'
 
 const MAX_RECENT = 30
 /** 扫描库目录时的最大子目录深度（库目录本身为 0） */
@@ -37,6 +37,8 @@ interface Settings {
   optionStopSchemes?: unknown
   /** 界面配色主题 */
   theme?: string
+  /** 风格主题中关掉的动效 */
+  themeEffectsOff?: unknown
 }
 
 interface RecentEntry {
@@ -272,4 +274,15 @@ export async function getMathUpright(): Promise<boolean> {
 export async function setMathUpright(on: boolean): Promise<void> {
   const settings = await readJsonFile<Settings>(settingsPath(), {})
   await writeFile(settingsPath(), JSON.stringify({ ...settings, mathUpright: on }, null, 2))
+}
+
+/** 风格主题中关掉的动效 */
+export async function getThemeEffectsOff(): Promise<ThemeEffectsOff> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  return sanitizeEffectsOff(settings.themeEffectsOff)
+}
+
+export async function setThemeEffectsOff(value: unknown): Promise<void> {
+  const settings = await readJsonFile<Settings>(settingsPath(), {})
+  await writeFile(settingsPath(), JSON.stringify({ ...settings, themeEffectsOff: sanitizeEffectsOff(value) }, null, 2))
 }

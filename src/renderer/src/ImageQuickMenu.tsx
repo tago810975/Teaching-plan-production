@@ -27,8 +27,10 @@ export function FigureQuickMenu(props: {
   onClose: () => void
   /** 调整顺序后，窗口跟着这张图 */
   onIndexChange: (index: number) => void
+  /** 从预览中打开（风格主题可用更张扬的样式） */
+  stage?: boolean
 }) {
-  const { block, figureIndex, list, x, y, dispatch, onClose, onIndexChange } = props
+  const { block, figureIndex, list, x, y, dispatch, onClose, onIndexChange, stage = false } = props
   const actions = useContext(FigureActionsContext)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export function FigureQuickMenu(props: {
   }
 
   return (
-    <QuickPopover x={x} y={y} title={`${name} ${figureIndex + 1}${figures.length > 1 ? `（共 ${figures.length} 张）` : ''}`} label="图片快捷设置" onClose={onClose}>
+    <QuickPopover x={x} y={y} title={`${name} ${figureIndex + 1}${figures.length > 1 ? `（共 ${figures.length} 张）` : ''}`} label="图片快捷设置" onClose={onClose} stage={stage}>
       <Row label="位置">
         <select
           aria-label="图片位置"
@@ -197,8 +199,16 @@ export function FigureQuickMenu(props: {
   )
 }
 
-export function OptionImageQuickMenu(props: { block: Block; optionRef: OptionImageRef; x: number; y: number; dispatch: Dispatch<EditorAction>; onClose: () => void }) {
-  const { block, optionRef, x, y, dispatch, onClose } = props
+export function OptionImageQuickMenu(props: {
+  block: Block
+  optionRef: OptionImageRef
+  x: number
+  y: number
+  dispatch: Dispatch<EditorAction>
+  onClose: () => void
+  stage?: boolean
+}) {
+  const { block, optionRef, x, y, dispatch, onClose, stage = false } = props
   if (block.type !== 'question') return null
   const q = block.question
   const image = q.options[optionRef.option]?.content.inlines[optionRef.inline]
@@ -209,7 +219,7 @@ export function OptionImageQuickMenu(props: { block: Block; optionRef: OptionIma
   const update = (fn: (q: Question) => Question): void =>
     dispatch({ type: 'update-block', blockId: block.id, update: (b) => (b.type === 'question' ? { ...b, question: fn(b.question) } : b) })
   return (
-    <QuickPopover x={x} y={y} title={`选项 ${label} 的图片`} label="图片快捷设置" onClose={onClose}>
+    <QuickPopover x={x} y={y} title={`选项 ${label} 的图片`} label="图片快捷设置" onClose={onClose} stage={stage}>
       <Row label="宽度">
         <CmStepper label="这张图片的宽度" value={toCm(image.widthEmu)} min={0.5} max={18} onChange={(cm) => update((qq) => resizeOptionImage(qq, at, Math.round(cm * EMU_PER_CM)))} />
       </Row>
