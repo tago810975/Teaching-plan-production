@@ -5921,54 +5921,69 @@ canvas.checker {
 
 /* ====================================================================
  * 赤黑：预览中右键的“战斗指令”式菜单（.quick-menu--stage）
- * 没有外框：身后一团红色的尖刺爆炸，每一行是一块各自歪着、直接压在红色上的黑色厚板，
- * 字段名是粗斜体白字、首字反白；各行错落着依次甩进来，悬停的那块翻成白底。
+ * 没有外框：身后是从中心向外射出的红色、暗红色尖刺；各项内容分两列错落地散在四周，
+ * 每一项是一块各自歪着的黑色厚板，字段名用拼贴字（字体、大小、底色各不相同）；
+ * 各项依次甩进来，悬停的那块回正、白边亮起、字段名放大。
  * 大纲里右键打开的菜单没有 --stage，保持紧凑的常规样式。
  * 设置里关掉“预览中右键的战斗指令式菜单”（data-fx-off~='stage'）时不生效。
  * ==================================================================== */
 @keyframes noir-burst-in {
   from {
     opacity: 0;
-    transform: rotate(-24deg) scale(0.3);
+    transform: rotate(-30deg) scale(0.2);
   }
 }
 @keyframes noir-cmd-in {
   from {
     opacity: 0;
-    transform: translateX(-46px) rotate(-14deg) scale(0.9);
+    translate: -40px 0;
+    scale: 0.85;
   }
 }
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage {
-  width: 380px;
-  padding: 16px 22px 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
+  align-items: start;
+  gap: 12px 16px;
+  width: 560px;
+  max-width: calc(100vw - 24px);
+  padding: 18px 24px 20px;
   border: none;
   background: none;
   box-shadow: none;
   isolation: isolate;
 }
-/* 身后的红色尖刺爆炸 */
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::before {
+/* 身后的尖刺：红色一层、暗红一层，从中心向外射出 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::before,
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::after {
   content: '';
   position: absolute;
-  inset: -34px -46px -38px -40px;
-  z-index: -2;
-  background: var(--red-pen);
-  clip-path: polygon(
-    8% 18%, 0% 2%, 22% 12%, 30% 0%, 38% 10%, 55% 1%, 60% 11%, 82% 0%, 78% 14%, 100% 10%,
-    90% 30%, 100% 44%, 89% 52%, 99% 72%, 86% 74%, 96% 100%, 70% 88%, 58% 99%, 50% 88%,
-    30% 100%, 28% 86%, 4% 96%, 12% 76%, 0% 64%, 10% 52%, 1% 34%
-  );
-  transform: rotate(-4deg);
-  animation: noir-burst-in 240ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  /* 尖刺都画在这个框里（尖端不超出框，否则被切平） */
+  inset: -120px -110px;
+  pointer-events: none;
 }
-/* 标题：白色斜切厚板、黑色粗斜体 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::before {
+  z-index: -1;
+  background: var(--red-pen);
+  clip-path: polygon(61.8% 48.0%, 90.1% 47.2%, 87.4% 49.5%, 62.0% 50.7%, 60.2% 56.3%, 77.9% 71.3%, 74.8% 71.2%, 58.5% 58.4%, 56.4% 60.2%, 64.8% 80.9%, 61.8% 79.6%, 53.4% 61.5%, 50.9% 62.0%, 48.0% 97.1%, 44.9% 93.6%, 47.5% 61.7%, 42.1% 59.1%, 23.7% 74.2%, 24.1% 70.8%, 40.0% 56.7%, 38.4% 53.1%, 14.8% 55.7%, 17.0% 53.4%, 38.0% 50.3%, 38.1% 48.6%, 15.3% 41.5%, 18.4% 39.8%, 39.0% 45.3%, 41.3% 41.7%, 27.5% 22.2%, 31.0% 22.7%, 44.1% 39.5%, 46.1% 38.6%, 42.8% 15.0%, 45.7% 17.1%, 49.6% 38.0%, 53.4% 38.5%, 69.5% 4.7%, 71.0% 9.2%, 56.4% 39.9%, 59.9% 43.2%, 89.2% 30.2%, 87.8% 34.5%, 61.5% 46.6%);
+  animation: noir-burst-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage::after {
+  z-index: -2;
+  background: #8c1219;
+  clip-path: polygon(59.9% 51.7%, 95.1% 64.4%, 90.7% 66.8%, 58.8% 54.8%, 56.5% 57.6%, 76.0% 90.2%, 71.2% 89.2%, 53.8% 59.2%, 50.1% 60.0%, 42.4% 92.6%, 38.7% 88.6%, 45.9% 59.1%, 41.5% 55.3%, 9.3% 68.5%, 11.0% 64.3%, 40.3% 52.5%, 40.1% 48.4%, 11.9% 38.6%, 15.5% 36.6%, 41.1% 45.4%, 43.7% 42.2%, 25.6% 9.6%, 30.4% 10.7%, 46.5% 40.6%, 49.3% 40.0%, 55.1% 1.1%, 59.4% 5.2%, 53.3% 40.6%, 57.5% 43.4%, 92.2% 23.2%, 91.4% 29.0%, 59.4% 46.6%);
+  animation: noir-burst-in 320ms cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+/* 标题：横跨两列的白色斜切厚板、黑色粗斜体 */
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-head {
-  margin: -4px -6px 10px -10px;
-  padding: 4px 8px 4px 14px;
+  grid-column: 1 / -1;
+  margin: 0 0 4px -8px;
+  padding: 5px 8px 5px 16px;
   border: none;
   background: #f4f4f4;
-  clip-path: polygon(0 0, 100% 6%, calc(100% - 12px) 100%, 2% 92%);
-  transform: rotate(-3deg);
+  clip-path: polygon(0 0, 100% 8%, calc(100% - 14px) 100%, 2% 90%);
+  rotate: -2.5deg;
   animation: noir-cmd-in 220ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-title {
@@ -5979,8 +5994,8 @@ canvas.checker {
   letter-spacing: 0.04em;
 }
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-head .icon-button {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 2px solid #0b0b0b;
   border-radius: 50% !important;
@@ -5992,108 +6007,131 @@ canvas.checker {
   background: var(--red-pen);
   border-color: var(--red-pen);
 }
-/* 每一行：一块各自歪着、左右错落的黑色厚板 */
+/* 每一项：歪着的黑色厚板，字段名在上、控件在下 */
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check) {
   position: relative;
-  margin: 7px 0;
-  padding: 6px 12px 6px 10px;
+  margin: 0;
+  padding: 8px 14px 10px 12px;
   background: #0b0b0b;
-  outline: 2px solid #0b0b0b;
-  clip-path: polygon(0 4%, 100% 0, calc(100% - 8px) 100%, 6px 96%);
+  clip-path: polygon(0 5%, 100% 0, calc(100% - 8px) 100%, 5px 95%);
+  box-shadow: inset 0 0 0 2px #2a2a2a;
   transition:
-    background-color 80ms linear,
-    transform 200ms var(--ease-spring);
-  animation: noir-cmd-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+    rotate 220ms var(--ease-spring),
+    scale 220ms var(--ease-spring),
+    box-shadow 80ms linear;
+  animation: noir-cmd-in 280ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):nth-of-type(odd) {
-  transform: rotate(-2.2deg) translateX(-8px);
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):nth-of-type(even) {
-  transform: rotate(1.6deg) translateX(10px);
+/* 左右两列各自歪向不同方向，奇偶再错开一点，像指令散在四周 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4n + 2) {
+  rotate: -4deg;
+  translate: -10px 0;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4n + 3) {
+  rotate: 3.5deg;
+  translate: 12px 10px;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4n + 4) {
+  rotate: 2deg;
+  translate: -4px 6px;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4n + 5) {
+  rotate: -3deg;
+  translate: 8px 14px;
+}
+/* 内容多的一项（难度有六档）横跨两列 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:has(.quick-menu-seg > button:nth-child(5)),
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:has(.answer-placement),
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:has(select) {
+  grid-column: 1 / -1;
 }
 /* 依次甩进来 */
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(2) { animation-delay: 30ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(3) { animation-delay: 60ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4) { animation-delay: 90ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(5) { animation-delay: 120ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(6) { animation-delay: 150ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(7) { animation-delay: 180ms; }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(n + 8) { animation-delay: 210ms; }
-/* 字段名：粗斜体白字，首字反白 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(3) { animation-delay: 70ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(4) { animation-delay: 100ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(5) { animation-delay: 130ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(6) { animation-delay: 160ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(7) { animation-delay: 190ms; }
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage > :nth-child(n + 8) { animation-delay: 220ms; }
+/* 字段名：拼贴字，比别处大一号 */
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label {
   width: auto;
-  min-width: 3.2em;
+  min-width: 0;
+  color: #f4f4f4;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  transform: none !important;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label .collage-char {
+  transition: transform 220ms var(--ease-spring);
+}
+/* 控件里的文字始终是浅色（不随悬停变色，免得和黑底融成一片） */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-controls {
+  color: #f4f4f4;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-controls .segmented button:not(.is-active) {
+  background: #1d1d1d;
+  color: #f4f4f4;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check {
+  display: flex;
+  align-self: center;
+  color: #f4f4f4;
+  font-weight: 700;
+}
+/* 悬停：回正、放大一点，亮起白边与红色错位边，字段名的纸片各自翻动 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):hover {
+  z-index: 1;
+  rotate: 0deg;
+  scale: 1.04;
+  box-shadow:
+    inset 0 0 0 2px #f4f4f4,
+    inset 5px -5px 0 0 var(--red-pen);
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-label .collage-char {
+  transform: translateY(calc(var(--dy) * -1)) rotate(calc(var(--r) * -1.4)) scale(calc(var(--s) * 1.12));
+}
+/* 底部动作：横跨两列，小号斜切板 */
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: none;
+  animation: noir-cmd-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1) 200ms both;
+}
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button {
+  padding: 5px 16px;
+  border: 2px solid #f4f4f4;
+  background: #0b0b0b;
   color: #f4f4f4;
   font-size: var(--fs-title);
   font-weight: 900;
   font-style: italic;
-  letter-spacing: 0.06em;
-  transform: none !important;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
 }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label::first-letter {
-  padding: 0 2px;
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button:hover:not(:disabled) {
   background: #f4f4f4;
   color: #0b0b0b;
 }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check {
-  color: #f4f4f4;
-  font-weight: 700;
-}
-/* 悬停的那块：回正、略放大，翻成白底黑字，首字变红 */
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-row, .quick-menu-check):hover {
-  z-index: 1;
-  background: #f4f4f4;
-  transform: rotate(-1deg) translateX(4px) scale(1.03);
-}
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-controls,
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-label,
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check:hover {
-  color: #0b0b0b !important;
-  font-style: italic;
-}
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover .quick-menu-label::first-letter {
-  background: var(--red-pen);
-  color: #fff;
-}
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-check:hover input[type='checkbox']:not(:checked) {
-  border-color: #0b0b0b;
-}
-/* 白底上的控件改成黑框，免得看不见 */
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-row:hover :is(.segmented, select, input[type='number'], input[type='text']) {
-  border-color: #0b0b0b;
-}
-/* 底部动作：小号黑板，悬停变红；删除是白底红字 */
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions {
-  margin-top: 12px;
-  padding-top: 0;
-  border-top: none;
-  animation: noir-cmd-in 260ms cubic-bezier(0.2, 1.3, 0.4, 1) 160ms both;
-}
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button {
-  padding: 4px 14px;
-  border: 2px solid #f4f4f4;
-  background: #0b0b0b;
-  color: #f4f4f4;
-  font-weight: 900;
-  font-style: italic;
-  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-}
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions button:hover:not(:disabled) {
-  background: var(--red-pen);
-  border-color: var(--red-pen);
-  color: #fff;
-}
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions .danger {
-  background: #f4f4f4;
-  color: var(--red-pen);
+  background: var(--red-pen);
+  border-color: #f4f4f4;
+  color: #fff;
 }
 :root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-actions .danger:hover:not(:disabled) {
-  background: #0b0b0b;
-  border-color: var(--red-pen);
+  background: #f4f4f4;
   color: var(--red-pen);
 }
-:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-note {
-  margin-left: 0;
+:root[data-theme='noir']:not([data-fx-off~='stage']) .quick-menu--stage :is(.quick-menu-note, .field-hint) {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px 8px;
+  background: rgba(11, 11, 11, 0.85);
   color: #d0d0d0;
 }
 /* 战斗菜单已有自己的入场，不再叠加浮层的倾斜甩入 */
@@ -6102,6 +6140,10 @@ canvas.checker {
     opacity: 1;
     transform: none;
   }
+}
+/* 拼贴字关掉时，字段名回到粗斜体白字、首字反白 */
+:root[data-theme='noir'][data-fx-off~='collage']:not([data-fx-off~='stage']) .quick-menu--stage .quick-menu-label {
+  font-style: italic;
 }
 
 /* ====================================================================

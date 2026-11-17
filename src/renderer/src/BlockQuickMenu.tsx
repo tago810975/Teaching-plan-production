@@ -7,7 +7,8 @@
  * 所有修改都可撤销（删除也是），所以删除不再确认。上移下移后窗口保持打开，可连续调整。
  * 右键图片时弹出的是图片的快捷窗口（ImageQuickMenu.tsx），两者互不冲突。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type ReactNode } from 'react'
+import { CollageText } from './theme/CollageText'
 import { difficultyOf, type FormatPreset } from '@core/presets'
 import { plainText } from '@core/model/factory'
 import type { Block, CompositeBlock, KeepTogether, OptionColumns, QuestionLayout } from '@core/model/types'
@@ -213,10 +214,14 @@ function title(b: Block, number: string | undefined): string {
   }
 }
 
+/** 是否在预览中打开的快捷窗口里（字段名用拼贴字，赤黑主题下画成战斗指令的样子） */
+const StageContext = createContext(false)
+
 export function Row({ label, children }: { label: string; children: ReactNode }) {
+  const stage = useContext(StageContext)
   return (
     <div className="quick-menu-row">
-      <span className="quick-menu-label">{label}</span>
+      <span className="quick-menu-label">{stage ? <CollageText text={label} /> : label}</span>
       <div className="quick-menu-controls">{children}</div>
     </div>
   )
@@ -321,7 +326,7 @@ export function QuickPopover({
           ×
         </button>
       </div>
-      {children}
+      <StageContext.Provider value={stage}>{children}</StageContext.Provider>
     </div>
   )
 }
