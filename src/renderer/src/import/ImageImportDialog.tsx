@@ -91,6 +91,8 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
   const [enhanceOn, setEnhanceOn] = useState(true)
   // 处理方式：默认（普通 / 线稿），单张可另选
   const [mode, setMode] = useState<'normal' | 'lineart'>('normal')
+  // 去白底（白色变透明），与“普通 / 线稿”搭配
+  const [transparent, setTransparent] = useState(false)
   const [boxMode, setBoxMode] = useState<Map<string, 'normal' | 'lineart'>>(new Map())
   const modeOf = (id: string): 'normal' | 'lineart' => boxMode.get(id) ?? mode
   const [selected, setSelected] = useState<string | null>(null)
@@ -301,7 +303,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
           asset = await createAsset(new TextEncoder().encode(svg), 'image/svg+xml')
         } else {
           let px = await readPixels(src.url, rect)
-          if (enhanceOn) px = await enhance(px, modeOf(b.id))
+          if (enhanceOn || transparent) px = await enhance(px, enhanceOn ? modeOf(b.id) : 'none', transparent)
           asset = await createAsset(await toPng(px), 'image/png')
         }
         let widthEmu = rect.w * EMU_PER_PX
@@ -395,6 +397,10 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
               <option value="normal">普通</option>
               <option value="lineart">线稿</option>
             </select>
+            <label className="checkbox" title="白色底色变为透明（线条边缘半透明，放在任何底色上都没有白边）">
+              <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} />
+              去白底
+            </label>
             <span className="field-hint">
               {images.length === 0 ? '也可以 Ctrl+V 粘贴截图，或把图片拖到这里' : `共框选 ${figureCount} 张插图`}
             </span>
@@ -482,8 +488,10 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
                 />
               )
             }
-            return enhanceOn ? (
+            return enhanceOn || transparent ? (
               <EnhancePreview
+                enhanceOn={enhanceOn}
+                transparent={transparent}
                 url={img.url}
                 box={box}
                 n={numbers.get(box.id)}
@@ -682,9 +690,25 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
-function EnhancePreview({ url, box, n, mode, onMode }: { url: string; box: Rect; n: number | undefined; mode: 'normal' | 'lineart'; onMode: (m: 'normal' | 'lineart') => void }) {
+function EnhancePreview({
+  url,
+  box,
+  n,
+  mode,
+  onMode,
+  enhanceOn,
+  transparent
+}: {
+  url: string
+  box: Rect
+  n: number | undefined
+  mode: 'normal' | 'lineart'
+  onMode: (m: 'normal' | 'lineart') => void
+  enhanceOn: boolean
+  transparent: boolean
+}) {
   const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
-  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${mode}`
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${mode}|${enhanceOn}|${transparent}`
   useEffect(() => {
     let alive = true
     const made: string[] = []
@@ -694,7 +718,7 @@ function EnhancePreview({ url, box, n, mode, onMode }: { url: string; box: Rect;
       made.push(before)
       if (!alive) return
       setPair({ before, after: null })
-      const after = await toObjectUrl(await enhance(px, mode))
+      const after = await toObjectUrl(await enhance(px, enhanceOn ? mode : 'none', transparent))
       made.push(after)
       if (alive) setPair({ before, after })
     })()
@@ -713,14 +737,14 @@ function EnhancePreview({ url, box, n, mode, onMode }: { url: string; box: Rect;
       <figure>
         <figcaption className="enhance-mode">
           处理后（导入时使用）：
-          {(['normal', 'lineart'] as const).map((m) => (
+          {enhanceOn && (['normal', 'lineart'] as const).map((m) => (
             <label key={m}>
               <input type="radio" name={`mode-${n ?? ''}`} checked={mode === m} onChange={() => onMode(m)} />
               {m === 'normal' ? '普通' : '线稿'}
             </label>
           ))}
         </figcaption>
-        {pair?.after != null ? <img src={pair.after} alt="" /> : <span className="field-hint">正在处理…</span>}
+        {pair?.after != null ? <img src={pair.after} alt="" className={transparent ? 'checker' : undefined} /> : <span className="field-hint">正在处理…</span>}
       </figure>
     </div>
   )

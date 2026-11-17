@@ -136,6 +136,21 @@ export function FigureQuickMenu(props: {
           </button>
           <button
             type="button"
+            disabled={busy || vector}
+            title={vector ? '矢量图不需要处理' : '白色底色变为透明（放在任何底色上都没有白边）；可撤销'}
+            onClick={() => {
+              setBusy(true)
+              void actions.sharpen([ref], 'none', true).then((r) => {
+                setBusy(false)
+                if (r.done > 0) onClose()
+                else setNote('这张图没有处理（矢量图不需要处理）。')
+              })
+            }}
+          >
+            去白底
+          </button>
+          <button
+            type="button"
             disabled={vector}
             title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
             onClick={() => {

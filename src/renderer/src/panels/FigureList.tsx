@@ -62,12 +62,12 @@ export function FigureList({
   const actions = useContext(FigureActionsContext)
   const [sharpening, setSharpening] = useState<number | null>(null)
   const refOf = (i: number): FigureRef => ({ blockId: blockId ?? '', figureIndex: i, ...(list !== undefined ? { list } : {}) })
-  const sharpen = async (i: number, mode: 'normal' | 'lineart' = 'normal'): Promise<void> => {
+  const sharpen = async (i: number, mode: 'normal' | 'lineart' | 'none' = 'normal', transparent = false): Promise<void> => {
     if (actions === null || blockId === undefined) return
     setError(null)
     setSharpening(i)
     try {
-      const r = await actions.sharpen([refOf(i)], mode)
+      const r = await actions.sharpen([refOf(i)], mode, transparent)
       if (r.done === 0) setError('这是矢量图，本来就清晰，不需要处理。')
     } catch {
       setError('处理失败，图片可能已损坏。')
@@ -256,6 +256,15 @@ export function FigureList({
                 title="变清晰后把线条压成纯黑、纸张纯白（填充保持原样）；适合黑白线条图；可撤销"
               >
                 线稿
+              </button>
+              <button
+                type="button"
+                className="link"
+                disabled={sharpening !== null || actions === null || blockId === undefined}
+                onClick={() => void sharpen(i, 'none', true)}
+                title="白色底色变为透明（放在任何底色上都没有白边）；可撤销"
+              >
+                去白底
               </button>
               <button
                 type="button"

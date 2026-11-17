@@ -96,3 +96,50 @@ describe('线稿模式', async () => {
     expect(px(r, 90, 20)).toEqual([255, 255, 255])
   })
 })
+
+describe('线稿：按线宽判断填充；去白底', async () => {
+  const { lineArt, whiteToAlpha, strokeWidth } = await import('@core/image/lineart')
+  const px = (p: { data: ArrayLike<number>; width: number }, x: number, y: number): number[] => [0, 1, 2, 3].map((k) => p.data[(y * p.width + x) * 4 + k]!)
+
+  it('不放大的图上 5 像素粗的线条，颜色偏浅的一段也压成黑色（不当成填充）；成片的浅灰仍保留', () => {
+    const W = 260
+    const H = 120
+    const img = { data: new Uint8ClampedArray(W * H * 4).fill(255), width: W, height: H }
+    for (let x = 10; x < 250; x++) for (let y = 20; y < 25; y++) img.data.set(x > 120 && x < 180 ? [165, 165, 165, 255] : [30, 30, 30, 255], (y * W + x) * 4)
+    for (let y = 50; y < 110; y++) for (let x = 20; x < 100; x++) img.data.set([200, 200, 200, 255], (y * W + x) * 4)
+    const lum = new Float32Array(W * H)
+    for (let i = 0; i < W * H; i++) lum[i] = img.data[i * 4]!
+    expect(strokeWidth(lum, W, H)).toBe(5)
+    const r = lineArt(img, 1)
+    expect(px(r, 150, 22)[0]).toBeLessThan(40)
+    expect(px(r, 60, 80)[0]).toBe(200)
+  })
+
+  it('去白底：白色透明；黑色与彩色不透明、颜色不变；边缘的浅灰变为半透明（叠在白底上不变）', () => {
+    const img = { data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255, 233, 82, 131, 255, 160, 160, 160, 255]), width: 4, height: 1 }
+    const r = whiteToAlpha(img)
+    expect(px(r, 0, 0)[3]).toBe(0)
+    expect(px(r, 1, 0)).toEqual([0, 0, 0, 255])
+    const red = px(r, 2, 0)
+    expect(red[3]).toBe(255)
+    expect(red.slice(0, 3)).toEqual([233, 82, 131])
+    // 浅灰：半透明，叠在白底上仍是原来的灰
+    const gray = px(r, 3, 0)
+    expect(gray[3]).toBeGreaterThan(0)
+    expect(gray[3]).toBeLessThan(255)
+    const onWhite = 255 - ((255 - gray[0]!) * gray[3]!) / 255
+    expect(Math.abs(onWhite - 160)).toBeLessThan(2)
+  })
+
+  it('enhanceFigure：只去白底（不做其他处理）与线稿 + 去白底', () => {
+    const img = { data: new Uint8ClampedArray(30 * 20 * 4).fill(255), width: 30, height: 20 }
+    for (let x = 2; x < 28; x++) img.data.set([0, 0, 0, 255], (10 * 30 + x) * 4)
+    const only = enhanceFigure(img, 'none', { transparent: true })
+    expect([only.width, only.height]).toEqual([30, 20])
+    expect(px(only, 15, 2)[3]).toBe(0)
+    expect(px(only, 15, 10)).toEqual([0, 0, 0, 255])
+    const both = enhanceFigure(img, 'lineart', { transparent: true })
+    expect(both.width).toBe(90)
+    expect(px(both, 45, 4)[3]).toBe(0)
+  })
+})

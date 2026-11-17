@@ -22,6 +22,9 @@ interface Props {
   onClose: () => void
 }
 
+const opName = (mode: 'normal' | 'lineart' | 'none', transparent: boolean): string =>
+  mode === 'none' ? (transparent ? '去白底' : '处理') : `${mode === 'lineart' ? '处理为线稿' : '变清晰'}${transparent ? '并去白底' : ''}`
+
 const keyOf = (ref: FigureRef): string => `${ref.blockId}|${ref.list ?? 'figures'}|${ref.figureIndex}`
 
 /** 插图的说明：第 3 题 解析插图 1、知识点“加速电场”插图 2…… */
@@ -76,7 +79,7 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
   const assetOf = (e: FigureEntry): Asset | undefined => assets[e.figure.assetId]
   const selected = entries.filter((e) => picked.has(keyOf(e.ref)) && !isVector(assetOf(e)))
 
-  const sharpen = async (mode: 'normal' | 'lineart'): Promise<void> => {
+  const sharpen = async (mode: 'normal' | 'lineart' | 'none', transparent = false): Promise<void> => {
     setNote(null)
     const newAssets: Asset[] = []
     const changes: Array<{ ref: FigureRef; assetId: string }> = []
@@ -84,12 +87,12 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
     const done = new Map<string, Asset>()
     for (let k = 0; k < selected.length; k++) {
       const e = selected[k]!
-      setProgress(`正在${mode === 'lineart' ? '处理为线稿' : '变清晰'} ${k + 1}/${selected.length}…`)
+      setProgress(`正在${opName(mode, transparent)} ${k + 1}/${selected.length}…`)
       const asset = assetOf(e)
       if (asset === undefined) continue
       let next = done.get(asset.id)
       if (next === undefined) {
-        const r = await sharpenAsset(asset, mode)
+        const r = await sharpenAsset(asset, mode, transparent)
         if (r === null) continue
         next = r
         done.set(asset.id, r)
@@ -99,7 +102,7 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
     }
     dispatch({ type: 'replace-figure-assets', assets: newAssets, changes })
     setProgress(null)
-    setNote(`已把 ${changes.length} 张插图${mode === 'lineart' ? '处理为线稿' : '变清晰'}（可用 Ctrl+Z 撤销）。`)
+    setNote(`已${opName(mode, transparent)} ${changes.length} 张插图（可用 Ctrl+Z 撤销）。`)
   }
 
   const sendRedraw = async (only?: FigureEntry[]): Promise<void> => {
@@ -258,6 +261,14 @@ export function FigureBatchDialog({ blocks, assets, questionNumbers, dispatch, i
           title="变清晰后再把线条压成纯黑（彩色线条保持原色）、纸张纯白；成片的填充保持原样。适合黑白线条图"
         >
           线稿（{selected.length}）
+        </button>
+        <button
+          type="button"
+          disabled={progress !== null || selected.length === 0}
+          onClick={() => void sharpen('none', true)}
+          title="去掉白色底色：白色变为透明（线条边缘半透明，放在任何底色上都没有白边）；不做其他处理"
+        >
+          去白底（{selected.length}）
         </button>
         <button type="button" disabled={progress !== null || selected.length === 0} onClick={() => void sendRedraw()} title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个">
           让 WorkBuddy 重绘（{selected.length}）
