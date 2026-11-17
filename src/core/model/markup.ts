@@ -5,7 +5,8 @@
  * - 普通文字原样书写；
  * - 新公式写作 $LaTeX$，文字中的 $ 写作 \$；
  * - 无法用文字表示的内容显示为标记，编辑时可以移动或删除，原内容完整保留：
- *     ⟦公式1⟧ ⟦图2⟧ ⟦填空3⟧        —— 从 Word 导入的公式、图片、填空横线
+ *     ⟦公式1⟧ ⟦图2⟧                —— 从 Word 导入的公式、图片
+ *     ______                        —— 填空横线：连续 3 个以上的下划线，每 2 个 1 个字宽（可直接增删调节长度）
  *     ⟦下标4:0⟧ ⟦上标5:2⟧ ⟦加粗6:文字⟧ —— 带格式的文字，冒号后的文字可以修改，格式保留
  *
  * 标记的编号只在同一个输入框内有效，由 toEditable 生成、fromEditable 解读。
@@ -57,7 +58,8 @@ function paragraphText(p: RichParagraph, objects: Map<number, Inline>): string {
         out += `⟦图${add(inline)}⟧`
         break
       case 'blank':
-        out += `⟦填空${add(inline)}⟧`
+        // 填空写成一串下划线：多打几个就加长、删掉几个就缩短（每 2 个下划线 1 个字宽，见 pushPlain）
+        out += '_'.repeat(Math.max(3, Math.round(inline.widthChars * 2)))
         break
       case 'table':
         out += `⟦表格${add(inline)}⟧`
@@ -125,7 +127,10 @@ export function paragraphFromEditable(line: string, objects: ReadonlyMap<number,
   return { inlines }
 }
 
-/** 普通文字：解析其中的 $LaTeX$ */
+/** 填空：连续 3 个以上的下划线（半角或全角），每 2 个下划线 1 个字宽 */
+export const BLANK_UNDERSCORES_PER_CHAR = 2
+
+/** 普通文字：解析其中的 $LaTeX$ 与填空横线（连续 3 个以上的下划线） */
 function pushPlain(inlines: Inline[], s: string): void {
   let text = ''
   let i = 0
@@ -141,6 +146,14 @@ function pushPlain(inlines: Inline[], s: string): void {
     if (ch === '\\' && s[i + 1] === '$') {
       text += '$'
       i += 2
+    } else if (ch === '_' || ch === '＿') {
+      let j = i
+      while (j < s.length && (s[j] === '_' || s[j] === '＿')) j++
+      if (j - i >= 3) {
+        flush()
+        inlines.push({ type: 'blank', widthChars: (j - i) / BLANK_UNDERSCORES_PER_CHAR })
+      } else text += s.slice(i, j)
+      i = j
     } else if (ch === '$') {
       const end = findClosingDollar(s, i + 1)
       if (end === -1) {

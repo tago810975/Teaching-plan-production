@@ -260,9 +260,9 @@ function EditorBody({
   /** 插入位置：选中内容之后；未选中或选中页眉时放在末尾 */
   const insertAfter = selectedBlock?.id ?? null
   const addBlock = (block: Block | Block[]): void => dispatch({ type: 'insert-blocks', blocks: Array.isArray(block) ? block : [block], afterBlockId: insertAfter })
-  const importWord = async (): Promise<void> => {
-    // 按本工程的格式预设整理导入的内容
-    const result = await window.api.importDocx(project.presetId)
+  const importWord = async (asKnowledge = false): Promise<void> => {
+    // 按本工程的格式预设整理导入的内容；asKnowledge：按知识点导入
+    const result = await window.api.importDocx(project.presetId, asKnowledge)
     if (!result.ok) onError(result.error)
     else if (result.value !== null) {
       const { blocks, assets, report } = result.value
@@ -272,8 +272,9 @@ function EditorBody({
   }
 
   // 从图片导入题目（识别结果由 AI 给出，见 import/ImageImportDialog.tsx）
-  const [imageImportOpen, setImageImportOpen] = useState(false)
-  const [importMenu, setImportMenu] = useState<{ x: number; y: number } | null>(null)
+  // 从图片导入：题目或知识点
+  const [imageImportOpen, setImageImportOpen] = useState<'questions' | 'knowledge' | null>(null)
+  const [importMenu, setImportMenu] = useState<{ x: number; y: number; kind: 'questions' | 'knowledge' } | null>(null)
 
   // 插图：批量处理窗口、变清晰（属性栏、右键快捷栏共用）、点击预览中的插图定位到属性栏
   const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
@@ -363,20 +364,31 @@ function EditorBody({
             aria-haspopup="menu"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
-              setImportMenu({ x: r.left, y: r.bottom + 4 })
+              setImportMenu({ x: r.left, y: r.bottom + 4, kind: 'questions' })
             }}
           >
             导入题目 ▾
+          </button>
+          <button
+            type="button"
+            title="导入知识点（讲解、笔记、知识梳理），插入到当前选中内容之后"
+            aria-haspopup="menu"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setImportMenu({ x: r.left, y: r.bottom + 4, kind: 'knowledge' })
+            }}
+          >
+            导入知识点 ▾
           </button>
           {importMenu !== null && (
             <ContextMenu
               x={importMenu.x}
               y={importMenu.y}
-              label="导入题目"
+              label={importMenu.kind === 'knowledge' ? '导入知识点' : '导入题目'}
               onClose={() => setImportMenu(null)}
               items={[
-                { label: 'Word 文档…', onSelect: () => void importWord() },
-                { label: '图片（交给 AI 识别）…', onSelect: () => setImageImportOpen(true) }
+                { label: 'Word 文档…', onSelect: () => void importWord(importMenu.kind === 'knowledge') },
+                { label: '图片（交给 AI 识别）…', onSelect: () => setImageImportOpen(importMenu.kind) }
               ]}
             />
           )}
@@ -393,14 +405,15 @@ function EditorBody({
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
       {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
-      {imageImportOpen && (
+      {imageImportOpen !== null && (
         <ImageImportDialog
+          kind={imageImportOpen}
           presetId={project.presetId}
-          onCancel={() => setImageImportOpen(false)}
+          onCancel={() => setImageImportOpen(null)}
           onImport={(blocks, assets, report) => {
             dispatch({ type: 'insert-blocks', blocks, assets, afterBlockId: insertAfter })
             onImportReport(report)
-            setImageImportOpen(false)
+            setImageImportOpen(null)
           }}
         />
       )}

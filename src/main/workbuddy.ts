@@ -11,7 +11,7 @@ import { app, ipcMain, webContents } from 'electron'
 import { copyFile, mkdir, readFile, writeFile, access } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-import'
+import { FORMAT_GUIDE, importText, KNOWLEDGE_GUIDE, type TextFigure } from '@core/import/text-import'
 import { IPC, type WorkBuddyStatus, type WorkBuddyTaskInput } from '@shared/ipc'
 import { resourcesDir } from './template-io'
 import { startBridge, type BridgeTask, type RedrawTask } from './workbuddy-bridge'
@@ -100,13 +100,13 @@ export async function startWorkBuddy(): Promise<void> {
   await startBridge(
     {
       pending: () => task,
-      guide: () => FORMAT_GUIDE,
+      guide: (t) => (t?.kind === 'knowledge' ? KNOWLEDGE_GUIDE : FORMAT_GUIDE),
       check: (text, t) => {
         const figures = new Map<number, TextFigure>(
           Array.from({ length: t?.figureCount ?? 0 }, (_, i) => [i + 1, { asset: { id: `f${i + 1}`, mime: 'image/png', data: new Uint8Array() }, widthEmu: 1, heightEmu: 1 }])
         )
-        const r = importText(text, { ...(t?.presetId !== undefined ? { presetId: t.presetId } : {}), figures })
-        return { questionCount: r.questionCount, issues: r.issues }
+        const r = importText(text, { ...(t?.presetId !== undefined ? { presetId: t.presetId } : {}), ...(t?.kind === 'knowledge' ? { asKnowledge: true } : {}), figures })
+        return { questionCount: r.questionCount, ...(r.knowledgeCount !== undefined ? { knowledgeCount: r.knowledgeCount } : {}), issues: r.issues }
       },
       submit: (taskId, text) => {
         if (task === null || task.id !== taskId) return false
@@ -145,7 +145,14 @@ export function registerWorkBuddyIpc(): void {
   })
   ipcMain.handle(IPC.workbuddyDisconnect, () => workbuddyDisconnect())
   ipcMain.handle(IPC.workbuddyStart, (event, input: WorkBuddyTaskInput) => {
-    task = { id: `task-${Date.now()}-${++seq}`, images: input.images, figureCount: input.figureCount, ...(input.presetId !== undefined ? { presetId: input.presetId } : {}), sender: event.sender.id }
+    task = {
+      id: `task-${Date.now()}-${++seq}`,
+      images: input.images,
+      figureCount: input.figureCount,
+      ...(input.presetId !== undefined ? { presetId: input.presetId } : {}),
+      ...(input.kind !== undefined ? { kind: input.kind } : {}),
+      sender: event.sender.id
+    }
     return task.id
   })
   ipcMain.handle(IPC.workbuddyUpdate, (_event, taskId: string, figureCount: number) => {

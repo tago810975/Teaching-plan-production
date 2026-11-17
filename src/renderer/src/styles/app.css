@@ -274,7 +274,8 @@ textarea {
 
 .toolbar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* 右侧按钮（添加、导入题目、导入知识点、导出、保存）放不下时，由左侧的标题让出位置 */
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
   gap: 16px;
   padding: 8px 14px;
@@ -5761,4 +5762,27 @@ input[type='checkbox']:disabled {
   align-items: center;
   gap: 2px;
   cursor: pointer;
+}
+/* 导入完成提示：与导出完成提示同样的右下角卡片 */
+.import-toast-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.import-toast-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  color: var(--red-pen);
+}
+.import-toast-list li + li {
+  margin-top: 2px;
+}
+
+/* 工具栏按钮与页数不折行 */
+.toolbar button,
+.toolbar .page-count {
+  white-space: nowrap;
 }

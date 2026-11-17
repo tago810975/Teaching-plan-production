@@ -20,6 +20,7 @@ import { normalizeFonts } from './normalize-fonts'
 import { applyPresetRules } from './preset-rules'
 import { recognize } from './recognize'
 import { recognizeHandbook } from './recognize-handbook'
+import { recognizeAsKnowledge } from './as-knowledge'
 
 /** 交给 AI 的格式说明（复制给任意 AI 工具，或由 WorkBuddy 的工具返回） */
 export const FORMAT_GUIDE = `请把图片中的题目逐字转写成下面的格式，用于导入“教学案制作”软件。
@@ -62,6 +63,36 @@ C．半径 $r=\\frac{mv_0}{qB}$　　D．周期与速度有关
 （1）落地时的速度大小；
 （2）下落所用的时间。`
 
+/** 导入知识点时交给 AI 的格式说明 */
+export const KNOWLEDGE_GUIDE = `请把图片中的知识点讲解逐字转写成下面的格式，用于导入“教学案制作”软件的知识梳理。
+
+【必须遵守】
+1. 逐字转写图片中的内容：不要改写、不要省略、不要补全填空，也不要添加图片中没有的内容。
+2. 看不清的字写成【?】，不要猜。
+3. 把全部转写结果放在一个代码块里（以 \`\`\`text 开头、\`\`\` 结尾），代码块外不要写任何说明。
+   这样公式和填空横线不会被对话界面渲染改掉。
+
+【格式】
+- 一行一段。按阅读顺序转写；分两栏的页面先左栏、后右栏。
+- 每个知识点以标题开头，单独一行，写成“一、标题”“二、标题”（中文数字加顿号），按图片中的顺序编号；
+  图片中的标题是“1.质谱仪”“考点一 质谱仪”“【考点一】质谱仪”等时，也改成“一、质谱仪”。
+- 知识点里的小标题、条目照原样写（如“1.模型解析”“（1）……”“①……”），不要改成知识点标题。
+- 所有公式、物理量符号、单位中的上下标都用 LaTeX 写在 $ 和 $ 之间，例如 $v_0$、$F=qvB$、$\\frac{mv}{qB}$。
+  单独成行的长公式写成 $$…$$。不要用 Unicode 上下标（如 v₀、m²）。
+- 填空的横线写成“______”（至少三个下划线），原图中较长的横线多写几个。
+- 插图、示意图：在它出现的位置单独写一行 [图1]、[图2]……（按出现顺序编号），不要描述图的内容。
+- 表格：每行写成一段，单元格之间用“｜”隔开。
+- 一张图片开头是上一页内容的后半部分时，照原样接着写。
+- 不要转写：图下的说明（如“（例1图）”）、二维码及“扫码看解析”、页眉页脚、页码。
+
+【示例】
+一、质谱仪
+1．质谱仪的结构如图所示。
+[图1]
+2．速度选择器的作用：只有所受______和电场力二力平衡的正离子，才能以一定速率 $v$ 从 $S_3$ 缝射出，即 $qE=$______。
+二、回旋加速器
+1．两个半圆盒处于与盒面______（垂直/平行）的匀强磁场中，粒子在盒内做匀速圆周运动。`
+
 /** 框选出的插图：按编号对应文字中的 [图N] */
 export interface TextFigure {
   asset: Asset
@@ -71,6 +102,8 @@ export interface TextFigure {
 
 export interface TextImportOptions {
   presetId?: string
+  /** 按知识点导入（“导入知识点”）：不识别题号，内容都成为知识点 */
+  asKnowledge?: boolean
   figures?: ReadonlyMap<number, TextFigure>
 }
 
@@ -78,6 +111,8 @@ export interface TextImportResult {
   blocks: Block[]
   assets: Record<string, Asset>
   questionCount: number
+  /** 按知识点导入时：知识点的个数 */
+  knowledgeCount?: number
   /** 需要留意的问题：公式无法转换、插图没有框选等 */
   issues: string[]
 }
@@ -301,7 +336,9 @@ export function importText(text: string, options: TextImportOptions = {}): TextI
   const figures = options.figures ?? new Map<number, TextFigure>()
   const preset = getPreset(options.presetId)
   const { paragraphs, usedFigures, missingFigures, continued } = textToParagraphs(text, figures)
-  const recognized = preset.kind === 'handbook' ? recognizeHandbook(paragraphs) : recognize(paragraphs, { optionsFollowSubQuestion: true })
+  const asKnowledge = options.asKnowledge === true && preset.kind !== 'handbook'
+  const recognized =
+    preset.kind === 'handbook' ? recognizeHandbook(paragraphs) : asKnowledge ? recognizeAsKnowledge(paragraphs) : recognize(paragraphs, { optionsFollowSubQuestion: true })
   const blocks = applyPresetRules(normalizeFonts(recognized.blocks), preset)
 
   const refs = collectAssetRefs({ ...createEmptyProject(), blocks })
@@ -328,8 +365,11 @@ export function importText(text: string, options: TextImportOptions = {}): TextI
   if ((text.match(/\u200b/g) ?? []).length >= 3) {
     issues.unshift('这段文字像是从 AI 对话气泡中直接复制的显示结果：公式已被拆散变形，填空横线也会丢失。请让 AI 把结果放在代码块里（复制给 AI 的指令已经这样要求），再用代码块的“复制”按钮复制')
   }
-  if (recognized.questionCount === 0 && preset.kind !== 'handbook') issues.push('没有识别到题目：题目要以“1．”这样的题号开头')
-  return { blocks, assets, questionCount: recognized.questionCount, issues }
+  const knowledgeCount = asKnowledge ? blocks.filter((b) => b.type === 'knowledge').length : undefined
+  if (asKnowledge) {
+    if (knowledgeCount === 0) issues.push('没有识别到知识点')
+  } else if (recognized.questionCount === 0 && preset.kind !== 'handbook') issues.push('没有识别到题目：题目要以“1．”这样的题号开头')
+  return { blocks, assets, questionCount: recognized.questionCount, ...(knowledgeCount !== undefined ? { knowledgeCount } : {}), issues }
 }
 
 function visitLatex(value: unknown, fn: (latex: string) => void): void {

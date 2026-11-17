@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { detectFigures, padBox, snapToFigure, sortReading, trimBottomLabel, type Box as Rect, type Pixels } from '@core/import/figure-detect'
-import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-import'
+import { FORMAT_GUIDE, importText, KNOWLEDGE_GUIDE, type TextFigure } from '@core/import/text-import'
 import { redrawSizes } from '@core/import/svg-redraw'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, Block } from '@core/model/types'
@@ -37,6 +37,8 @@ interface Box extends Rect {
 }
 
 interface Props {
+  /** 导入题目或知识点（格式说明、检查、提示随之不同） */
+  kind?: 'questions' | 'knowledge'
   presetId: string | undefined
   onCancel: () => void
   onImport: (blocks: Block[], assets: Record<string, Asset>, report: ImportReport) => void
@@ -73,7 +75,10 @@ async function loadPixels(url: string, width: number, height: number): Promise<{
 
 const scaleRect = (r: Rect, k: number): Rect => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k })
 
-export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
+export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onImport }: Props) {
+  const asKnowledge = kind === 'knowledge'
+  const guide = asKnowledge ? KNOWLEDGE_GUIDE : FORMAT_GUIDE
+  const opts = { ...(presetId !== undefined ? { presetId } : {}), ...(asKnowledge ? { asKnowledge: true } : {}) }
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [images, setImages] = useState<SourceImage[]>([])
   const [current, setCurrent] = useState<string | null>(null)
@@ -222,7 +227,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
     try {
       const encoded = await Promise.all(images.map((i) => encodeForAi(i.url, i.width, i.height).then((data) => ({ name: i.name, mime: 'image/jpeg', data }))))
       if (wbTask.current !== null) await window.api.workbuddyCancel(wbTask.current)
-      const taskId = await window.api.workbuddyStart({ images: encoded, figureCount: boxes.length, ...(presetId !== undefined ? { presetId } : {}) })
+      const taskId = await window.api.workbuddyStart({ images: encoded, figureCount: boxes.length, ...(presetId !== undefined ? { presetId } : {}), ...(asKnowledge ? { kind: 'knowledge' as const } : {}) })
       wbTask.current = taskId
       setWb({ state: 'waiting', taskId })
     } catch (e) {
@@ -269,7 +274,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
       [...numbers.values()].map((n) => [n, { asset: { id: `box-${n}`, mime: 'image/png', data: new Uint8Array() }, widthEmu: 1, heightEmu: 1 }])
     )
     try {
-      return importText(text, { ...(presetId !== undefined ? { presetId } : {}), figures })
+      return importText(text, { ...opts, figures })
     } catch (e) {
       return { blocks: [], assets: {}, questionCount: 0, issues: [`识别出错：${e instanceof Error ? e.message : String(e)}`] }
     }
@@ -308,12 +313,12 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
         }
         figures.set(n, { asset, widthEmu: Math.round(widthEmu), heightEmu: Math.round(heightEmu) })
       }
-      const r = importText(text, { ...(presetId !== undefined ? { presetId } : {}), figures })
+      const r = importText(text, { ...opts, figures })
       if (r.blocks.length === 0) {
         setError('没有可导入的内容。')
         return
       }
-      onImport(r.blocks, r.assets, { fileNames: images.map((i) => i.name), questionCount: r.questionCount, warnings: r.issues })
+      onImport(r.blocks, r.assets, { fileNames: images.map((i) => i.name), questionCount: r.questionCount, ...(r.knowledgeCount !== undefined ? { knowledgeCount: r.knowledgeCount } : {}), warnings: r.issues })
     } catch (e) {
       setError(`导入失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -336,7 +341,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
         onCancel()
       }}
     >
-      <h2 id="image-import-title">从图片导入题目</h2>
+      <h2 id="image-import-title">{asKnowledge ? '从图片导入知识点' : '从图片导入题目'}</h2>
       <div className="image-import-body">
         <section
           className="image-import-left"
@@ -494,7 +499,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard.writeText(FORMAT_GUIDE).then(() => {
+                void navigator.clipboard.writeText(guide).then(() => {
                   setCopied(true)
                   setTimeout(() => setCopied(false), 2500)
                 })
@@ -509,6 +514,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
           </div>
           <WorkBuddyNotice
             wb={wb}
+            phrase={asKnowledge ? '导入知识点' : '导入题目'}
             onConnect={() => void connectWorkBuddy()}
             onCancel={() => {
               if (wbTask.current !== null) void window.api.workbuddyCancel(wbTask.current)
@@ -529,7 +535,13 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               <span className="field-hint">粘贴后这里会显示识别到几道题、有哪些问题。</span>
             ) : (
               <>
-                <strong>{check.questionCount > 0 ? `识别到 ${check.questionCount} 道题` : `识别到 ${check.blocks.length} 项内容（没有题目）`}</strong>
+                <strong>
+                  {check.knowledgeCount !== undefined
+                    ? `识别到 ${check.knowledgeCount} 个知识点${check.questionCount > 0 ? `、${check.questionCount} 道题` : ''}`
+                    : check.questionCount > 0
+                      ? `识别到 ${check.questionCount} 道题`
+                      : `识别到 ${check.blocks.length} 项内容（没有题目）`}
+                </strong>
                 {check.issues.length === 0 ? <span className="image-import-ok">，没有发现问题</span> : null}
                 {check.issues.length > 0 && (
                   <ul>
@@ -549,7 +561,9 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
           取消
         </button>
         <button type="button" className="primary" disabled={busy || check === null || check.blocks.length === 0} onClick={() => void doImport()}>
-          {busy ? '正在导入…' : `导入${check !== null && check.questionCount > 0 ? ` ${check.questionCount} 道题` : ''}`}
+          {busy
+            ? '正在导入…'
+            : `导入${check?.knowledgeCount !== undefined && check.knowledgeCount > 0 ? ` ${check.knowledgeCount} 个知识点` : check !== null && check.questionCount > 0 ? ` ${check.questionCount} 道题` : ''}`}
         </button>
       </div>
     </dialog>
@@ -557,7 +571,7 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
 }
 
 /** WorkBuddy 状态提示 */
-function WorkBuddyNotice({ wb, onConnect, onCancel }: { wb: { state: string; note?: string }; onConnect: () => void; onCancel: () => void }) {
+function WorkBuddyNotice({ wb, phrase, onConnect, onCancel }: { wb: { state: string; note?: string }; phrase: string; onConnect: () => void; onCancel: () => void }) {
   const [copied, setCopied] = useState(false)
   if (wb.state === 'idle') return wb.note !== undefined ? <p className="image-import-wb">{wb.note}</p> : null
   if (wb.state === 'need-connect') {
@@ -574,12 +588,12 @@ function WorkBuddyNotice({ wb, onConnect, onCancel }: { wb: { state: string; not
     return (
       <div className="image-import-wb is-waiting" role="status">
         <span>
-          已交给 WorkBuddy。请到 WorkBuddy 里说：<strong>导入题目</strong>
+          已交给 WorkBuddy。请到 WorkBuddy 里说：<strong>{phrase}</strong>
         </span>
         <button
           type="button"
           onClick={() => {
-            void navigator.clipboard.writeText('导入题目').then(() => {
+            void navigator.clipboard.writeText(phrase).then(() => {
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             })

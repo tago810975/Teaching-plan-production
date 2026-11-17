@@ -56,7 +56,12 @@ const textContent = (text) => ({ content: [{ type: 'text', text }] })
 const NO_REDRAW = '教学案制作里现在没有等待重绘的插图。请让用户在教学案制作的“导入题目 → 图片”窗口中框好插图，点“让 WorkBuddy 重绘插图”，然后再说“重绘插图”。'
 
 function describeCheck(r) {
-  const head = r.questionCount > 0 ? `识别到 ${r.questionCount} 道题` : '没有识别到题目（题目要以“1．”这样的题号开头）'
+  const head =
+    r.knowledgeCount !== undefined
+      ? `识别到 ${r.knowledgeCount} 个知识点${r.questionCount > 0 ? `、${r.questionCount} 道题` : ''}`
+      : r.questionCount > 0
+        ? `识别到 ${r.questionCount} 道题`
+        : '没有识别到题目（题目要以“1．”这样的题号开头）'
   return r.issues && r.issues.length > 0 ? `${head}。需要修正的问题：\n${r.issues.map((i) => `- ${i}`).join('\n')}` : `${head}，没有发现问题。`
 }
 
@@ -64,7 +69,7 @@ const TOOLS = [
   {
     name: 'get_pending_images',
     description:
-      '取出“教学案制作”软件中老师交给你识别的题目图片，以及转写格式说明。当用户说“导入题目”“识别题目图片”“教学案导入”等时先调用本工具，' +
+      '取出“教学案制作”软件中老师交给你识别的题目或知识点图片，以及转写格式说明。当用户说“导入题目”“导入知识点”“识别题目图片”“教学案导入”等时先调用本工具，' +
       '然后按格式说明逐字转写图片，再调用 check_questions 检查、submit_questions 提交。',
     inputSchema: { type: 'object', properties: {} }
   },

@@ -11,12 +11,15 @@ import { applyPresetRules } from './preset-rules'
 import { getPreset } from '../presets'
 import { recognize } from './recognize'
 import { gradeOfCoefficient, isZujuan, prepareZujuan } from './zujuan'
+import { recognizeAsKnowledge } from './as-knowledge'
 import { recognizeHandbook } from './recognize-handbook'
 
 export interface DocxImportResult {
   blocks: Block[]
   assets: Record<string, Asset>
   questionCount: number
+  /** 按知识点导入时：知识点的个数 */
+  knowledgeCount?: number
   /** 文档中的第一个大标题 */
   firstTitle?: string
   /** 需要用户留意的情况，如矢量图片、文本框、无法识别的公式结构 */
@@ -26,16 +29,23 @@ export interface DocxImportResult {
 export interface DocxImportOptions {
   /** 格式预设，决定作业单、解析等的整理规则；默认物理教学案 V1.0 */
   presetId?: string
+  /** 按知识点导入（“导入知识点”）：不识别题目编号，内容都成为知识点 */
+  asKnowledge?: boolean
 }
 
 export async function importDocx(bytes: Uint8Array, options: DocxImportOptions = {}): Promise<DocxImportResult> {
   const read = await readDocx(bytes)
   const preset = getPreset(options.presetId)
   // 组卷网下载的题目：先按题组整理（见 zujuan.ts）
-  const zujuan = preset.kind !== 'handbook' && isZujuan(read.paragraphs) ? prepareZujuan(read.paragraphs) : null
+  const asKnowledge = options.asKnowledge === true && preset.kind !== 'handbook'
+  const zujuan = preset.kind !== 'handbook' && !asKnowledge && isZujuan(read.paragraphs) ? prepareZujuan(read.paragraphs) : null
   // 知识点手册只有大标题与知识点，不识别题目
   const recognized =
-    preset.kind === 'handbook' ? recognizeHandbook(read.paragraphs) : recognize(zujuan !== null ? zujuan.paragraphs : read.paragraphs)
+    preset.kind === 'handbook'
+      ? recognizeHandbook(read.paragraphs)
+      : asKnowledge
+        ? recognizeAsKnowledge(read.paragraphs)
+        : recognize(zujuan !== null ? zujuan.paragraphs : read.paragraphs)
   // 组卷网题组的【知识点】是整组共用的，保留在综合题共用解析的开头（只显示一次，与原文一致）
   if (zujuan !== null) applyZujuanDifficulty(recognized.blocks, zujuan.difficulty)
   const { questionCount, firstTitle } = recognized
@@ -54,9 +64,12 @@ export async function importDocx(bytes: Uint8Array, options: DocxImportOptions =
   const unknown = new Set<string>()
   visitMath(blocks, (omml) => ommlToMathml(omml).unknown.forEach((u) => unknown.add(u)))
   if (unknown.size > 0) warnings.push(`部分公式含有暂不支持的结构（${[...unknown].join('、')}），预览中只显示其中的文字。`)
-  if (questionCount === 0) warnings.push('没有识别到题目。请确认题目以“1.”这样的题号开头，或使用“物理排版 题目”样式。')
+  const knowledgeCount = asKnowledge ? blocks.filter((b) => b.type === 'knowledge').length : undefined
+  if (asKnowledge) {
+    if (knowledgeCount === 0) warnings.push('没有识别到知识点。')
+  } else if (questionCount === 0) warnings.push('没有识别到题目。请确认题目以“1.”这样的题号开头，或使用“物理排版 题目”样式。')
 
-  return { blocks, assets, questionCount, ...(firstTitle !== undefined ? { firstTitle } : {}), warnings }
+  return { blocks, assets, questionCount, ...(knowledgeCount !== undefined ? { knowledgeCount } : {}), ...(firstTitle !== undefined ? { firstTitle } : {}), warnings }
 }
 
 function visitMath(value: unknown, fn: (omml: string) => void): void {

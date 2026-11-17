@@ -34,7 +34,7 @@ const api: RendererApi = {
   createProject: (request) => ipcRenderer.invoke(IPC.createProject, request),
   removeRecent: (filePath) => ipcRenderer.invoke(IPC.removeRecent, filePath),
   revealInFolder: (filePath) => ipcRenderer.send(IPC.revealInFolder, filePath),
-  importDocx: (presetId) => ipcRenderer.invoke(IPC.importDocx, presetId),
+  importDocx: (presetId, asKnowledge) => ipcRenderer.invoke(IPC.importDocx, presetId, asKnowledge === true),
   createFromDocx: (templateId, presetId) => ipcRenderer.invoke(IPC.createFromDocx, templateId, presetId),
   getDefaultPreset: () => ipcRenderer.invoke(IPC.getDefaultPreset),
   setDefaultPreset: (presetId) => ipcRenderer.invoke(IPC.setDefaultPreset, presetId),

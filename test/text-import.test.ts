@@ -175,3 +175,37 @@ describe('WorkBuddy 实测：按代码块复制的原文（test/fixtures/image-i
     expect(text).toContain('rad/s')
   })
 })
+
+describe('导入知识点', async () => {
+  const { KNOWLEDGE_GUIDE } = await import('@core/import/text-import')
+  const { recognizeAsKnowledge } = await import('@core/import/as-knowledge')
+  const { textToParagraphs } = await import('@core/import/text-import')
+  const knowledge = (r: { blocks: Array<{ type: string }> }) => r.blocks.filter((b): b is import('@core/model/types').KnowledgeBlock => b.type === 'knowledge')
+
+  it('“一、”标题成为知识点；知识点里的“1．”条目不当成题目；填空保留', () => {
+    const r = importText('一、质谱仪\n1．质谱仪的结构如图所示。\n2．速度选择器的作用：只有所受______和电场力二力平衡的正离子才能射出。\n二、回旋加速器\n1．两个半圆盒处于与盒面______的匀强磁场中。', { asKnowledge: true })
+    expect(r.questionCount).toBe(0)
+    expect(r.knowledgeCount).toBe(2)
+    const ks = knowledge(r)
+    expect(ks.map((k) => k.title)).toEqual(['一、质谱仪', '二、回旋加速器'])
+    expect(ks[0]!.content).toHaveLength(2)
+    expect(JSON.stringify(ks[0]!.content)).toContain('"type":"blank"')
+    expect(r.issues).toEqual([])
+  })
+
+  it('开头没有标题的正文合并成一个（没有标题的）知识点；没有内容时提示', () => {
+    const r = importText('平行板两侧施加电压 $U$，内部分布匀强电场。\n带电粒子在其中做匀加速直线运动。', { asKnowledge: true })
+    expect(knowledge(r)).toHaveLength(1)
+    expect(knowledge(r)[0]!.title).toBe('')
+    expect(knowledge(r)[0]!.content).toHaveLength(2)
+    expect(importText('', { asKnowledge: true }).issues).toContain('没有识别到知识点')
+  })
+
+  it('格式说明中的示例本身按知识点导入正确', () => {
+    const example = KNOWLEDGE_GUIDE.slice(KNOWLEDGE_GUIDE.indexOf('【示例】') + 5)
+    const r = importText(example, { asKnowledge: true })
+    expect(knowledge(r).map((k) => k.title)).toEqual(['一、质谱仪', '二、回旋加速器'])
+    void recognizeAsKnowledge
+    void textToParagraphs
+  })
+})

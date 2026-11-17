@@ -109,11 +109,15 @@ export interface WorkBuddyTaskInput {
   images: Array<{ name: string; mime: string; data: string }>
   figureCount: number
   presetId?: string
+  /** 导入知识点（格式说明与检查按知识点） */
+  kind?: 'questions' | 'knowledge'
 }
 
 export interface ImportReport {
   fileNames: string[]
   questionCount: number
+  /** 导入知识点时：知识点的个数（提示中显示“导入 N 个知识点”） */
+  knowledgeCount?: number
   warnings: string[]
 }
 
@@ -233,7 +237,8 @@ export interface RendererApi {
   createProject(request: { title: string; dir: string | null; templateId: string; presetId: string }): Promise<Result<OpenedProject>>
   removeRecent(filePath: string): Promise<void>
   /** 选择一个或多个 Word 文档并识别其中的题目；用户取消时返回 null */
-  importDocx(presetId: string): Promise<Result<ImportedContent | null>>
+  /** 导入 Word：asKnowledge 时按知识点导入 */
+  importDocx(presetId: string, asKnowledge?: boolean): Promise<Result<ImportedContent | null>>
   /** 选择一个 Word 文档，以其内容新建教学案；用户取消时返回 null */
   createFromDocx(templateId: string, presetId: string): Promise<Result<{ opened: OpenedProject; report: ImportReport } | null>>
   /** 设置：导入（从 Word 新建）时默认使用的格式预设 */

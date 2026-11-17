@@ -536,7 +536,7 @@ function KnowledgeForm({
       </Field>
       <Field
         label="内容"
-        hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
+        hint="公式写作 $LaTeX$；填空写作 ______（下划线越多横线越长）；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
         aside={fontSelect('内容', block.content, STYLE_SPECS.body.fontRole, (content) => set({ content }), dispatch)}
       >
         <RichTextField fieldId="content" value={block.content} rows={10} onChange={(content) => set({ content })} />
@@ -802,7 +802,7 @@ function QuestionForm({
       </label>
       <Field
         label="题干"
-        hint="公式写作 $LaTeX$；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
+        hint="公式写作 $LaTeX$；填空写作 ______（下划线越多横线越长）；⟦⟧ 中的标记是导入的公式、图片或带格式文字，可移动或删除"
         aside={fontSelect('题干', q.stem, STYLE_SPECS.question.fontRole, (stem) => set({ stem }), dispatch)}
       >
         <RichTextField fieldId="stem" value={q.stem} rows={5} onChange={(stem) => set({ stem })} />

@@ -277,11 +277,11 @@ function registerIpc(): void {
 
   ipcMain.on(IPC.revealInFolder, (_event, filePath: string) => shell.showItemInFolder(filePath))
 
-  ipcMain.handle(IPC.importDocx, async (event, presetId: string) => {
+  ipcMain.handle(IPC.importDocx, async (event, presetId: string, asKnowledge?: boolean) => {
     const paths = await pickDocx(event.sender, true)
     if (paths.length === 0) return { ok: true, value: null }
     try {
-      return { ok: true, value: await importDocxFiles(paths, presetId) }
+      return { ok: true, value: await importDocxFiles(paths, presetId, asKnowledge === true) }
     } catch (err) {
       return { ok: false, error: describeError(err) }
     }

@@ -25,6 +25,8 @@ export interface BridgeTask {
   /** 窗口中框选的插图数（检查 [图N] 是否对得上） */
   figureCount: number
   presetId?: string
+  /** 导入知识点（格式说明与检查按知识点） */
+  kind?: 'questions' | 'knowledge'
 }
 
 /** 待重绘为 SVG 的插图（来自“从图片导入”窗口的“让 WorkBuddy 重绘插图”） */
@@ -44,14 +46,16 @@ export interface RedrawResult {
 
 export interface BridgeCheck {
   questionCount: number
+  /** 导入知识点时：知识点的个数 */
+  knowledgeCount?: number
   issues: string[]
 }
 
 export interface BridgeHandlers {
   /** 当前待识别的任务；没有时为 null */
   pending: () => BridgeTask | null
-  /** 交给 AI 的格式说明 */
-  guide: () => string
+  /** 交给 AI 的格式说明（按当前任务是题目还是知识点） */
+  guide: (task: BridgeTask | null) => string
   check: (text: string, task: BridgeTask | null) => BridgeCheck
   /** 把识别结果交回窗口；任务已不在（窗口关了、取消了）时返回 false */
   submit: (taskId: string, text: string) => boolean
@@ -103,7 +107,7 @@ export async function startBridge(handlers: BridgeHandlers, infoPath: string): P
         switch (req.url) {
           case '/pending': {
             const task = handlers.pending()
-            return send(200, { task, guide: handlers.guide() })
+            return send(200, { task, guide: handlers.guide(task) })
           }
           case '/check': {
             const text = typeof body['text'] === 'string' ? body['text'] : ''
