@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { detectFigures, snapBox, snapToFigure, trimBottomLabel, type Box } from '@core/import/figure-detect'
+import { detectFigures, padBox, snapBox, snapToFigure, trimBottomLabel, type Box } from '@core/import/figure-detect'
 import { readPng } from './helpers/png'
 
 const DIR = 'test/fixtures/figure-detect'
@@ -77,4 +77,11 @@ describe('随手拖的框收紧到插图（不含框进来的图注、文字）'
     const s = snapToFigure(img, { x: 40, y: 0, w: 300, h: 30 }, r.pieces, 0)
     expect(s.h).toBeLessThanOrEqual(30)
   }, 30000)
+})
+
+describe('框四周留白', () => {
+  it('四周各放宽约半个字高（至少 4 像素），不超出图片', () => {
+    expect(padBox({ x: 100, y: 50, w: 200, h: 80 }, 16, 1000, 800)).toEqual({ x: 92, y: 42, w: 216, h: 96 })
+    expect(padBox({ x: 2, y: 1, w: 50, h: 30 }, 4, 54, 33)).toEqual({ x: 0, y: 0, w: 54, h: 33 })
+  })
 })

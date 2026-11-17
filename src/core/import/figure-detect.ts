@@ -399,6 +399,19 @@ export function detectFigures(img: Pixels, options: { textHeight?: number } = {}
   return { boxes: sortReading(figs, h), pieces, textHeight: h }
 }
 
+/**
+ * 框四周留白：检测与收紧都贴着墨迹边缘，裁出的图边缘的线条紧贴图片边界、像被切掉一点。
+ * 四周各放宽约半个字高（至少 4 像素），不超出图片。
+ */
+export function padBox(box: Box, textHeight: number, width: number, height: number): Box {
+  const p = Math.max(4, Math.round(0.5 * textHeight))
+  const x0 = Math.max(0, box.x - p)
+  const y0 = Math.max(0, box.y - p)
+  const x1 = Math.min(width, box.x + box.w + p)
+  const y1 = Math.min(height, box.y + box.h + p)
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
 /** 阅读顺序：先上后下（约 3 个字高为一行），同一行先左后右 */
 export function sortReading(boxes: Box[], textHeight: number): Box[] {
   return [...boxes].sort((a, b) => Math.round(a.y / (3 * textHeight)) - Math.round(b.y / (3 * textHeight)) || a.x - b.x)

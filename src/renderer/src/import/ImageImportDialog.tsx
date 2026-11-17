@@ -6,7 +6,7 @@
  * 下方即时显示识别到几道题、有哪些问题。确认后插图裁成 PNG（选项图去掉底部单独的字母），文字按格式预设识别为题目。
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { detectFigures, snapToFigure, sortReading, trimBottomLabel, type Box as Rect, type Pixels } from '@core/import/figure-detect'
+import { detectFigures, padBox, snapToFigure, sortReading, trimBottomLabel, type Box as Rect, type Pixels } from '@core/import/figure-detect'
 import { FORMAT_GUIDE, importText, type TextFigure } from '@core/import/text-import'
 import { redrawSizes } from '@core/import/svg-redraw'
 import { createAsset } from '@core/project-file/codec'
@@ -117,7 +117,8 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
     try {
       loaded ??= await loadPixels(img.url, img.width, img.height)
       const r = detectFigures(loaded.pixels)
-      const found = r.boxes.map((b) => ({ ...scaleRect(b, 1 / loaded!.scale), id: `b${++keySeq}`, image: img.key }))
+      // 四周留白，免得裁出的图边缘的线条紧贴图片边界
+      const found = r.boxes.map((b) => ({ ...scaleRect(padBox(b, r.textHeight, loaded!.pixels.width, loaded!.pixels.height), 1 / loaded!.scale), id: `b${++keySeq}`, image: img.key }))
       setBoxes((all) => [...all.filter((b) => b.image !== img.key), ...found])
       setImages((all) => all.map((i) => (i.key === img.key ? { ...i, pixels: loaded!.pixels, scale: loaded!.scale, textHeight: r.textHeight / loaded!.scale, pieces: r.pieces, detecting: false } : i)))
     } catch {
@@ -415,7 +416,10 @@ export function ImageImportDialog({ presetId, onCancel, onImport }: Props) {
               numbers={numbers}
               onAdd={(r) => {
                 // 新画的框收紧到墨迹边缘
-                const snapped = img.pixels !== null ? scaleRect(snapToFigure(img.pixels, scaleRect(r, img.scale), img.pieces), 1 / img.scale) : r
+                const snapped =
+                  img.pixels !== null
+                    ? scaleRect(padBox(snapToFigure(img.pixels, scaleRect(r, img.scale), img.pieces, 0), img.textHeight * img.scale, img.pixels.width, img.pixels.height), 1 / img.scale)
+                    : r
                 setBoxes((all) => [...all, { ...snapped, id: `b${++keySeq}`, image: img.key }])
               }}
               onChange={(id, r) => setBoxes((all) => all.map((b) => (b.id === id ? { ...b, ...r } : b)))}
