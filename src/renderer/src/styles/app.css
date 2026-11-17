@@ -5835,3 +5835,8 @@ img.checker {
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
 }
+
+/* 添加插图：只有图片区 */
+.image-import-body.is-figures {
+  grid-template-columns: minmax(0, 1fr);
+}

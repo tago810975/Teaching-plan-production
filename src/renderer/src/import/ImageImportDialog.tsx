@@ -36,12 +36,25 @@ interface Box extends Rect {
   image: string
 }
 
+/** 添加插图时交回的一张图（显示尺寸按截取的像素估算） */
+export interface AddedFigure {
+  asset: Asset
+  widthEmu: number
+  heightEmu: number
+}
+
 interface Props {
-  /** 导入题目或知识点（格式说明、检查、提示随之不同） */
-  kind?: 'questions' | 'knowledge'
+  /**
+   * 导入题目或知识点（格式说明、检查、提示随之不同）；figures：给题目、答案、解析、知识点添加插图
+   * （只有图片区：框选、变清晰、去白底、一键加深，交回框选的插图；没有框时整张）
+   */
+  kind?: 'questions' | 'knowledge' | 'figures'
+  /** 添加插图时：插图的名称（如“题图”“答案插图”） */
+  figureTitle?: string
   presetId: string | undefined
   onCancel: () => void
-  onImport: (blocks: Block[], assets: Record<string, Asset>, report: ImportReport) => void
+  onImport?: (blocks: Block[], assets: Record<string, Asset>, report: ImportReport) => void
+  onAddFigures?: (figures: AddedFigure[]) => void
 }
 
 /** 插图导入后的默认宽度上限（厘米），之后可在属性面板或预览中调整 */
@@ -75,7 +88,8 @@ async function loadPixels(url: string, width: number, height: number): Promise<{
 
 const scaleRect = (r: Rect, k: number): Rect => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k })
 
-export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onImport }: Props) {
+export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', presetId, onCancel, onImport, onAddFigures }: Props) {
+  const figuresOnly = kind === 'figures'
   const asKnowledge = kind === 'knowledge'
   const guide = asKnowledge ? KNOWLEDGE_GUIDE : FORMAT_GUIDE
   const opts = { ...(presetId !== undefined ? { presetId } : {}), ...(asKnowledge ? { asKnowledge: true } : {}) }
@@ -280,6 +294,40 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
     }
   }, [text, numbers, presetId])
 
+  /** 截取一块并按选项处理，返回图片与显示尺寸 */
+  const cutFigure = async (src: SourceImage, rect: Rect): Promise<AddedFigure> => {
+    let px = await readPixels(src.url, rect)
+    if (enhanceOn || transparent || levels) px = await enhance(px, enhanceOn ? 'normal' : 'none', { transparent, autoLevels: levels })
+    const asset = await createAsset(await toPng(px), 'image/png')
+    let widthEmu = rect.w * EMU_PER_PX
+    let heightEmu = rect.h * EMU_PER_PX
+    const max = MAX_FIGURE_CM * EMU_PER_CM
+    if (widthEmu > max) {
+      heightEmu = (heightEmu * max) / widthEmu
+      widthEmu = max
+    }
+    return { asset, widthEmu: Math.round(widthEmu), heightEmu: Math.round(heightEmu) }
+  }
+
+  // 添加插图：框选的部分按编号顺序；一个框也没有时每张图片整张
+  const doAddFigures = async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      const out: AddedFigure[] = []
+      if (boxes.length > 0) {
+        for (const img of images) {
+          for (const b of sortReading(boxes.filter((x) => x.image === img.key), img.textHeight) as Box[]) out.push(await cutFigure(img, b))
+        }
+      } else for (const img of images) out.push(await cutFigure(img, { x: 0, y: 0, w: img.width, h: img.height }))
+      onAddFigures?.(out)
+    } catch (e) {
+      setError(`添加失败：${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const doImport = async (): Promise<void> => {
     setBusy(true)
     setError(null)
@@ -318,7 +366,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
         setError('没有可导入的内容。')
         return
       }
-      onImport(r.blocks, r.assets, { fileNames: images.map((i) => i.name), questionCount: r.questionCount, ...(r.knowledgeCount !== undefined ? { knowledgeCount: r.knowledgeCount } : {}), warnings: r.issues })
+      onImport?.(r.blocks, r.assets, { fileNames: images.map((i) => i.name), questionCount: r.questionCount, ...(r.knowledgeCount !== undefined ? { knowledgeCount: r.knowledgeCount } : {}), warnings: r.issues })
     } catch (e) {
       setError(`导入失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -341,8 +389,8 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
         onCancel()
       }}
     >
-      <h2 id="image-import-title">{asKnowledge ? '从图片导入知识点' : '从图片导入题目'}</h2>
-      <div className="image-import-body">
+      <h2 id="image-import-title">{figuresOnly ? `添加${figureTitle}` : asKnowledge ? '从图片导入知识点' : '从图片导入题目'}</h2>
+      <div className={figuresOnly ? 'image-import-body is-figures' : 'image-import-body'}>
         <section
           className="image-import-left"
           aria-label="题目图片"
@@ -371,7 +419,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
                 重新自动框选
               </button>
             )}
-            {boxes.length > 0 && (
+            {boxes.length > 0 && !figuresOnly && (
               <button
                 type="button"
                 disabled={boxes.every((b) => !redrawPick.has(b.id))}
@@ -410,7 +458,11 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
           {img === null ? (
             <div className="image-import-empty">
               <p>把题目图片放到这里</p>
-              <p className="field-hint">软件会自动框出其中的插图，编号按阅读顺序排列，与识别结果中的 [图1]、[图2] 对应</p>
+              <p className="field-hint">
+                {figuresOnly
+                  ? '软件会自动框出其中的插图，可拖动调整、删除或补画；没有框时整张添加'
+                  : '软件会自动框出其中的插图，编号按阅读顺序排列，与识别结果中的 [图1]、[图2] 对应'}
+              </p>
             </div>
           ) : (
             <BoxCanvas
@@ -429,6 +481,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
               onRemove={(id) => setBoxes((all) => all.filter((b) => b.id !== id))}
               svgBoxes={useSvg}
               redrawPick={redrawPick}
+              allowRedraw={!figuresOnly}
               onToggleRedraw={(id) =>
                 setRedrawPick((s) => {
                   const next = new Set(s)
@@ -493,6 +546,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
           })()}
         </section>
 
+        {!figuresOnly && (
         <section className="image-import-right" aria-label="识别结果">
           <div className="image-import-tools">
             <button
@@ -553,17 +607,24 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
             )}
           </div>
         </section>
+        )}
       </div>
       {error !== null && <p className="field-error" role="alert">{error}</p>}
       <div className="dialog-actions">
         <button type="button" onClick={onCancel}>
           取消
         </button>
-        <button type="button" className="primary" disabled={busy || check === null || check.blocks.length === 0} onClick={() => void doImport()}>
-          {busy
-            ? '正在导入…'
-            : `导入${check?.knowledgeCount !== undefined && check.knowledgeCount > 0 ? ` ${check.knowledgeCount} 个知识点` : check !== null && check.questionCount > 0 ? ` ${check.questionCount} 道题` : ''}`}
-        </button>
+        {figuresOnly ? (
+          <button type="button" className="primary" disabled={busy || images.length === 0 || images.some((i) => i.detecting)} onClick={() => void doAddFigures()}>
+            {busy ? '正在添加…' : boxes.length > 0 ? `添加 ${boxes.length} 张${figureTitle}` : `整张添加为${figureTitle}`}
+          </button>
+        ) : (
+          <button type="button" className="primary" disabled={busy || check === null || check.blocks.length === 0} onClick={() => void doImport()}>
+            {busy
+              ? '正在导入…'
+              : `导入${check?.knowledgeCount !== undefined && check.knowledgeCount > 0 ? ` ${check.knowledgeCount} 个知识点` : check !== null && check.questionCount > 0 ? ` ${check.questionCount} 道题` : ''}`}
+          </button>
+        )}
       </div>
     </dialog>
   )
@@ -747,6 +808,7 @@ function BoxCanvas({
   svgBoxes,
   redrawPick,
   onToggleRedraw,
+  allowRedraw = true,
   selected,
   onSelect
 }: {
@@ -758,8 +820,9 @@ function BoxCanvas({
   onRemove: (id: string) => void
   /** 选用了 SVG 的框（标签显示“SVG”） */
   svgBoxes: ReadonlySet<string>
-  /** 勾选了“重绘”的框 */
+  /** 勾选了“重绘”的框（添加插图时不显示“重绘”开关：allowRedraw 为假） */
   redrawPick: ReadonlySet<string>
+  allowRedraw?: boolean
   onToggleRedraw: (id: string) => void
   selected: string | null
   onSelect: (id: string | null) => void
@@ -845,6 +908,7 @@ function BoxCanvas({
               <button type="button" className="image-box-remove" aria-label={`删除图${n}`} title={`删除图${n}`} onClick={() => onRemove(b.id)}>
                 ×
               </button>
+              {allowRedraw && (
               <button
                 type="button"
                 className={redrawPick.has(b.id) ? 'image-box-redraw is-on' : 'image-box-redraw'}
@@ -854,6 +918,7 @@ function BoxCanvas({
               >
                 {redrawPick.has(b.id) ? '☑ 重绘' : '☐ 重绘'}
               </button>
+              )}
               {(['nw', 'ne', 'sw', 'se'] as const).map((c) => (
                 <span key={c} className={`image-box-handle is-${c}`} data-corner={c} aria-hidden="true" />
               ))}

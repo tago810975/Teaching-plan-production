@@ -2,10 +2,10 @@
  * 题图管理：添加、删除、调整位置（题干下方 / 右侧环绕）与宽度。
  */
 import { useContext, useEffect, useRef, useState } from 'react'
-import { createAsset } from '@core/project-file/codec'
 import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/model/types'
 import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm } from './figure-options'
 import { assetMime } from '../preview/assets'
+import { ImageImportDialog, type AddedFigure } from '../import/ImageImportDialog'
 import { FigureActionsContext } from '../figures/figure-actions'
 import type { EnhanceOptions } from '@core/image/enhance'
 import { FieldFocusContext } from './fieldFocus'
@@ -30,11 +30,6 @@ interface Props {
   onAddAsset: (asset: Asset) => void
 }
 
-const ACCEPTED = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-/** 新加图片的默认宽度：5 厘米 */
-const DEFAULT_WIDTH_CM = 5
-
-
 export function FigureList({
   blockId,
   list,
@@ -47,7 +42,6 @@ export function FigureList({
   onChange,
   onAddAsset
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
   const update = (i: number, patch: Partial<QuestionFigure>): void =>
@@ -94,24 +88,14 @@ export function FigureList({
     row.classList.add('is-located')
   }, [focus, blockId, list])
 
-  const add = async (file: File): Promise<void> => {
-    setError(null)
-    if (!ACCEPTED.includes(file.type)) {
-      setError('请选择 PNG、JPG、GIF 或 WebP 格式的图片。')
-      return
-    }
-    try {
-      const data = new Uint8Array(await file.arrayBuffer())
-      const bitmap = await createImageBitmap(new Blob([data], { type: file.type }))
-      const ratio = bitmap.height / bitmap.width
-      bitmap.close()
-      const asset = await createAsset(data, file.type)
-      onAddAsset(asset)
-      const widthEmu = DEFAULT_WIDTH_CM * EMU_PER_CM
-      onChange([...figures, { assetId: asset.id, widthEmu, heightEmu: Math.round(widthEmu * ratio), placement: 'right' }])
-    } catch {
-      setError('无法读取这张图片，文件可能已损坏。')
-    }
+  // 添加插图：与“从图片导入”同一个窗口（选择、粘贴截图或拖入，自动框选，变清晰、去白底、一键加深）
+  const [adding, setAdding] = useState(false)
+  const addFigures = (added: AddedFigure[]): void => {
+    for (const a of added) onAddAsset(a.asset)
+    // 一张时沿用原来的默认位置（右侧环绕）；多张时放在下方（每个段落右侧只能环绕一张）
+    const placement = added.length === 1 ? 'right' : 'below'
+    onChange([...figures, ...added.map((a) => ({ assetId: a.asset.id, widthEmu: a.widthEmu, heightEmu: a.heightEmu, placement }) as const)])
+    setAdding(false)
   }
 
   return (
@@ -296,22 +280,12 @@ export function FigureList({
         <p className="field-hint">每个段落右侧只能环绕一张图，多出的会排在下方。</p>
       )}
       <div className="group-actions">
-        <button type="button" onClick={() => inputRef.current?.click()}>
+        <button type="button" onClick={() => setAdding(true)} title="选择图片、粘贴截图或拖入；可框选其中的一部分，并变清晰、去白底、一键加深">
           添加{title}…
         </button>
       </div>
       {error !== null && <p className="field-error">{error}</p>}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED.join(',')}
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          e.target.value = ''
-          if (file !== undefined) void add(file)
-        }}
-      />
+      {adding && <ImageImportDialog kind="figures" figureTitle={title} presetId={undefined} onCancel={() => setAdding(false)} onAddFigures={addFigures} />}
     </fieldset>
   )
 }
