@@ -7,7 +7,8 @@ import { adjustPixels, autoLevels, NO_ADJUST, type Adjust } from '@core/image/ad
 import type { Asset } from '@core/model/types'
 import { createAsset } from '@core/project-file/codec'
 import { enhance, toPng, type Rgba } from '../import/enhance-client'
-import { keepTransparency, pixelsOfAsset } from './figure-actions'
+import { hasTransparency, keepTransparency, pixelsOfAsset } from './figure-actions'
+import { whiteToAlpha } from '@core/image/transparent'
 
 interface Props {
   asset: Asset
@@ -33,6 +34,8 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
   const [adjust, setAdjust] = useState<Adjust>(NO_ADJUST)
   const [levels, setLevels] = useState(false)
   const [busy, setBusy] = useState(false)
+  // 原图带透明（已去白底）：预览在调色后同样去白底（与应用后的结果一致），并用棋盘格底显示透明处
+  const [transparent, setTransparent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -40,6 +43,7 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
     const url = URL.createObjectURL(new Blob([asset.data as Uint8Array<ArrayBuffer>], { type: asset.mime }))
     setOriginalUrl(url)
     void pixelsOfAsset(asset, PREVIEW_MAX).then(setBase, () => setError('无法读取这张图片。'))
+    void hasTransparency(asset).then(setTransparent, () => setTransparent(false))
     return () => URL.revokeObjectURL(url)
   }, [asset])
 
@@ -49,13 +53,14 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
     const id = requestAnimationFrame(() => {
       const canvas = canvasRef.current
       if (canvas === null) return
-      const px = adjustPixels(levels ? autoLevels(base) : base, adjust)
+      const adjusted = adjustPixels(levels ? autoLevels(base) : base, adjust)
+      const px = transparent ? whiteToAlpha(adjusted) : adjusted
       canvas.width = px.width
       canvas.height = px.height
       canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(px.data), px.width, px.height), 0, 0)
     })
     return () => cancelAnimationFrame(id)
-  }, [base, adjust, levels])
+  }, [base, adjust, levels, transparent])
 
   const changed = levels || adjust.brightness !== 0 || adjust.contrast !== 0 || adjust.saturation !== 100
 
@@ -87,11 +92,11 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
       <div className="figure-adjust-compare">
         <figure>
           <figcaption>原图</figcaption>
-          {originalUrl !== null && <img src={originalUrl} alt="" />}
+          {originalUrl !== null && <img src={originalUrl} alt="" className={transparent ? 'checker' : undefined} />}
         </figure>
         <figure>
-          <figcaption>调整后</figcaption>
-          <canvas ref={canvasRef} aria-label="调整后的预览" />
+          <figcaption>{transparent ? '调整后（已去白底，棋盘格处为透明）' : '调整后'}</figcaption>
+          <canvas ref={canvasRef} aria-label="调整后的预览" className={transparent ? 'checker' : undefined} />
         </figure>
       </div>
       <div className="figure-adjust-controls">
