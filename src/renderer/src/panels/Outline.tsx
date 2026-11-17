@@ -21,9 +21,11 @@ interface Props {
   onBlockMenu?: (blockId: string, x: number, y: number) => void
   /** 打开“批量处理插图” */
   onOpenFigureBatch?: () => void
+  /** 点击了某项（已选中时再点也会请求）：预览滚动到它（老师手动翻页后再点能翻回去） */
+  onReveal?: (blockId: string) => void
 }
 
-export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu, onOpenFigureBatch }: Props) {
+export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu, onOpenFigureBatch, onReveal }: Props) {
   const menu = (id: string) => (e: ReactMouseEvent): void => {
     if (onBlockMenu === undefined) return
     e.preventDefault()
@@ -84,6 +86,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
                 onClick={() => {
                   if (consumeClick()) return
                   dispatch({ type: 'select', blockId: block.id })
+                  onReveal?.(block.id)
                 }}
               >
                 {block.type === 'question' && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
@@ -109,6 +112,7 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
                       onClick={() => {
                         if (consumeClick()) return
                         dispatch({ type: 'select', blockId: item.id })
+                        onReveal?.(item.id)
                       }}
                     >
                       <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>

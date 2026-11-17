@@ -16,8 +16,10 @@ export interface FigureActions {
    * options：去白底（白色变透明）、一键加深、手动调整。返回处理与跳过的张数
    */
   sharpen: (refs: FigureRef[], mode?: EnhanceMode, options?: EnhanceOptions) => Promise<{ done: number; skipped: number }>
-  /** 打开“调整图片”（亮度、对比度、灰度） */
+  /** 打开“手动调色”（亮度、对比度、饱和度） */
   openAdjust: (ref: FigureRef) => void
+  /** 预览滚动到这张图（属性栏中单击插图时），并短暂高亮 */
+  reveal: (ref: FigureRef) => void
   /** 打开“批量处理插图”；给出 refs 时只勾选这些，redraw 为真时立即交给 WorkBuddy 重绘 */
   openBatch: (options?: { refs?: FigureRef[]; redraw?: boolean }) => void
 }
@@ -43,10 +45,36 @@ export async function pixelsOfAsset(asset: Asset, maxSide = Infinity): Promise<R
   return { data: ctx.getImageData(0, 0, w, h).data, width: w, height: h }
 }
 
-/** 变清晰后的新图片资源；矢量图返回 null */
+/**
+ * 图片是否带透明（已去白底）。处理时先铺白底再计算（清理、加深都按白纸算），
+ * 带透明的图处理后要再去白底，否则透明处会变成白底。
+ */
+export async function hasTransparency(asset: Asset): Promise<boolean> {
+  if (!/png|gif|webp/.test(asset.mime)) return false
+  const bitmap = await createImageBitmap(new Blob([asset.data as Uint8Array<ArrayBuffer>], { type: asset.mime }))
+  const k = Math.min(1, 400 / Math.max(bitmap.width, bitmap.height))
+  const w = Math.max(1, Math.round(bitmap.width * k))
+  const h = Math.max(1, Math.round(bitmap.height * k))
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  bitmap.close()
+  const d = ctx.getImageData(0, 0, w, h).data
+  for (let i = 3; i < d.length; i += 4) if (d[i]! < 250) return true
+  return false
+}
+
+/** 处理选项：原图带透明（已去白底）时保持透明 */
+export async function keepTransparency(asset: Asset, options: EnhanceOptions): Promise<EnhanceOptions> {
+  return options.transparent === true || !(await hasTransparency(asset)) ? options : { ...options, transparent: true }
+}
+
+/** 变清晰后的新图片资源；矢量图返回 null。已去白底的图处理后仍保持透明 */
 export async function sharpenAsset(asset: Asset, mode: EnhanceMode = 'normal', options: EnhanceOptions = {}): Promise<Asset | null> {
   if (isVector(asset)) return null
-  const px = await enhance(await pixelsOfAsset(asset), mode, options)
+  const px = await enhance(await pixelsOfAsset(asset), mode, await keepTransparency(asset, options))
   return createAsset(await toPng(px), 'image/png')
 }
 

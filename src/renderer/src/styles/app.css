@@ -5874,3 +5874,27 @@ img.checker {
   border-color: var(--red-pen);
   color: #fff;
 }
+
+/* 属性栏插图缩略图：单击在预览中显示这张图 */
+.figure-thumb.is-clickable {
+  cursor: pointer;
+}
+.figure-thumb.is-clickable:hover {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+/* 预览中被定位到的插图：短暂高亮 */
+.page .figure.is-located {
+  animation: figure-located 1.6s ease-out;
+}
+@keyframes figure-located {
+  0%,
+  45% {
+    outline: 3px solid #e0782b;
+    outline-offset: 2px;
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+  }
+}

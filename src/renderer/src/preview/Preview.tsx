@@ -52,9 +52,12 @@ interface Props {
   onFormatRange?: (ranges: TextRange[], op: FormatOp) => void
   formatColors?: FormatPreset['textColors']
   keyPoint?: FormatPreset['keyPoint']
+  /** 大纲中点击了某项（即使已选中）：滚动到它；nonce 每次点击都变 */
+  revealRequest?: { id: string; nonce: number } | null
 }
 
 export function Preview({
+  revealRequest,
   ir,
   assetUrls,
   selectedBlockId,
@@ -179,7 +182,7 @@ export function Preview({
     },
     [onSelect, selectedBlockId]
   )
-  useEffect(() => {
+  const scrollToPending = useCallback(() => {
     const id = pendingScrollRef.current
     if (id === null) return
     const container = scrollRef.current
@@ -189,7 +192,14 @@ export function Preview({
       container.scrollTo({ top: container.scrollTop + offset - container.clientHeight * REVEAL_AT, behavior: 'smooth' })
       pendingScrollRef.current = null
     }
-  }, [selectedBlockId, layout])
+  }, [])
+  useEffect(() => scrollToPending(), [selectedBlockId, layout, scrollToPending])
+  // 大纲中再点已选中的内容：选中没有变化，也要滚回去（老师手动翻页后找不到原题目）
+  useEffect(() => {
+    if (revealRequest === null || revealRequest === undefined) return
+    pendingScrollRef.current = revealRequest.id
+    scrollToPending()
+  }, [revealRequest, scrollToPending])
 
   const bodyStyle: CSSProperties = {
     position: 'absolute',

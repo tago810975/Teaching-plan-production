@@ -110,7 +110,19 @@ export function FigureList({
             rowRefs.current[i] = el
           }}
         >
-          <div className="figure-thumb">
+          <div
+            className="figure-thumb is-clickable"
+            role="button"
+            tabIndex={0}
+            title="单击在预览中显示这张图"
+            onClick={() => actions?.reveal(refOf(i))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                actions?.reveal(refOf(i))
+              }
+            }}
+          >
             <img src={assetUrls.get(f.assetId)} alt={`${title} ${i + 1}`} />
           </div>
           <div className="figure-controls">

@@ -7,7 +7,7 @@ import { adjustPixels, autoLevels, NO_ADJUST, type Adjust } from '@core/image/ad
 import type { Asset } from '@core/model/types'
 import { createAsset } from '@core/project-file/codec'
 import { enhance, toPng, type Rgba } from '../import/enhance-client'
-import { pixelsOfAsset } from './figure-actions'
+import { keepTransparency, pixelsOfAsset } from './figure-actions'
 
 interface Props {
   asset: Asset
@@ -63,7 +63,8 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const px = await enhance(await pixelsOfAsset(asset), 'none', { autoLevels: levels, adjust })
+      // 已去白底的图调色后仍保持透明
+      const px = await enhance(await pixelsOfAsset(asset), 'none', await keepTransparency(asset, { autoLevels: levels, adjust }))
       onApply(await createAsset(await toPng(px), 'image/png'))
     } catch {
       setError('处理失败，图片可能已损坏。')

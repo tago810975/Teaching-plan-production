@@ -20,7 +20,7 @@ import { FigureBatchDialog, figureLabel } from './figures/FigureBatchDialog'
 import { FigureAdjustDialog } from './figures/FigureAdjustDialog'
 import { FigureActionsContext, sharpenAsset, type FigureActions } from './figures/figure-actions'
 import { FigureClickContext } from './preview/image-menu'
-import { figureFieldId, listFigures, listKeyOf } from '@core/model/figure-refs'
+import { figureFieldId, figureRefKey, listFigures, listKeyOf } from '@core/model/figure-refs'
 import type { FigureRef } from '@core/document/ir'
 import { FigureQuickMenu, OptionImageQuickMenu } from './ImageQuickMenu'
 import type { ImageTarget } from './preview/image-menu'
@@ -281,6 +281,9 @@ function EditorBody({
   const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
   // 调整图片（亮度、对比度、灰度）
   const [adjustRef, setAdjustRef] = useState<FigureRef | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // 大纲中点击某项（即使已选中）：预览滚动到它
+  const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
   const figureActions = useMemo<FigureActions>(
@@ -306,7 +309,19 @@ function EditorBody({
         return { done: changes.length, skipped }
       },
       openBatch: (options) => setFigureBatch(options ?? {}),
-      openAdjust: (ref) => setAdjustRef(ref)
+      openAdjust: (ref) => setAdjustRef(ref),
+      reveal: (ref) => {
+        const root = rootRef.current
+        const fig = root?.querySelector<HTMLElement>(`.page [data-figure="${CSS.escape(figureRefKey(ref))}"]`)
+        const container = root?.querySelector<HTMLElement>('.preview')
+        if (fig === null || fig === undefined || container === null || container === undefined) return
+        const r = fig.getBoundingClientRect()
+        const c = container.getBoundingClientRect()
+        container.scrollTo({ top: container.scrollTop + r.top - c.top - (c.height - r.height) / 2, behavior: 'smooth' })
+        fig.classList.remove('is-located')
+        void fig.offsetWidth
+        fig.classList.add('is-located')
+      }
     }),
     [dispatch]
   )
@@ -319,7 +334,7 @@ function EditorBody({
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
   return (
-    <div className={inactive ? 'app is-inactive' : 'app'} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
+    <div ref={rootRef} className={inactive ? 'app is-inactive' : 'app'} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
       <FigureActionsContext.Provider value={figureActions}>
       <FigureClickContext.Provider value={onFigureClick}>
       <header className="toolbar">
@@ -475,11 +490,13 @@ function EditorBody({
           preset={preset}
           onBlockMenu={openQuickMenu}
           onOpenFigureBatch={() => setFigureBatch({})}
+          onReveal={(id) => setReveal((r) => ({ id, nonce: (r?.nonce ?? 0) + 1 }))}
         />
         <Preview
           ir={ir}
           assetUrls={assetUrls}
           selectedBlockId={state.selectedBlockId}
+          revealRequest={reveal}
           onSelect={select}
           onSelectHeader={selectHeader}
           headerSelected={headerSelected}

@@ -20,6 +20,11 @@ export interface FigureEntry {
 
 export const listKeyOf = (ref: FigureRef): FigureListKey => ref.list ?? 'figures'
 
+/** 预览中插图元素的标识（data-figure）：属性栏中单击插图时据此找到它 */
+export function figureRefKey(ref: FigureRef): string {
+  return `${ref.blockId}|${listKeyOf(ref)}|${ref.figureIndex}`
+}
+
 /** 属性栏中插图行的标识（预览中点击插图时据此定位） */
 export function figureFieldId(list: FigureListKey, index: number): string {
   return `figure:${list}:${index}`

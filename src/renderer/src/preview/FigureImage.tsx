@@ -13,6 +13,7 @@ import type { FigureRef, OptionImageRef, FloatingImage } from '@core/document/ir
 import { emuToPt } from '@core/document/units'
 import { FLOAT_GAP_EMU } from '@core/document/styles'
 import { FigureClickContext, ImageMenuContext, type ImageTarget } from './image-menu'
+import { figureRefKey } from '@core/model/figure-refs'
 
 export interface FigurePatch {
   widthEmu?: number
@@ -138,6 +139,7 @@ export function FigureImage(props: Props) {
       ref={boxRef}
       className={[className, 'figure', interactive ? 'figure--active' : '', float !== undefined ? 'figure--movable' : ''].filter(Boolean).join(' ')}
       style={boxStyle}
+      {...(figureRef !== undefined ? { 'data-figure': figureRefKey(figureRef) } : {})}
       onPointerDownCapture={(e) => {
         downAt.current = { x: e.clientX, y: e.clientY }
       }}
