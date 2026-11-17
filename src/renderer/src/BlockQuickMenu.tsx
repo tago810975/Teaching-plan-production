@@ -289,13 +289,23 @@ export function QuickPopover({
   stage?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ left: x, top: y })
   useLayoutEffect(() => {
     const el = ref.current
     if (el === null) return
     const r = el.getBoundingClientRect()
-    setPos({ left: Math.max(6, Math.min(x, window.innerWidth - r.width - 6)), top: Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) })
-  }, [x, y, title])
+    let left = x
+    let top = y
+    // 战斗指令式菜单（主题把内容区排成左右两列、中间留空）：让中间那块空处正对鼠标点下的位置，各项围着它向四周散开
+    const body = bodyRef.current
+    if (stage && body !== null && getComputedStyle(body).display === 'grid') {
+      const b = body.getBoundingClientRect()
+      left = x - (b.left + b.width / 2 - r.left)
+      top = y - (b.top + b.height / 2 - r.top)
+    }
+    setPos({ left: Math.max(6, Math.min(left, window.innerWidth - r.width - 6)), top: Math.max(6, Math.min(top, window.innerHeight - r.height - 6)) })
+  }, [x, y, title, stage])
   useEffect(() => {
     const onDown = (e: MouseEvent): void => {
       if (ref.current !== null && !ref.current.contains(e.target as Node)) onClose()
@@ -326,7 +336,10 @@ export function QuickPopover({
           ×
         </button>
       </div>
-      <StageContext.Provider value={stage}>{children}</StageContext.Provider>
+      {/* 常规样式下这一层不参与排版（display: contents）；战斗指令式菜单把它排成围绕鼠标位置的两列 */}
+      <div ref={bodyRef} className="quick-menu-body">
+        <StageContext.Provider value={stage}>{children}</StageContext.Provider>
+      </div>
     </div>
   )
 }
