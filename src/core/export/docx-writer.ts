@@ -17,6 +17,7 @@ import { WORD_FONT_NAMES } from '../document/fonts'
 import { applyHeadingStyles } from './heading-styles'
 import { applyMathMarks, uprightOmml } from './math-marks'
 import { latexToOmml } from '../math/mathml-to-omml'
+import { fixOmmlPrescripts } from '../math/omml-prescripts'
 import type { Asset, FontFamily, HeaderImage, TextMarks } from '../model/types'
 import { extForMime } from '../project-file/format'
 import { attr, child, descendants, escapeXml, NS, parseXml, serializeXml, type Element } from '../xml/dom'
@@ -270,7 +271,8 @@ class ExportContext {
           }
         }
         if (omml === undefined) return ''
-        omml = applyMathMarks(normalizeOmml(omml), run)
+        // 空底数的上下标 + 主体 → 左上下标（从 Word 原样保留的公式也要处理）
+        omml = applyMathMarks(normalizeOmml(fixOmmlPrescripts(omml)), run)
         if (this.mathUpright) omml = uprightOmml(omml)
         return run.display === true ? `<m:oMathPara>${omml}</m:oMathPara>` : omml
       }

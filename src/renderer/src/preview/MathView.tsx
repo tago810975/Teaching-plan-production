@@ -1,6 +1,7 @@
 import { memo, type KeyboardEvent, type MouseEvent } from 'react'
 import temml from 'temml'
 import { ommlToMathml } from '@core/math/omml-to-mathml'
+import { fixOmmlPrescripts } from '@core/math/omml-prescripts'
 
 interface Props {
   latex?: string
@@ -58,7 +59,8 @@ export const MathView = memo(function MathView({ latex, omml, display, onEdit }:
     const key = `${display === true ? 'D' : 'I'}${omml}`
     let html = ommlCache.get(key)
     if (html === undefined) {
-      html = ommlToMathml(omml, display === true).mathml
+      // 与导出一致：空底数的上下标 + 主体显示为左上下标（核素 ⁴₂He）
+      html = ommlToMathml(fixOmmlPrescripts(omml), display === true).mathml
       if (ommlCache.size > 5000) ommlCache.clear()
       ommlCache.set(key, html)
     }

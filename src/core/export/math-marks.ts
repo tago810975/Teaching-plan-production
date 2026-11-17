@@ -42,7 +42,8 @@ export function applyMathMarks(omml: string, marks: { bold?: boolean; underline?
  */
 export function uprightOmml(omml: string): string {
   return omml.replace(/<m:r>([\s\S]*?)<\/m:r>/g, (whole, inner: string) => {
-    const mrPrMatch = /<m:rPr>([\s\S]*?)<\/m:rPr>/.exec(inner)
+    // 也认空的简写 <m:rPr/>（否则会再加一个 m:rPr，同一段公式文字有两个格式）
+    const mrPrMatch = /<m:rPr\s*\/>|<m:rPr>([\s\S]*?)<\/m:rPr>/.exec(inner)
     const mrPr = mrPrMatch?.[1] ?? ''
     if (/<m:scr\b/.test(mrPr) || /<m:nor\s*\/>/.test(mrPr)) return whole
     const sty = /<m:sty m:val="(\w+)"\/>/.exec(mrPr)?.[1]
