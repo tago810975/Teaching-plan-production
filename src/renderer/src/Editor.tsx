@@ -35,6 +35,7 @@ import { Outline } from './panels/Outline'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
 import { findBlock, HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
+import { useMathUpright } from './state/mathUpright'
 
 /** 编辑器用到的文件操作（作用于本标签页） */
 export interface EditorFiles {
@@ -289,6 +290,9 @@ function EditorBody({
   const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
   // 调整图片（亮度、对比度、灰度）
   const [adjustRef, setAdjustRef] = useState<FigureRef | null>(null)
+  // 公式字母正体 / 斜体：这份教学案的版式设置优先，没有设置时用本机设置（预览与导出一致）
+  const machineUpright = useMathUpright()
+  const mathUpright = project.layout.mathUpright ?? machineUpright
   const rootRef = useRef<HTMLDivElement>(null)
   // 大纲中点击某项（即使已选中）：预览滚动到它
   const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(null)
@@ -342,7 +346,7 @@ function EditorBody({
   const status = state.dirty ? '未保存' : state.filePath === null ? '示例，尚未保存为文件' : '已保存'
 
   return (
-    <div ref={rootRef} className={inactive ? 'app is-inactive' : 'app'} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
+    <div ref={rootRef} className={`${inactive ? 'app is-inactive' : 'app'} ${mathUpright ? 'math-upright' : 'math-italic'}`} inert={inactive} aria-hidden={inactive} {...(tabId !== undefined ? { 'data-tab': tabId } : {})}>
       <FigureActionsContext.Provider value={figureActions}>
       <FigureClickContext.Provider value={onFigureClick}>
       <header className="toolbar">

@@ -364,6 +364,11 @@
   text-transform: none;
   font-style: normal;
 }
+/* 教学案的版式设置为斜体时（编辑器根元素上；须在上一条之后，覆盖窗口上的本机设置） */
+.math-italic math mi {
+  text-transform: math-auto;
+  font-style: normal;
+}
 
 /* 每页的外框：按缩放后的尺寸占位，页面在其中按原尺寸排版后用 transform 缩放 */
 .page-frame {

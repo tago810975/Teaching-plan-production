@@ -416,6 +416,8 @@ export interface ProjectLayout {
   lineSpacing?: Partial<LineSpacing>
   /** 题目可选项（审题、重点题）是否使用；不设（或某项不设）时用格式预设的设置，预设也没有时不使用 */
   questionFields?: Partial<QuestionFields>
+  /** 公式中的字母用正体（不倾斜）还是斜体；不设时用本机设置（首页“设置…”，默认正体） */
+  mathUpright?: boolean
 }
 
 /** 题目可选项：所有题型都可以使用，由格式预设决定默认是否打开 */

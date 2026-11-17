@@ -47,6 +47,7 @@ import type { EditorAction } from '../state/store'
 import { HeaderForm } from './HeaderForm'
 import type { LineSpacing, PageHeader, ProjectLayout, QuestionFields, Variant } from '@core/model/types'
 import { CollageText } from '../theme/CollageText'
+import { useMathUpright } from '../state/mathUpright'
 
 interface Props {
   block: Block | null
@@ -263,6 +264,8 @@ const BLOCK_NAMES: Record<Block['type'], string> = {
 // ---------------- 版式设置 ----------------
 
 function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispatch: Dispatch<EditorAction>; preset: FormatPreset }) {
+  // 公式字母：这份教学案没有设置时用本机设置
+  const machineUpright = useMathUpright()
   type Key = 'keepQuestionTogether' | 'keepKnowledgeTogether'
   const set = (key: Key, variant: Variant, value: boolean): void =>
     dispatch({ type: 'update-layout', layout: { ...layout, [key]: { ...layout[key], [variant]: value } } })
@@ -309,6 +312,18 @@ function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispa
             ['none', '不显示']
           ]}
           onChange={(difficultyDisplay) => dispatch({ type: 'update-layout', layout: { ...layout, difficultyDisplay } })}
+        />
+      </fieldset>
+      <fieldset className="group">
+        <legend>公式字母</legend>
+        <p className="field-hint">公式中的字母（如 v、F、B）用正体还是斜体，预览与导出的 Word 一致。只对这份教学案生效；新教学案按首页“设置…”中的默认。</p>
+        <Segmented<'upright' | 'italic'>
+          value={(layout.mathUpright ?? machineUpright) ? 'upright' : 'italic'}
+          options={[
+            ['upright', '正体（不倾斜）'],
+            ['italic', '斜体']
+          ]}
+          onChange={(v) => dispatch({ type: 'update-layout', layout: { ...layout, mathUpright: v === 'upright' } })}
         />
       </fieldset>
       <fieldset className="group">

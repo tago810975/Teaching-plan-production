@@ -248,7 +248,8 @@ export const projectSchema = z.object({
     optionStops,
     difficultyDisplay: z.enum(['both', 'grade', 'stars', 'none']),
     lineSpacing: lineSpacing.optional(),
-    questionFields: questionFields.optional()
+    questionFields: questionFields.optional(),
+    mathUpright: z.boolean().optional()
   }),
   templateId: z.string(),
   presetId: z.string(),

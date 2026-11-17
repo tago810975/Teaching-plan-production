@@ -34,8 +34,8 @@ export async function exportWord(req: ExportRequest): Promise<ExportResult> {
   const template = new Uint8Array(await readFile(join(templateDir(project.templateId), 'template.docx')))
   const assets = { ...req.bundle.assets, ...req.replacementAssets }
   const files: string[] = []
-  // 公式字母是否用正体，与预览一致（设置中修改，默认是）
-  const mathUpright = await getMathUpright()
+  // 公式字母正体 / 斜体：教学案的版式设置优先，没有设置时用本机设置
+  const mathUpright = project.layout.mathUpright ?? (await getMathUpright())
   const jobs = [
     ...req.variants.map((variant) => ({ name: exportFileName(req.baseName, variant), ir: () => buildDocument(project, variant) })),
     // 知识点重点难点汇总

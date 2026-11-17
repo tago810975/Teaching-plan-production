@@ -106,9 +106,11 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
         <legend>公式</legend>
         <label className="checkbox">
           <input type="checkbox" checked={mathUpright} onChange={(e) => setMathUpright(e.target.checked)} />
-          公式中的字母用正体（不倾斜）
+          公式中的字母默认用正体（不倾斜）
         </label>
-        <p className="field-hint">预览与导出的 Word 都按这里显示；不改动公式本身，随时可以切换。关闭时为 Word 默认的数学斜体。</p>
+        <p className="field-hint">
+          这是默认设置：每份教学案可以在“版式设置 → 公式字母”中单独切换正体或斜体，以教学案中的设置为准。关闭时默认为 Word 的数学斜体。
+        </p>
       </fieldset>
       <WorkBuddySetting />
 
