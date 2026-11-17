@@ -1,5 +1,5 @@
 /**
- * 调整图片：亮度、对比度、饱和度（灰度，拖到最左为黑白），可先“一键加深”。
+ * 手动调色：亮度、对比度、饱和度（灰度，拖到最左为黑白），可先“一键加深”。
  * 拖动滑块时在缩小的图上实时预览；应用时按原尺寸处理（后台线程），换成新图片（一步撤销）。
  */
 import { useEffect, useRef, useState } from 'react'
@@ -82,7 +82,7 @@ export function FigureAdjustDialog({ asset, label, onApply, onClose }: Props) {
         onClose()
       }}
     >
-      <h2 id="figure-adjust-title">调整图片：{label}</h2>
+      <h2 id="figure-adjust-title">手动调色：{label}</h2>
       <div className="figure-adjust-compare">
         <figure>
           <figcaption>原图</figcaption>

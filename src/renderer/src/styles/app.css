@@ -5840,3 +5840,37 @@ img.checker {
 .image-import-body.is-figures {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* 属性栏插图的操作按钮：带框的小按钮，两行（顺序、重绘、删除 / 图片处理） */
+.figure-btn {
+  padding: 1px 7px;
+  border: var(--hairline, 1px) solid var(--rule);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.figure-btn:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+.figure-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.figure-btn.danger {
+  color: var(--red-pen);
+}
+.figure-actions:has(.figure-btn) {
+  gap: 5px 6px;
+}
+/* 带框的“删除”按钮沿用各主题对危险操作的颜色（月潮保留暖红；赤黑悬停时红底白字） */
+:root[data-theme='tide'] .figure-btn.danger {
+  color: var(--keypoint);
+}
+:root[data-theme='noir'] .figure-btn.danger:hover:not(:disabled) {
+  background: var(--red-pen);
+  border-color: var(--red-pen);
+  color: #fff;
+}

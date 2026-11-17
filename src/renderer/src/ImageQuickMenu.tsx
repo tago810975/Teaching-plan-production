@@ -152,13 +152,13 @@ export function FigureQuickMenu(props: {
           <button
             type="button"
             disabled={vector}
-            title={vector ? '矢量图不需要处理' : '手动调整亮度、对比度、灰度'}
+            title={vector ? '矢量图不需要处理' : '手动调整亮度、对比度、饱和度（灰度）'}
             onClick={() => {
               actions.openAdjust(ref)
               onClose()
             }}
           >
-            调整…
+            手动调色…
           </button>
           <button
             type="button"

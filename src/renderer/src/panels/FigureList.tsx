@@ -212,13 +212,14 @@ export function FigureList({
               />
               厘米
             </label>
+            {/* 第一行：顺序、重绘、删除；第二行：图片处理 */}
             <div className="figure-actions">
-              <button type="button" className="link" disabled={i === 0} onClick={() => onChange(swap(figures, i, i - 1))}>
+              <button type="button" className="figure-btn" disabled={i === 0} onClick={() => onChange(swap(figures, i, i - 1))}>
                 上移
               </button>
               <button
                 type="button"
-                className="link"
+                className="figure-btn"
                 disabled={i === figures.length - 1}
                 onClick={() => onChange(swap(figures, i, i + 1))}
               >
@@ -226,7 +227,21 @@ export function FigureList({
               </button>
               <button
                 type="button"
-                className="link"
+                className="figure-btn"
+                disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
+                onClick={() => actions?.openBatch({ refs: [refOf(i)], redraw: true })}
+                title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
+              >
+                WorkBuddy 重绘
+              </button>
+              <button type="button" className="figure-btn danger" onClick={() => onChange(figures.filter((_, j) => j !== i))}>
+                删除
+              </button>
+            </div>
+            <div className="figure-actions">
+              <button
+                type="button"
+                className="figure-btn"
                 disabled={sharpening !== null || actions === null || blockId === undefined}
                 onClick={() => void sharpen(i)}
                 title="去掉灰底与杂点、放大 3 倍（不改变内容），打印更清楚；可撤销"
@@ -235,7 +250,7 @@ export function FigureList({
               </button>
               <button
                 type="button"
-                className="link"
+                className="figure-btn"
                 disabled={sharpening !== null || actions === null || blockId === undefined}
                 onClick={() => void sharpen(i, 'none', { transparent: true })}
                 title="白色底色变为透明（放在任何底色上都没有白边）；可撤销"
@@ -244,7 +259,7 @@ export function FigureList({
               </button>
               <button
                 type="button"
-                className="link"
+                className="figure-btn"
                 disabled={sharpening !== null || actions === null || blockId === undefined}
                 onClick={() => void sharpen(i, 'none', { autoLevels: true })}
                 title="扫描件发灰时：最深的线条拉到接近黑、纸张拉到白；可撤销"
@@ -253,24 +268,12 @@ export function FigureList({
               </button>
               <button
                 type="button"
-                className="link"
+                className="figure-btn"
                 disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
                 onClick={() => actions?.openAdjust(refOf(i))}
-                title="手动调整亮度、对比度、灰度"
+                title="手动调整亮度、对比度、饱和度（灰度）"
               >
-                调整…
-              </button>
-              <button
-                type="button"
-                className="link"
-                disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
-                onClick={() => actions?.openBatch({ refs: [refOf(i)], redraw: true })}
-                title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
-              >
-                WorkBuddy 重绘
-              </button>
-              <button type="button" className="link danger" onClick={() => onChange(figures.filter((_, j) => j !== i))}>
-                删除
+                手动调色…
               </button>
             </div>
           </div>
