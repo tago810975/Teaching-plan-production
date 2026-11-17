@@ -30,6 +30,14 @@ function seq(els: Element[]): string {
   let out = ''
   for (let i = 0; i < els.length; i++) {
     const el = els[i]!
+    // 左上下标（核素 ⁴₂He 等）：底数为空的上下标后跟主体 → m:sPre（否则 Word 里是一个空方框带右上下标，主体排在后面）
+    const pre = prescripts(el)
+    const base = els[i + 1]
+    if (pre !== null && base !== undefined && prescripts(base) === null) {
+      out += sPre(pre.sub, pre.sup, node(base))
+      i += 1
+      continue
+    }
     const nary = naryParts(el)
     if (nary !== null) {
       const operand = els[i + 1]
@@ -49,6 +57,28 @@ function seq(els: Element[]): string {
     out += node(el)
   }
   return out
+}
+
+/** 底数为空的 msub / msup / msubsup：其上下标（用作左上下标）；否则 null */
+function prescripts(el: Element): { sub: string; sup: string } | null {
+  const kids = children(el)
+  const name = el.localName
+  if ((name !== 'msub' && name !== 'msup' && name !== 'msubsup') || kids[0] === undefined || !isEmptyNode(kids[0])) return null
+  const arg = (k: Element | undefined): string => (k === undefined ? '' : node(k))
+  if (name === 'msub') return { sub: arg(kids[1]), sup: '' }
+  if (name === 'msup') return { sub: '', sup: arg(kids[1]) }
+  return { sub: arg(kids[1]), sup: arg(kids[2]) }
+}
+
+/** 没有内容的元素（如 {} 生成的空 mrow、<none/>） */
+function isEmptyNode(el: Element): boolean {
+  if (el.localName === 'none') return true
+  if (children(el).length > 0) return children(el).every(isEmptyNode)
+  return (el.textContent ?? '').trim() === '' && el.localName !== 'mspace'
+}
+
+function sPre(sub: string, sup: string, base: string): string {
+  return `<m:sPre><m:sub>${sub}</m:sub><m:sup>${sup}</m:sup><m:e>${base}</m:e></m:sPre>`
 }
 
 function node(el: Element): string {
@@ -93,6 +123,16 @@ function node(el: Element): string {
       return `<m:sSup><m:e>${arg(kids[0])}</m:e><m:sup>${arg(kids[1])}</m:sup></m:sSup>`
     case 'msubsup':
       return `<m:sSubSup><m:e>${arg(kids[0])}</m:e><m:sub>${arg(kids[1])}</m:sub><m:sup>${arg(kids[2])}</m:sup></m:sSubSup>`
+    case 'mmultiscripts': {
+      // 底数、右上下标（成对）、<mprescripts/>、左上下标（成对）；各取第一对
+      const split = kids.findIndex((k) => k.localName === 'mprescripts')
+      const post = split === -1 ? kids.slice(1) : kids.slice(1, split)
+      const pre = split === -1 ? [] : kids.slice(split + 1)
+      const part = (k: Element | undefined): string => (k === undefined || isEmptyNode(k) ? '' : node(k))
+      let inner = arg(kids[0])
+      if (post.length > 0) inner = `<m:sSubSup><m:e>${inner}</m:e><m:sub>${part(post[0])}</m:sub><m:sup>${part(post[1])}</m:sup></m:sSubSup>`
+      return pre.length > 0 ? sPre(part(pre[0]), part(pre[1]), inner) : inner
+    }
     case 'msqrt':
       return `<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/><m:e>${seq(kids)}</m:e></m:rad>`
     case 'mroot':
