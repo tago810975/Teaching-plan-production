@@ -4,7 +4,7 @@
 import { createContext } from 'react'
 import type { FigureRef } from '@core/document/ir'
 import { detectFigures } from '@core/import/figure-detect'
-import type { EnhanceMode } from '@core/image/enhance'
+import type { EnhanceMode, EnhanceOptions } from '@core/image/enhance'
 import { redrawSizes } from '@core/import/svg-redraw'
 import type { Asset } from '@core/model/types'
 import { createAsset } from '@core/project-file/codec'
@@ -13,9 +13,11 @@ import { enhance, toPng, type Rgba } from '../import/enhance-client'
 export interface FigureActions {
   /**
    * 变清晰（一步撤销；矢量图跳过）；mode 为 'none' 时不处理；
-   * transparent：去白底（白色变透明）。返回处理与跳过的张数
+   * options：去白底（白色变透明）、一键加深、手动调整。返回处理与跳过的张数
    */
-  sharpen: (refs: FigureRef[], mode?: EnhanceMode, transparent?: boolean) => Promise<{ done: number; skipped: number }>
+  sharpen: (refs: FigureRef[], mode?: EnhanceMode, options?: EnhanceOptions) => Promise<{ done: number; skipped: number }>
+  /** 打开“调整图片”（亮度、对比度、灰度） */
+  openAdjust: (ref: FigureRef) => void
   /** 打开“批量处理插图”；给出 refs 时只勾选这些，redraw 为真时立即交给 WorkBuddy 重绘 */
   openBatch: (options?: { refs?: FigureRef[]; redraw?: boolean }) => void
 }
@@ -42,9 +44,9 @@ export async function pixelsOfAsset(asset: Asset, maxSide = Infinity): Promise<R
 }
 
 /** 变清晰后的新图片资源；矢量图返回 null */
-export async function sharpenAsset(asset: Asset, mode: EnhanceMode = 'normal', transparent = false): Promise<Asset | null> {
+export async function sharpenAsset(asset: Asset, mode: EnhanceMode = 'normal', options: EnhanceOptions = {}): Promise<Asset | null> {
   if (isVector(asset)) return null
-  const px = await enhance(await pixelsOfAsset(asset), mode, transparent)
+  const px = await enhance(await pixelsOfAsset(asset), mode, options)
   return createAsset(await toPng(px), 'image/png')
 }
 

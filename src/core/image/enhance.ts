@@ -7,6 +7,7 @@
  */
 import { fsrcnnY } from './fsrcnn'
 import { whiteToAlpha } from './transparent'
+import { adjustPixels, autoLevels, type Adjust } from './adjust'
 
 export interface Pixels {
   data: Uint8Array | Uint8ClampedArray
@@ -157,14 +158,22 @@ export type EnhanceMode = 'normal' | 'none'
 export interface EnhanceOptions {
   /** 去白底：白色变为透明 */
   transparent?: boolean
+  /** 一键加深（扫描件发灰） */
+  autoLevels?: boolean
+  /** 手动调整亮度、对比度、饱和度 */
+  adjust?: Adjust
 }
 
 /** 插图变清晰：清理底色，较小的图再 FSRCNN 放大 3 倍；去白底时最后把白色变为透明。mode 为 'none' 时只去白底 */
 export function enhanceFigure(img: Pixels, mode: EnhanceMode = 'normal', options: EnhanceOptions = {}): Pixels {
+  // 加深、调整在原图上做（清理、放大之前）
   let out: Pixels = img
+  if (options.autoLevels === true) out = autoLevels(out)
+  if (options.adjust !== undefined) out = adjustPixels(out, options.adjust)
+  const src = out
   if (mode === 'normal') {
-    const cleaned = cleanBackground(img)
-    out = img.width * img.height <= MAX_UPSCALE_PIXELS ? upscale3(cleaned) : cleaned
+    const cleaned = cleanBackground(src)
+    out = src.width * src.height <= MAX_UPSCALE_PIXELS ? upscale3(cleaned) : cleaned
   }
   return options.transparent === true ? whiteToAlpha(out) : out
 }

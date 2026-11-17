@@ -1,6 +1,7 @@
 /**
  * 插图变清晰（界面端）：在后台线程中处理（enhance.worker.ts），以及图片与像素、PNG 之间的转换。
  */
+import type { EnhanceOptions } from '@core/image/enhance'
 export interface Rgba {
   data: Uint8ClampedArray
   width: number
@@ -24,13 +25,13 @@ function getWorker(): Worker {
   return worker
 }
 
-/** 变清晰：清理底色，较小的图放大 3 倍；mode 为 'none' 时不处理。transparent：去白底 */
-export function enhance(px: Rgba, mode: 'normal' | 'none' = 'normal', transparent = false): Promise<Rgba> {
+/** 变清晰：清理底色，较小的图放大 3 倍；mode 为 'none' 时不处理。options：去白底、一键加深、手动调整 */
+export function enhance(px: Rgba, mode: 'normal' | 'none' = 'normal', options: EnhanceOptions = {}): Promise<Rgba> {
   const id = ++seq
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject })
     const copy = new Uint8ClampedArray(px.data)
-    getWorker().postMessage({ id, data: copy, width: px.width, height: px.height, mode, transparent }, [copy.buffer])
+    getWorker().postMessage({ id, data: copy, width: px.width, height: px.height, mode, options }, [copy.buffer])
   })
 }
 

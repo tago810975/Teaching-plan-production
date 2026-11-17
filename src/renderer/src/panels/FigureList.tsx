@@ -7,6 +7,7 @@ import type { Asset, FigurePlacement, QuestionFigure, RichText } from '@core/mod
 import { EMU_PER_CM, excerpt, KNOWLEDGE_PLACEMENTS, needsParagraph, placementPatch, QUESTION_PLACEMENTS, swap, toCm } from './figure-options'
 import { assetMime } from '../preview/assets'
 import { FigureActionsContext } from '../figures/figure-actions'
+import type { EnhanceOptions } from '@core/image/enhance'
 import { FieldFocusContext } from './fieldFocus'
 import type { FigureListName, FigureRef } from '@core/document/ir'
 
@@ -62,12 +63,12 @@ export function FigureList({
   const actions = useContext(FigureActionsContext)
   const [sharpening, setSharpening] = useState<number | null>(null)
   const refOf = (i: number): FigureRef => ({ blockId: blockId ?? '', figureIndex: i, ...(list !== undefined ? { list } : {}) })
-  const sharpen = async (i: number, mode: 'normal' | 'none' = 'normal', transparent = false): Promise<void> => {
+  const sharpen = async (i: number, mode: 'normal' | 'none' = 'normal', options: EnhanceOptions = {}): Promise<void> => {
     if (actions === null || blockId === undefined) return
     setError(null)
     setSharpening(i)
     try {
-      const r = await actions.sharpen([refOf(i)], mode, transparent)
+      const r = await actions.sharpen([refOf(i)], mode, options)
       if (r.done === 0) setError('这是矢量图，本来就清晰，不需要处理。')
     } catch {
       setError('处理失败，图片可能已损坏。')
@@ -252,10 +253,28 @@ export function FigureList({
                 type="button"
                 className="link"
                 disabled={sharpening !== null || actions === null || blockId === undefined}
-                onClick={() => void sharpen(i, 'none', true)}
+                onClick={() => void sharpen(i, 'none', { transparent: true })}
                 title="白色底色变为透明（放在任何底色上都没有白边）；可撤销"
               >
                 去白底
+              </button>
+              <button
+                type="button"
+                className="link"
+                disabled={sharpening !== null || actions === null || blockId === undefined}
+                onClick={() => void sharpen(i, 'none', { autoLevels: true })}
+                title="扫描件发灰时：最深的线条拉到接近黑、纸张拉到白；可撤销"
+              >
+                一键加深
+              </button>
+              <button
+                type="button"
+                className="link"
+                disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
+                onClick={() => actions?.openAdjust(refOf(i))}
+                title="手动调整亮度、对比度、灰度"
+              >
+                调整…
               </button>
               <button
                 type="button"

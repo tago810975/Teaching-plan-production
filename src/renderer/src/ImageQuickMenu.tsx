@@ -125,7 +125,7 @@ export function FigureQuickMenu(props: {
             title={vector ? '矢量图不需要处理' : '白色底色变为透明（放在任何底色上都没有白边）；可撤销'}
             onClick={() => {
               setBusy(true)
-              void actions.sharpen([ref], 'none', true).then((r) => {
+              void actions.sharpen([ref], 'none', { transparent: true }).then((r) => {
                 setBusy(false)
                 if (r.done > 0) onClose()
                 else setNote('这张图没有处理（矢量图不需要处理）。')
@@ -133,6 +133,32 @@ export function FigureQuickMenu(props: {
             }}
           >
             去白底
+          </button>
+          <button
+            type="button"
+            disabled={busy || vector}
+            title={vector ? '矢量图不需要处理' : '扫描件发灰时：最深的线条拉到接近黑、纸张拉到白；可撤销'}
+            onClick={() => {
+              setBusy(true)
+              void actions.sharpen([ref], 'none', { autoLevels: true }).then((r) => {
+                setBusy(false)
+                if (r.done > 0) onClose()
+                else setNote('这张图没有处理（矢量图不需要处理）。')
+              })
+            }}
+          >
+            一键加深
+          </button>
+          <button
+            type="button"
+            disabled={vector}
+            title={vector ? '矢量图不需要处理' : '手动调整亮度、对比度、灰度'}
+            onClick={() => {
+              actions.openAdjust(ref)
+              onClose()
+            }}
+          >
+            调整…
           </button>
           <button
             type="button"

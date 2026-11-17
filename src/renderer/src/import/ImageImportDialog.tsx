@@ -91,6 +91,8 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
   const [enhanceOn, setEnhanceOn] = useState(true)
   // 去白底（白色变透明），可与变清晰搭配
   const [transparent, setTransparent] = useState(false)
+  // 一键加深（扫描件发灰）
+  const [levels, setLevels] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   // 让 WorkBuddy 重绘为 SVG：交出时的图号 → 框；收到的 SVG；选用 SVG 的框
   const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
@@ -299,7 +301,7 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
           asset = await createAsset(new TextEncoder().encode(svg), 'image/svg+xml')
         } else {
           let px = await readPixels(src.url, rect)
-          if (enhanceOn || transparent) px = await enhance(px, enhanceOn ? 'normal' : 'none', transparent)
+          if (enhanceOn || transparent || levels) px = await enhance(px, enhanceOn ? 'normal' : 'none', { transparent, autoLevels: levels })
           asset = await createAsset(await toPng(px), 'image/png')
         }
         let widthEmu = rect.w * EMU_PER_PX
@@ -386,6 +388,10 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
             <label className="checkbox" title="白色底色变为透明（线条边缘半透明，放在任何底色上都没有白边）">
               <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} />
               去白底
+            </label>
+            <label className="checkbox" title="扫描件发灰时：最深的线条拉到接近黑、纸张拉到白，颜色更鲜明（不改变内容）">
+              <input type="checkbox" checked={levels} onChange={(e) => setLevels(e.target.checked)} />
+              一键加深
             </label>
             <span className="field-hint">
               {images.length === 0 ? '也可以 Ctrl+V 粘贴截图，或把图片拖到这里' : `共框选 ${figureCount} 张插图`}
@@ -474,10 +480,11 @@ export function ImageImportDialog({ kind = 'questions', presetId, onCancel, onIm
                 />
               )
             }
-            return enhanceOn || transparent ? (
+            return enhanceOn || transparent || levels ? (
               <EnhancePreview
                 enhanceOn={enhanceOn}
                 transparent={transparent}
+                levels={levels}
                 url={img.url}
                 box={box}
                 n={numbers.get(box.id)}
@@ -674,9 +681,23 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /** 选中插图的变清晰效果：处理前 / 处理后（后台处理） */
-function EnhancePreview({ url, box, n, enhanceOn, transparent }: { url: string; box: Rect; n: number | undefined; enhanceOn: boolean; transparent: boolean }) {
+function EnhancePreview({
+  url,
+  box,
+  n,
+  enhanceOn,
+  transparent,
+  levels
+}: {
+  url: string
+  box: Rect
+  n: number | undefined
+  enhanceOn: boolean
+  transparent: boolean
+  levels: boolean
+}) {
   const [pair, setPair] = useState<{ before: string; after: string | null } | null>(null)
-  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${enhanceOn}|${transparent}`
+  const key = `${url}|${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${enhanceOn}|${transparent}|${levels}`
   useEffect(() => {
     let alive = true
     const made: string[] = []
@@ -686,7 +707,7 @@ function EnhancePreview({ url, box, n, enhanceOn, transparent }: { url: string; 
       made.push(before)
       if (!alive) return
       setPair({ before, after: null })
-      const after = await toObjectUrl(await enhance(px, enhanceOn ? 'normal' : 'none', transparent))
+      const after = await toObjectUrl(await enhance(px, enhanceOn ? 'normal' : 'none', { transparent, autoLevels: levels }))
       made.push(after)
       if (alive) setPair({ before, after })
     })()

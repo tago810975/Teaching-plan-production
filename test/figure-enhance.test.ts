@@ -89,3 +89,59 @@ describe('去白底', async () => {
     expect(px(both, 45, 31)[3]).toBeGreaterThan(200)
   })
 })
+
+describe('扫描件发灰：一键加深与手动调整', async () => {
+  const { autoLevels, adjustPixels, NO_ADJUST } = await import('@core/image/adjust')
+  const lums = (p: { data: ArrayLike<number>; width: number; height: number }): number[] => {
+    const out: number[] = []
+    for (let i = 0; i < p.width * p.height; i++) if (p.data[i * 4 + 3]! > 0) out.push((p.data[i * 4]! + p.data[i * 4 + 1]! + p.data[i * 4 + 2]!) / 3)
+    return out.sort((a, b) => a - b)
+  }
+
+  // 线条（非纸色）像素亮度的 q 分位
+  const inkP = (p: { data: ArrayLike<number>; width: number; height: number }, q: number): number => {
+    const ink = lums(p).filter((v) => v < 235)
+    return ink[Math.floor(ink.length * q)]!
+  }
+
+  it('一键加深（用户的扫描图）：最深的线条由灰（约 110）变为接近黑；线条整体明显加深；纸张仍为白', () => {
+    const src = readPng(`${DIR}/发灰的正弦图像.png`)
+    const out = autoLevels(src)
+    expect(inkP(src, 0.01)).toBeGreaterThan(100)
+    expect(inkP(out, 0.01)).toBeLessThan(35)
+    expect(inkP(out, 0.3)).toBeLessThan(inkP(src, 0.3) - 40)
+    const all = lums(out)
+    expect(all[Math.floor(all.length * 0.9)]).toBeGreaterThan(250)
+  })
+
+  it('一键加深：彩色色相不变（红仍是红，更鲜明）；透明通道不变；全白的图不变', () => {
+    const img = { data: new Uint8ClampedArray([255, 255, 255, 255, 120, 120, 120, 255, 233, 140, 160, 255, 200, 200, 200, 0]), width: 4, height: 1 }
+    const r = autoLevels(img)
+    expect(r.data[4]).toBeLessThan(40)
+    expect(r.data[8]! > r.data[9]! && r.data[8]! > r.data[10]!).toBe(true)
+    expect(r.data[8]! - r.data[9]!).toBeGreaterThan(233 - 140)
+    expect(r.data[15]).toBe(0)
+    const white = { data: new Uint8ClampedArray(16).fill(255), width: 4, height: 1 }
+    expect(autoLevels(white)).toBe(white)
+  })
+
+  it('手动调整：亮度、对比度、饱和度（0 为黑白）；不调整时原样返回', () => {
+    const img = { data: new Uint8ClampedArray([200, 100, 50, 255, 128, 128, 128, 255]), width: 2, height: 1 }
+    expect(adjustPixels(img, NO_ADJUST)).toBe(img)
+    const bright = adjustPixels(img, { brightness: 20, contrast: 0, saturation: 100 })
+    expect(bright.data[4]).toBe(179)
+    const contrast = adjustPixels(img, { brightness: 0, contrast: 50, saturation: 100 })
+    expect(contrast.data[0]).toBeGreaterThan(200)
+    expect(contrast.data[4]).toBe(128)
+    const gray = adjustPixels(img, { brightness: 0, contrast: 0, saturation: 0 })
+    expect(gray.data[0]).toBe(gray.data[1])
+    expect(gray.data[1]).toBe(gray.data[2])
+  })
+
+  it('enhanceFigure：一键加深在清理、放大之前', () => {
+    const src = readPng(`${DIR}/发灰的正弦图像.png`)
+    const r = enhanceFigure(src, 'none', { autoLevels: true })
+    expect([r.width, r.height]).toEqual([src.width, src.height])
+    expect(inkP(r, 0.01)).toBeLessThan(35)
+  })
+})

@@ -16,7 +16,8 @@ import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { BlockQuickMenu } from './BlockQuickMenu'
 import { ImageImportDialog } from './import/ImageImportDialog'
 import { ContextMenu } from './home/ContextMenu'
-import { FigureBatchDialog } from './figures/FigureBatchDialog'
+import { FigureBatchDialog, figureLabel } from './figures/FigureBatchDialog'
+import { FigureAdjustDialog } from './figures/FigureAdjustDialog'
 import { FigureActionsContext, sharpenAsset, type FigureActions } from './figures/figure-actions'
 import { FigureClickContext } from './preview/image-menu'
 import { figureFieldId, listFigures, listKeyOf } from '@core/model/figure-refs'
@@ -278,11 +279,13 @@ function EditorBody({
 
   // 插图：批量处理窗口、变清晰（属性栏、右键快捷栏共用）、点击预览中的插图定位到属性栏
   const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
+  // 调整图片（亮度、对比度、灰度）
+  const [adjustRef, setAdjustRef] = useState<FigureRef | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
   const figureActions = useMemo<FigureActions>(
     () => ({
-      sharpen: async (refs, mode = 'normal', transparent = false) => {
+      sharpen: async (refs, mode = 'normal', options = {}) => {
         const { bundle } = stateRef.current
         const keys = new Set(refs.map((r) => `${r.blockId}|${r.list ?? ''}|${r.figureIndex}`))
         const entries = listFigures(bundle.project.blocks).filter((e) => keys.has(`${e.ref.blockId}|${e.ref.list ?? ''}|${e.ref.figureIndex}`))
@@ -291,7 +294,7 @@ function EditorBody({
         let skipped = 0
         for (const e of entries) {
           const asset = bundle.assets[e.figure.assetId]
-          const next = asset !== undefined ? await sharpenAsset(asset, mode, transparent) : null
+          const next = asset !== undefined ? await sharpenAsset(asset, mode, options) : null
           if (next === null) {
             skipped++
             continue
@@ -302,7 +305,8 @@ function EditorBody({
         dispatch({ type: 'replace-figure-assets', assets: newAssets, changes })
         return { done: changes.length, skipped }
       },
-      openBatch: (options) => setFigureBatch(options ?? {})
+      openBatch: (options) => setFigureBatch(options ?? {}),
+      openAdjust: (ref) => setAdjustRef(ref)
     }),
     [dispatch]
   )
@@ -521,6 +525,25 @@ function EditorBody({
           onReset={() => resetPanel('right')}
         />
       </main>
+      {adjustRef !== null &&
+        (() => {
+          const entry = listFigures(project.blocks).find(
+            (e) => e.ref.blockId === adjustRef.blockId && e.ref.figureIndex === adjustRef.figureIndex && (e.ref.list ?? '') === (adjustRef.list ?? '')
+          )
+          const asset = entry !== undefined ? state.bundle.assets[entry.figure.assetId] : undefined
+          if (entry === undefined || asset === undefined) return null
+          return (
+            <FigureAdjustDialog
+              asset={asset}
+              label={figureLabel(entry, questionNumbers)}
+              onClose={() => setAdjustRef(null)}
+              onApply={(next) => {
+                dispatch({ type: 'replace-figure-assets', assets: [next], changes: [{ ref: entry.ref, assetId: next.id }] })
+                setAdjustRef(null)
+              }}
+            />
+          )
+        })()}
       {figureBatch !== null && (
         <FigureBatchDialog
           blocks={project.blocks}
