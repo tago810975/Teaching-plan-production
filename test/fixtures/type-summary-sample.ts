@@ -65,12 +65,10 @@ export async function createTypeSummarySample(): Promise<ProjectBundle> {
   project.presetId = preset.id
   project.meta.title = '放缩圆母题01'
   project.header = {
-    logo: await headerImage('logo.png', 1063625, 304800, assets),
     left: preset.header.left ?? '',
     phoneIcon: await headerImage('phone-icon.png', 111125, 111125, assets),
-    phone: '134-8210-2204',
-    right: '选修二　磁场 磁场力　带电粒子圆周运动',
-    watermark: await headerImage('watermark.png', 6352540, 8021320, assets)
+    phone: '000-0000-0000',
+    right: '选修二　磁场 磁场力　带电粒子圆周运动'
   }
   const [example, review, solve, summary] = preset.sectionNames
 

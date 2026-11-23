@@ -24,9 +24,15 @@ export function builtinTemplateDir(templateId: string): string {
 
 /** 用户模板中的 Word 模板：模板 ID（user-<预设 id>）→ 文件夹，由 user-templates.ts 登记 */
 let userTemplateDirs: ReadonlyMap<string, string> = new Map()
+/** 全部用户模板：预设 ID → 文件夹，由 user-templates.ts 登记（用于读取不带 template.docx 的模板页眉） */
+let userPresetDirs: ReadonlyMap<string, string> = new Map()
 
 export function setUserTemplateDirs(dirs: ReadonlyMap<string, string>): void {
   userTemplateDirs = dirs
+}
+
+export function setUserPresetDirs(dirs: ReadonlyMap<string, string>): void {
+  userPresetDirs = dirs
 }
 
 /** Word 模板所在的文件夹：用户模板优先，其次是内置模板 */
@@ -37,9 +43,11 @@ export function templateDir(templateId: string): string {
   return builtinTemplateDir(templateId)
 }
 
-export async function readTemplateDefaults(templateId: string): Promise<TemplateDefaults> {
-  // 用户模板可以不带 header/：用内置模板的页眉
-  let dir = join(templateDir(templateId), 'header')
+export async function readTemplateDefaults(templateId: string, presetId?: string): Promise<TemplateDefaults> {
+  // 优先用用户预设自带的 header/（即使该模板没有自定义 template.docx）；其次用 Word 模板目录；最后用内置默认页眉
+  const presetDir = presetId !== undefined ? userPresetDirs.get(presetId) : undefined
+  let dir = presetDir !== undefined ? join(presetDir, 'header') : ''
+  if (dir === '' || !existsSync(join(dir, 'defaults.json'))) dir = join(templateDir(templateId), 'header')
   if (!existsSync(join(dir, 'defaults.json'))) dir = join(builtinTemplateDir('physics-default'), 'header')
   const file = JSON.parse(await readFile(join(dir, 'defaults.json'), 'utf8')) as HeaderDefaultsFile
   const assets: Record<string, Asset> = {}

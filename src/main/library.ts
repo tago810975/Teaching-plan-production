@@ -198,13 +198,13 @@ export async function createProject(
   await mkdir(targetDir, { recursive: true })
   const filePath = await uniquePath(targetDir, sanitizeFileName(title))
 
-  const defaults = await readTemplateDefaults(templateId)
+  const defaults = await readTemplateDefaults(templateId, presetId)
   const bundle = withTemplateDefaults(createEmptyBundle(), defaults)
   bundle.project.meta.title = title.trim() === '' ? '未命名教学案' : title.trim()
   bundle.project.templateId = templateId
   const preset = getPreset(presetId)
   bundle.project.presetId = preset.id
-  // 预设规定的页眉左侧文字（如知识点手册为“墨帝教育物理知识单”）
+  // 预设规定的页眉左侧文字（如知识点手册为“物理知识单”）
   if (preset.header.left !== undefined) bundle.project.header = { ...bundle.project.header, left: preset.header.left }
   if (content !== undefined) {
     bundle.project.blocks = content.blocks

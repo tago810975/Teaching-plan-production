@@ -173,7 +173,7 @@ describe('导出：变式题题号', () => {
 describe('WPS 兼容：含浮动图片的段落不写“段中不分页”', async () => {
   const { writeDocx } = await import('@core/export/docx-writer')
   it('整题同页时，浮动图片所在段落只有“与下段同页”，其他段落照常', async () => {
-    const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/logo.png')), 'image/png')
+    const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png')), 'image/png')
     const ir = {
       variant: 'student' as const,
       page: A4_PAGE,

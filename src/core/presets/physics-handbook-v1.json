@@ -2,12 +2,12 @@
   "id": "physics-handbook-v1",
   "name": "物理知识点手册 V1.0",
   "subject": "物理",
-  "description": "墨帝教育物理知识点手册（知识单）：大标题与“一、二、三……”知识点，没有知识梳理等二级标题；学生版把红色加粗的重点挖空成横线，用于默写。",
+  "description": "物理知识点手册（知识单）：大标题与“一、二、三……”知识点，没有知识梳理等二级标题；学生版把红色加粗的重点挖空成横线，用于默写。",
   "templateId": "physics-default",
   "kind": "handbook",
   "header": {
     "variantSuffix": false,
-    "left": "墨帝教育物理知识单"
+    "left": "物理知识单"
   },
   "headings": {
     "title": {

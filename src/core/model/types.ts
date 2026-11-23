@@ -393,7 +393,7 @@ export interface HeaderImage {
  */
 export interface PageHeader {
   logo?: HeaderImage
-  /** 如“墨帝教育秋季学期” */
+  /** 如“秋季学期” */
   left: string
   phoneIcon?: HeaderImage
   phone: string

@@ -102,7 +102,8 @@ export function TemplatesDialog({ onClose, onChanged }: Props) {
       <h2 id="templates-title"><CollageText text="模板" /></h2>
       <p className="field-hint">
         内置模板随软件安装，不能修改；要做自己的模板，先把一个模板“复制为新模板”，再修改模板文件夹中的 preset.json
-        （格式预设）与 template.docx（Word 模板），说明见文件夹里的 README.md。也可以导入其他老师导出的模板压缩包。
+        （格式预设）、template.docx（Word 模板）与 header/（默认页眉：电话、机构标志、水印），说明见文件夹里的 README.md。
+        导入模板压缩包时会自动导入其中的页眉电话与机构标志。
       </p>
       {catalog !== null && (
         <p className="templates-dir">

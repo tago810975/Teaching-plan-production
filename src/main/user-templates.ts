@@ -17,7 +17,7 @@ import { allPresets, getPreset, isBuiltinPreset, parsePreset, PRESETS, setUserPr
 import { checkWordTemplate } from '@core/template/check'
 import type { TemplateCatalog, TemplateProblem } from '@shared/ipc'
 import { getLibraryDir } from './library'
-import { builtinTemplateDir, setUserTemplateDirs, templateDir } from './template-io'
+import { builtinTemplateDir, setUserPresetDirs, setUserTemplateDirs, templateDir } from './template-io'
 
 export const USER_TEMPLATE_FOLDER = '模板'
 
@@ -40,6 +40,7 @@ export async function loadUserTemplates(): Promise<TemplateCatalog> {
   const presets: FormatPreset[] = []
   const user: TemplateCatalog['user'] = []
   const dirs = new Map<string, string>()
+  const presetDirs = new Map<string, string>()
   let entries: string[] = []
   try {
     entries = (await readdir(dir, { withFileTypes: true })).filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name)
@@ -70,6 +71,7 @@ export async function loadUserTemplates(): Promise<TemplateCatalog> {
       continue
     }
     presets.push(preset)
+    presetDirs.set(preset.id, full)
     user.push({ id: preset.id, name: preset.name, description: preset.description, dir: full, hasWordTemplate: result.hasWordTemplate })
   }
   // 引用了其他用户模板的 Word 模板（templateId 为 user-xxx）但那个模板不存在
@@ -78,10 +80,12 @@ export async function loadUserTemplates(): Promise<TemplateCatalog> {
       const info = user.find((u) => u.id === p.id)!
       problems.push({ folder: info.dir.slice(dir.length + 1), message: `templateId“${p.templateId}”指向的用户模板不存在` })
       presets.splice(presets.indexOf(p), 1)
+      presetDirs.delete(p.id)
       user.splice(user.indexOf(info), 1)
     }
   }
   setUserTemplateDirs(dirs)
+  setUserPresetDirs(presetDirs)
   setUserPresets(presets)
   catalog = {
     dir,
@@ -133,7 +137,12 @@ async function templateFiles(presetId: string): Promise<Map<string, Uint8Array |
   }
   const wordDir = templateDir(preset.templateId)
   files.set('template.docx', new Uint8Array(await readFile(join(wordDir, 'template.docx'))))
-  const headerDir = (await exists(join(wordDir, 'header', 'defaults.json'))) ? join(wordDir, 'header') : join(builtinTemplateDir('physics-default'), 'header')
+  const headerDir =
+    user !== undefined && (await exists(join(user.dir, 'header', 'defaults.json')))
+      ? join(user.dir, 'header')
+      : (await exists(join(wordDir, 'header', 'defaults.json')))
+        ? join(wordDir, 'header')
+        : join(builtinTemplateDir('physics-default'), 'header')
   for (const name of await readdir(headerDir)) {
     if (HEADER_FILE.test(name)) files.set(`header/${name}`, new Uint8Array(await readFile(join(headerDir, name))))
   }

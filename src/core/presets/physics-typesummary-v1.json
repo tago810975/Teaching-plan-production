@@ -2,7 +2,7 @@
   "id": "physics-typesummary-v1",
   "name": "物理题型整理 V1.0",
   "subject": "物理",
-  "description": "墨帝教育高中物理题型整理（单题小页册）：一道母题配“例题 / 审题 / 解题 / 题后归纳”，审题用灰底注释框，解题用“思维过程 / 书写过程”对照表；学生版的书写过程换成虚线格，供学生自己写。",
+  "description": "高中物理题型整理（单题小页册）：一道母题配“例题 / 审题 / 解题 / 题后归纳”，审题用灰底注释框，解题用“思维过程 / 书写过程”对照表；学生版的书写过程换成虚线格，供学生自己写。",
   "templateId": "physics-default",
   "kind": "typeSummary",
   "numberQuestions": false,
@@ -14,7 +14,7 @@
   },
   "header": {
     "variantSuffix": false,
-    "left": "墨帝教育高中物理"
+    "left": "高中物理"
   },
   "headings": {
     "title": {
