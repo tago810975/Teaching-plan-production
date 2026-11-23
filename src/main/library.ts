@@ -27,6 +27,8 @@ const MAX_SCAN_DEPTH = 2
 
 interface Settings {
   libraryDir?: string
+  /** 安装程序写入的教学案库路径（用于区分“在软件设置中修改”与“重新安装时改选”） */
+  installedLibraryDir?: string
   /** 导入（从 Word 新建）时默认使用的格式预设 */
   defaultPresetId?: string
   /** 导出 Word 时是否默认勾选“知识点重点难点汇总” */
@@ -59,11 +61,29 @@ async function readJsonFile<T>(path: string, fallback: T): Promise<T> {
 
 // ---------- 库目录 ----------
 
+async function readInstallerLibraryDir(): Promise<string | null> {
+  if (!app.isPackaged) return null
+  try {
+    const raw = await readFile(join(process.resourcesPath, 'installer-library-dir.txt'), 'utf16le')
+    const dir = raw.replace(/^\uFEFF/, '').trim()
+    return dir !== '' ? dir : null
+  } catch {
+    return null
+  }
+}
+
 export async function getLibraryDir(): Promise<string> {
   const settings = await readJsonFile<Settings>(settingsPath(), {})
-  const dir = settings.libraryDir ?? join(app.getPath('documents'), '教学案')
-  await mkdir(dir, { recursive: true })
-  return dir
+  const installed = await readInstallerLibraryDir()
+  let dir = settings.libraryDir
+  if (installed !== null && (dir === undefined || settings.installedLibraryDir !== installed)) {
+    dir = installed
+    await mkdir(app.getPath('userData'), { recursive: true })
+    await writeFile(settingsPath(), JSON.stringify({ ...settings, libraryDir: dir, installedLibraryDir: installed }, null, 2))
+  }
+  const resolved = dir ?? join(app.getPath('documents'), '教学案')
+  await mkdir(resolved, { recursive: true })
+  return resolved
 }
 
 export async function setLibraryDir(dir: string): Promise<void> {

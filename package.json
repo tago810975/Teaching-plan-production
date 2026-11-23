@@ -1,7 +1,7 @@
 {
   "name": "teaching-plan-production",
   "productName": "TeachingPlan",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "教学案制作：导入题目、排版、导出 Word 教案与学案",
   "author": "tago810975",
   "license": "MIT",
