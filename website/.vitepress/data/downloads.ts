@@ -37,13 +37,13 @@ export interface DownloadConfig {
   platforms: PlatformDownloads[]
 }
 
-const LATEST_RELEASE_URL = 'https://github.com/tago810975/TeachingPlan-downloads/releases/latest'
+const LATEST_RELEASE_URL = 'https://github.com/tago810975/Teaching-plan-production/releases/latest'
 
 export const DOWNLOAD_CONFIG: DownloadConfig = {
   version: '0.3.0',
-  releaseRepo: 'https://github.com/tago810975/TeachingPlan-downloads',
+  releaseRepo: 'https://github.com/tago810975/Teaching-plan-production',
   latestReleaseUrl: LATEST_RELEASE_URL,
-  allReleasesUrl: 'https://github.com/tago810975/TeachingPlan-downloads/releases',
+  allReleasesUrl: 'https://github.com/tago810975/Teaching-plan-production/releases',
   platforms: [
     {
       id: 'windows',

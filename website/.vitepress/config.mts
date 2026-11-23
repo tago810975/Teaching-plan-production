@@ -22,7 +22,7 @@ export default defineConfig({
       { text: '下载', link: '/download' },
       {
         text: '更新日志',
-        link: 'https://github.com/tago810975/TeachingPlan-downloads/releases'
+        link: 'https://github.com/tago810975/Teaching-plan-production/releases'
       }
     ],
 
@@ -95,7 +95,7 @@ export default defineConfig({
     socialLinks: [
       {
         icon: 'github',
-        link: 'https://github.com/tago810975/TeachingPlan-downloads/releases',
+        link: 'https://github.com/tago810975/Teaching-plan-production/releases',
         ariaLabel: 'GitHub Releases'
       }
     ],

@@ -17,7 +17,7 @@ hero:
       link: /guide/getting-started
     - theme: alt
       text: GitHub Releases
-      link: https://github.com/tago810975/TeachingPlan-downloads/releases
+      link: https://github.com/tago810975/Teaching-plan-production/releases
 
 features:
   - title: 双版同步导出

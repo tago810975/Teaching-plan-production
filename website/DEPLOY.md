@@ -1,20 +1,20 @@
 # 官网双站部署与日常维护说明
 
-本项目官网位于 `website/` 目录，使用 VitePress 构建为纯静态页面。由于源码仓库（`tago810975/Teaching-plan-production`）为私有仓库，而公开下载仓库为 `tago810975/TeachingPlan-downloads`，因此采用 **GitHub Pages + Cloudflare Pages 双站自动同步部署**，两者共用同一套代码，零服务器成本。
+本项目官网位于 `website/` 目录，使用 VitePress 构建为纯静态页面，采用 **GitHub Pages + Cloudflare Pages 双站自动同步部署**，两者共用同一套代码，零服务器成本。
 
 ---
 
 ## 一、GitHub Pages 一次性开启步骤
 
-> 原理：本仓库中的 [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) 会在 `website/` 变更推送到 `main` 时自动构建，并利用已配置好的 `RELEASE_TOKEN` 将静态文件推送到公开仓库 `tago810975/TeachingPlan-downloads` 的 `gh-pages` 分支。
+> 原理：本仓库中的 [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) 会在 `website/` 变更推送到 `main` 时自动构建，并直接将静态文件推送到当前仓库 `tago810975/Teaching-plan-production` 的 `gh-pages` 分支。
 
-1. 将当前改动推送到 GitHub `main` 分支（触发第一次 **部署官网到 GitHub Pages** workflow，或到本仓库 **Actions** 页面手动点一次 **Run workflow**），等待运行成功，此时 `TeachingPlan-downloads` 仓库会出现 `gh-pages` 分支。
-2. 打开公开仓库 **`tago810975/TeachingPlan-downloads`** 的 **Settings → Pages**。
+1. 将当前改动推送到 GitHub `main` 分支（触发 **部署官网到 GitHub Pages** workflow），等待运行成功，此时仓库会出现 `gh-pages` 分支。
+2. 打开仓库 **`tago810975/Teaching-plan-production`** 的 **Settings → Pages**。
 3. 在 **Build and deployment** 中设置：
    - **Source**：选择 `Deploy from a branch`
    - **Branch**：选择 `gh-pages` 和 `/ (root)`
 4. 点击 **Save**，稍等 1～2 分钟即可通过以下地址访问：
-   - `https://tago810975.github.io/TeachingPlan-downloads/`
+   - `https://tago810975.github.io/Teaching-plan-production/`
 
 ---
 
@@ -76,6 +76,6 @@ npm.cmd run build     # 测试默认根路径 / 构建（对应 Cloudflare Pages
 如需本地模拟 GitHub Pages 子路径构建：
 
 ```powershell
-$env:SITE_BASE='/TeachingPlan-downloads/'
+$env:SITE_BASE='/Teaching-plan-production/'
 npm.cmd --prefix website run build
 ```
