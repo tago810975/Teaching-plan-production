@@ -39,6 +39,45 @@ export interface DownloadConfig {
 
 const LATEST_RELEASE_URL = 'https://github.com/tago810975/Teaching-plan-production/releases/latest'
 
+const SHARED_CHANNELS: DownloadChannel[] = [
+  {
+    name: '小飞机网盘',
+    url: 'https://share.feijipan.com/s/Zsz8oKHa',
+    code: 'modi',
+    badge: '推荐',
+    note: '国内直连高速下载，免登录更方便'
+  },
+  {
+    name: '夸克网盘',
+    url: 'https://pan.quark.cn/s/28ffc6f3020b',
+    code: 'modi',
+    note: '国内网盘分流'
+  },
+  {
+    name: '123 网盘',
+    url: 'https://1813707651.share.123pan.cn/123pan/11QlVv-A7O8A',
+    code: 'modi',
+    note: '国内网盘分流'
+  },
+  {
+    name: '阿里云盘',
+    url: 'https://www.alipan.com/s/9hxc9EHNj1b',
+    code: 'modi',
+    note: '国内网盘分流'
+  },
+  {
+    name: '百度网盘',
+    url: 'https://pan.baidu.com/s/109suKgdXmnw__XcHKyUknA',
+    code: 'modi',
+    note: '国内网盘备用'
+  },
+  {
+    name: 'GitHub Release（官方直链）',
+    url: LATEST_RELEASE_URL,
+    note: '获取最新正式版安装包'
+  }
+]
+
 export const DOWNLOAD_CONFIG: DownloadConfig = {
   version: '0.3.0',
   releaseRepo: 'https://github.com/tago810975/Teaching-plan-production',
@@ -50,64 +89,14 @@ export const DOWNLOAD_CONFIG: DownloadConfig = {
       name: 'Windows 版',
       subtitle: 'Windows 10 / 11（64 位安装程序）',
       fileHint: 'TeachingPlan-0.3.0-Windows-setup.exe',
-      channels: [
-        {
-          name: 'GitHub Release（官方直链）',
-          url: LATEST_RELEASE_URL,
-          badge: '推荐',
-          note: '获取最新正式版安装包'
-        },
-        {
-          name: '夸克网盘（国内高速）',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        },
-        {
-          name: '百度网盘（国内备用）',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        },
-        {
-          name: '123 云盘 / 蓝奏云',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        }
-      ]
+      channels: SHARED_CHANNELS
     },
     {
       id: 'macos',
       name: 'macOS 版',
       subtitle: 'Apple Silicon（arm64）/ Intel（x64）',
       fileHint: 'TeachingPlan-0.3.0-Mac-arm64.dmg / x64.dmg',
-      channels: [
-        {
-          name: 'GitHub Release（官方直链）',
-          url: LATEST_RELEASE_URL,
-          badge: '推荐',
-          note: '获取最新正式版安装包'
-        },
-        {
-          name: '夸克网盘（国内高速）',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        },
-        {
-          name: '百度网盘（国内备用）',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        },
-        {
-          name: '123 云盘 / 蓝奏云',
-          url: '',
-          code: '',
-          note: '待补充链接'
-        }
-      ]
+      channels: SHARED_CHANNELS
     }
   ]
 }
