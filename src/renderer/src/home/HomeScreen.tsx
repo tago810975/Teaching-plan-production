@@ -13,17 +13,18 @@ import { SettingsDialog } from './SettingsDialog'
 import { CollageText } from '../theme/CollageText'
 
 interface Props {
-  /** 已在标签页中打开的文件：不能在首页重命名或删除（先关闭标签页） */
+  /** 已在标签页中打开的文件：不能在首页删除（先关闭标签页） */
   openPaths: string[]
   onOpen: (filePath: string) => void
   onOpenOther: () => void
   onNew: () => void
   onOpenDemo: () => void
+  onRename: (filePath: string, newStem: string) => Promise<string | null>
   /** 从 Word 文档新建；给出 filePath 时直接用这个文档 */
   onCreateFromDocx: (filePath?: string) => void
 }
 
-export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, onCreateFromDocx }: Props) {
+export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, onRename, onCreateFromDocx }: Props) {
   const [view, setView] = useState<HomeView>({ kind: 'recent' })
   const [listing, setListing] = useState<LibraryListing | null>(null)
   const [folder, setFolder] = useState<FolderListing | null>(null)
@@ -106,15 +107,10 @@ export function HomeScreen({ openPaths, onOpen, onOpenOther, onNew, onOpenDemo, 
     },
     createFromDocx: (item) => onCreateFromDocx(item.path),
     rename: async (item, newStem) => {
-      if (isOpen(item)) {
-        const msg = `“${item.name}”正在上方的标签页中编辑，请先关闭它再重命名。`
-        setError(msg)
-        return msg
-      }
-      const r = await window.api.renameFile(item.path, newStem)
-      if (!r.ok) {
-        setError(r.error)
-        return r.error
+      const err = await onRename(item.path, newStem)
+      if (err !== null) {
+        setError(err)
+        return err
       }
       await refresh()
       return null

@@ -12,6 +12,7 @@ const EMU_PER_TWIP = 635
 
 export const QUESTION_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
   ['below', '题干下方'],
+  ['center', '题干下方（居中）'],
   ['right', '题干右侧（文字环绕）'],
   ['right-items', '题干下方，位于选项或小问右侧'],
   ['below-item', '某个小问下方'],
@@ -21,6 +22,7 @@ export const QUESTION_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, strin
 
 export const KNOWLEDGE_PLACEMENTS: ReadonlyArray<readonly [FigurePlacement, string]> = [
   ['below', '某段之后'],
+  ['center', '某段之后（居中）'],
   ['right', '某段右侧（文字环绕）'],
   ['free', '自由位置（文字环绕，可拖动）']
 ]

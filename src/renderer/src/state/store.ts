@@ -115,6 +115,8 @@ export type EditorAction =
   /** 拖拽排序：把内容块移到第 toIndex 个位置之前（toIndex 按移动前的顺序计算） */
   | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
+  /** 同步重命名：更新文件路径与工程名称，不额外记入撤销历史 */
+  | { type: 'renamed'; filePath: string; title: string }
   | { type: 'update-layout'; layout: ProjectLayout }
   /** 让属性面板的输入框重新读取内容（如改了字体，文字自身的格式随之变化） */
   | { type: 'refresh-inspector' }
@@ -175,6 +177,15 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 /** 先按动作修改，再记录撤销历史；now 为当前时间（测试中可指定） */
 export function reduceAt(state: EditorState, action: EditorAction, now: number): EditorState {
   if (action.type === 'undo' || action.type === 'redo') return travel(state, action)
+  if (action.type === 'renamed') {
+    const project = { ...state.bundle.project, meta: { ...state.bundle.project.meta, title: action.title } }
+    return {
+      ...state,
+      filePath: action.filePath,
+      bundle: { ...state.bundle, project },
+      savedProject: state.dirty ? state.savedProject : project
+    }
+  }
   const next = baseReducer(state, action)
   if (action.type === 'load' || action.type === 'close') return { ...next, history: EMPTY_HISTORY }
   // 只有工程内容（或资源）变化才记入历史
@@ -231,7 +242,7 @@ function travel(state: EditorState, action: { type: 'undo' | 'redo'; focus?: Car
   }
 }
 
-function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: 'undo' } | { type: 'redo' }>): EditorState {
+function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: 'undo' } | { type: 'redo' } | { type: 'renamed' }>): EditorState {
   switch (action.type) {
     case 'load':
       return {

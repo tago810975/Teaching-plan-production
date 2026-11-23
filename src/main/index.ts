@@ -68,6 +68,9 @@ let closeConfirmed = false
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // 部分网络配置工具会拦截 UDP 443（QUIC），禁用 QUIC 可避免墨案等 HTTPS/WSS 连接等待回退
+  app.commandLine.appendSwitch('disable-quic')
+
   app.on('second-instance', (_event, argv) => {
     const file = findProjectArg(argv)
     if (mainWindow !== null) {

@@ -211,7 +211,7 @@
 
 .tab-row {
   display: inline-flex;
-  width: 100%;
+  max-width: 100%;
   text-indent: 0;
 }
 .tab-cell {

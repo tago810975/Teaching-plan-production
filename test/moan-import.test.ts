@@ -354,3 +354,42 @@ describe('知识点、答案、解析中的图片', () => {
     expect(plainText(q.question.analysis)).toBe('【解析】讲解提要：')
   })
 })
+
+describe('题干中间的选项表格与普通数据表格', () => {
+  it('题干小问下的选项表格去掉表格只留选项内容，同时保留实验数据等普通表格', () => {
+    const show = {
+      teachingPlan: { id: 1, name: '电解质溶液' },
+      mainTeachingPlanExtra: [
+        {
+          id: 1,
+          type_id: 1,
+          sort_id: 1,
+          name:
+            '<p>（1）实验设计如下：</p>' +
+            '<table><tr><td>试管</td><td>A</td><td>B</td></tr><tr><td>加入试剂</td><td>4mL</td><td>2mL</td></tr></table>' +
+            '<p>（2）下列说法正确的是______。</p>' +
+            '<table><tr><td>A. 测其 pH=2</td></tr><tr><td>B. 测其 pH&gt;7</td></tr><tr><td>C. 稀释 100 倍</td></tr><tr><td>D. 收集到 224mL</td></tr></table>' +
+            '<p>（3）继续实验。</p>'
+        }
+      ],
+      childTeachingPlanExtra: {}
+    } as unknown as MoanPlanShow
+    const r = convertMoanPlan(show, new Map(), [])
+    const q = r.blocks.find((b) => b.type === 'question')!
+    if (q.type !== 'question') throw new Error()
+    // 第一个实验数据表格必须保留
+    const tables = q.question.stem.flatMap((p) => p.inlines).filter((i) => i.type === 'table')
+    expect(tables).toHaveLength(1)
+    // 第二个选项表格已拆成普通段落，且保留顺序
+    expect(q.question.stem.map((p) => plainText([p]))).toEqual([
+      '（1）实验设计如下：',
+      '[表格]',
+      '（2）下列说法正确的是______。',
+      'A. 测其 pH=2',
+      'B. 测其 pH>7',
+      'C. 稀释 100 倍',
+      'D. 收集到 224mL',
+      '（3）继续实验。'
+    ])
+  })
+})

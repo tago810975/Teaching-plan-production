@@ -132,7 +132,8 @@ class ExportContext {
       const rest = p.runs.filter((r) => r.kind !== 'table')
       const hasOther = rest.some((r) => !(r.kind === 'text' && r.text.trim() === ''))
       let out = hasOther || p.label !== undefined ? this.paragraph({ ...p, runs: rest }) : ''
-      for (const r of p.runs) if (r.kind === 'table') out += this.table(r.table)
+      const indentLeft = p.indentLeftTwip ?? STYLE_SPECS[p.style].indentLeftTwip
+      for (const r of p.runs) if (r.kind === 'table') out += this.table(r.table, indentLeft)
       return out
     }
     const spec = STYLE_SPECS[p.style]
@@ -193,9 +194,10 @@ class ExportContext {
    * 表格：细实线边框、固定列宽、居中；合并单元格写成 gridSpan / vMerge（被上方单元格覆盖的位置写续行单元格）。
    * 单元格中的段落用正文样式，但不缩进、段前段后为 0。
    */
-  private table(t: DocTable): string {
+  private table(t: DocTable, indentLeft = 0): string {
     const grid = layoutTable(t.rows)
-    const widths = t.colWidthsTwip.length === grid.cols ? t.colWidthsTwip : Array.from({ length: grid.cols }, () => Math.floor(contentWidthTwip(A4_PAGE) / Math.max(1, grid.cols)))
+    const maxWidth = contentWidthTwip(A4_PAGE) - indentLeft
+    const widths = t.colWidthsTwip.length === grid.cols ? t.colWidthsTwip : Array.from({ length: grid.cols }, () => Math.floor(maxWidth / Math.max(1, grid.cols)))
     const total = widths.reduce((a, b) => a + b, 0)
     const span = (c: number, n: number): number => widths.slice(c, c + n).reduce((a, b) => a + b, 0)
     const colored = t.borderColor !== undefined
@@ -207,8 +209,9 @@ class ExportContext {
       cp?.ruleLine === true
         ? `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:pBdr>${ruleBorder('bottom')}${ruleBorder('between')}</w:pBdr><w:spacing w:before="0" w:after="0" w:line="${RULE_LINE_TWIP}" w:lineRule="exact"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/></w:pPr></w:p>`
         : `<w:p><w:pPr>${bodyStyle !== undefined ? `<w:pStyle w:val="${bodyStyle}"/>` : ''}<w:spacing w:before="0" w:after="0"/><w:ind w:left="0" w:firstLine="0" w:firstLineChars="0"/>${cp?.align !== undefined ? `<w:jc w:val="${cp.align}"/>` : ''}</w:pPr>${(cp?.runs ?? []).map((r) => this.run(r, cp?.font)).join('')}</w:p>`
+    const alignXml = indentLeft > 0 ? `<w:jc w:val="left"/><w:tblInd w:w="${indentLeft}" w:type="dxa"/>` : '<w:jc w:val="center"/>'
     let xml =
-      `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:jc w:val="center"/>` +
+      `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${alignXml}` +
       `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('')}</w:tblBorders>` +
       `<w:tblLayout w:type="fixed"/>` +
       // 彩色边框的表格（题型整理对照表）单元格留白大一些，与样张一致；预览的 .doc-table--roomy 与此相同

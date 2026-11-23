@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { blankKeyPoints, buildDocument } from '@core/document/build'
 import { writeDocx } from '@core/export/docx-writer'
 import { importDocx } from '@core/import/import-docx'
-import { createEmptyBundle, createEmptyProject, createKnowledge, para } from '@core/model/factory'
+import { createEmptyBundle, createEmptyProject, createKnowledge, createQuestion, para } from '@core/model/factory'
 import { fromEditable, toEditable } from '@core/model/markup'
 import { projectSchema } from '@core/model/schema'
 import { createTable, deleteColumn, deleteRow, hasMerges, insertColumn, insertRow, layoutTable } from '@core/model/table'
@@ -298,5 +298,34 @@ describe('有合并单元格时增删行列', async () => {
     const t = setColumnWidths(createTable(2, 3), [1000, 2000, 3000])
     expect(t.colWidthsTwip).toEqual([1000, 2000, 3000])
     expect(setColumnWidths(t, undefined).colWidthsTwip).toBeUndefined()
+  })
+
+  it('题干中的表格按题干缩进扣减宽度并导出 tblInd，与正文左右对齐', async () => {
+    const tbl = createTable(2, 2)
+    const p = createEmptyProject()
+    p.blocks = [
+      {
+        id: 'q1',
+        type: 'question',
+        question: createQuestion({
+          kind: 'solve',
+          stem: [{ inlines: [{ type: 'text', text: '实验如下：' }] }, { inlines: [tbl] }]
+        })
+      }
+    ]
+    const ir = buildDocument(p, 'teacher')
+    const tblPara = ir.paragraphs.find((dp) => dp.runs.some((r) => r.kind === 'table'))!
+    const docTbl = tblPara.runs.find((r) => r.kind === 'table')!
+    if (docTbl.kind !== 'table') throw new Error()
+    // 2 列平分 10133 = 5066 * 2 = 10132（不超出 10466 - 333）
+    expect(docTbl.table.colWidthsTwip.reduce((a, b) => a + b, 0)).toBe(10132)
+
+    const bytes = await writeDocx({ ir, assets: {}, title: 't', template: TEMPLATE })
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(bytes)
+    const docXml = await zip.file('word/document.xml')!.async('string')
+    expect(docXml).toContain('<w:tblW w:w="10132" w:type="dxa"/>')
+    expect(docXml).toContain('<w:jc w:val="left"/>')
+    expect(docXml).toContain('<w:tblInd w:w="333" w:type="dxa"/>')
   })
 })

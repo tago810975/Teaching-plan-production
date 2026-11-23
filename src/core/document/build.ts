@@ -27,7 +27,7 @@ import type {
 import { bodyTopTwip } from './header'
 import type { DocIR, DocParagraph, DocRun, DocTable, FigureListName, FloatingImage } from './ir'
 import { columnWidths } from '../model/table'
-import { BODY_LINE_HEIGHT_TWIP, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
+import { BODY_LINE_HEIGHT_TWIP, FLOAT_GAP_EMU, STYLE_SPECS, UNNUMBERED_STEM_INDENT_TWIP, type StyleKey } from './styles'
 import { DEFAULT_OPTION_STOPS } from '../model/factory'
 import { difficultyOf, getPreset, presetStyles, resolveLineSpacing, resolveQuestionFields, starText, type FormatPreset } from '../presets'
 import { A4_PAGE, contentWidthTwip, emuToTwip } from './units'
@@ -307,9 +307,12 @@ function buildQuestion(
   }
 
   // 题干：第一段带题号，难度标记写作【B】前缀
+  const numbered = preset.numberQuestions !== false
+  const stemIndent = numbered ? STYLE_SPECS.question.indentLeftTwip : 0
+  const stemTableWidth = contentWidthTwip(A4_PAGE) - stemIndent
   const stem: RichText = q.stem.length > 0 ? q.stem : [{ inlines: [] }]
   stem.forEach((p, i) => {
-    const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined)
+    const runs = toRuns(p, q.stem.length > 0 ? at('stem', i) : undefined, stemTableWidth)
     // 难度：等级写作【B】，其后是对应的星级，如【B】★★（等级与星级的对应见格式预设）
     // 显示哪些由版式设置决定（等级和星级 / 只显示等级 / 只显示星级 / 不显示）
     const d = difficultyOf(q, preset)
@@ -322,7 +325,6 @@ function buildQuestion(
       runs.unshift({ kind: 'text', text: IMPORTANT_LABEL, marks: { bold: true, color: preset.keyPoint.marks.color } })
     }
     // 不编号（题型整理）：题干不显示题号，取消悬挂缩进，各段首行缩进两个字
-    const numbered = preset.numberQuestions !== false
     push({
       key: key(`stem${i}`),
       anchorIndex: i,
@@ -341,29 +343,36 @@ function buildQuestion(
   const hasItems = q.options.length > 0 || q.subQuestions.length > 0
   /** 按位置分组；放不下的（如同一段已有右侧图）退回题干下方 */
   const below: FigItem[] = []
+  const belowCenter: FigItem[] = []
   const rightItems: FigItem[] = []
   const belowItem = new Map<number, FigItem[]>()
   const belowAll: FigItem[] = []
+  let rightSideFigWidthEmu = 0
   for (const item of figs) {
     const { fig } = item
     const host = stemParas[Math.min(fig.anchorParagraph ?? 0, stemParas.length - 1)]
     if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) {
       addFloating(host, rightFloating(fig, blockId, item.index, 'vertical'))
+      rightSideFigWidthEmu = Math.max(rightSideFigWidthEmu, fig.widthEmu)
     } else if (fig.placement === 'free' && host !== undefined) {
       addFloating(host, freeFloating(fig, blockId, item.index))
     } else if (fig.placement === 'right-items' && hasItems) {
       rightItems.push(item)
+      if (rightItems.length === 1) rightSideFigWidthEmu = Math.max(rightSideFigWidthEmu, fig.widthEmu)
     } else if (fig.placement === 'below-item' && fig.anchorItem !== undefined && fig.anchorItem < q.subQuestions.length) {
       const list = belowItem.get(fig.anchorItem) ?? []
       list.push(item)
       belowItem.set(fig.anchorItem, list)
     } else if (fig.placement === 'below-all' || fig.placement === 'below-item') {
       belowAll.push(item)
+    } else if (fig.placement === 'center') {
+      belowCenter.push(item)
     } else {
       below.push(item)
     }
   }
   if (below.length > 0) push(imageParagraph(key('fig-below'), below, blockId))
+  if (belowCenter.length > 0) push(imageParagraph(key('fig-center'), belowCenter, blockId, undefined, 'center'))
 
   /** 选项或小问的第一段：挂“位于选项/小问右侧”的图（多张时其余排在全部文字之后） */
   let itemsHostKey: string | null = null
@@ -375,11 +384,19 @@ function buildQuestion(
     belowAll.unshift(...rest)
   }
 
-  // 选项：右侧有图时自动排成每行 1 项，避免与图重叠
+  // 选项：右侧有图时根据图片宽度自适应缩小选项间距，使 2 列/4 列选项与右侧图同行排列
   if (q.options.length > 0) {
     const setting = rightItems.length > 0 && q.layout.optionColumns === 'auto' ? 1 : q.layout.optionColumns
-    const stops = q.layout.optionStops ?? projectStops
-    const columns = resolveOptionColumns(q.options, setting, stops)
+    const rawStops = q.layout.optionStops ?? projectStops
+    const rightEdgeTwip =
+      rightSideFigWidthEmu > 0
+        ? Math.max(
+            STYLE_SPECS.option.indentLeftTwip + 4 * CHAR_TWIP,
+            contentWidthTwip(A4_PAGE) - Math.ceil(emuToTwip(rightSideFigWidthEmu + FLOAT_GAP_EMU))
+          )
+        : contentWidthTwip(A4_PAGE)
+    const stops = fitOptionStops(rawStops, rightEdgeTwip)
+    const columns = resolveOptionColumns(q.options, setting, stops, rightEdgeTwip)
     chunk(q.options, columns).forEach((row, i) => {
       const runs: DocRun[] = []
       row.forEach((opt, j) => {
@@ -388,7 +405,7 @@ function buildQuestion(
         // 选项中的图片记下位置，预览中可单独或整体缩放
         // 一行中可能有几个选项，选项的整段字体落到各自的文字上
         const optFont = opt.content.format?.font
-        const optRuns = toRuns(opt.content, at('options', option, 'content')).map((r, inline): DocRun =>
+        const optRuns = toRuns(opt.content, at('options', option, 'content'), contentWidthTwip(A4_PAGE) - STYLE_SPECS.option.indentLeftTwip).map((r, inline): DocRun =>
           r.kind === 'image'
             ? { ...r, optionRef: { blockId, option, inline } }
             : r.kind === 'text' && optFont !== undefined && r.marks?.font === undefined
@@ -418,7 +435,7 @@ function buildQuestion(
         ...(j === 0 ? { label: `(${i + 1})` } : {}),
         ...fontProp(p),
         editTarget: { field: `sub:${i}`, paragraph: j },
-        runs: toRuns(p, at('subQuestions', i, 'content', j))
+        runs: toRuns(p, at('subQuestions', i, 'content', j), contentWidthTwip(A4_PAGE) - STYLE_SPECS.subQuestion.indentLeftTwip)
       })
       attachRightItems(paras[paras.length - 1]!)
     })
@@ -597,24 +614,31 @@ function contentWithFigures(
 function placeFigures(paras: DocParagraph[], figures: QuestionFigure[], blockId: string, list: FigureListName, keyPrefix: string): DocParagraph[] {
   if (figures.length === 0) return paras
   const last = Math.max(0, paras.length - 1)
-  const after = new Map<number, FigItem[]>()
+  const after = new Map<number, { left: FigItem[]; center: FigItem[] }>()
   for (const [index, fig] of figures.entries()) {
     const anchor = Math.min(fig.anchorParagraph ?? last, last)
     const host = paras[anchor]
     if (fig.placement === 'right' && host !== undefined && !hasRightAligned(host)) addFloating(host, rightFloating(fig, blockId, index, 'vertical', list))
     else if (fig.placement === 'free' && host !== undefined) addFloating(host, freeFloating(fig, blockId, index, list))
-    else after.set(anchor, [...(after.get(anchor) ?? []), { fig, index }])
+    else {
+      const entry = after.get(anchor) ?? { left: [], center: [] }
+      if (fig.placement === 'center') entry.center.push({ fig, index })
+      else entry.left.push({ fig, index })
+      after.set(anchor, entry)
+    }
+  }
+  const pushAfter = (out: DocParagraph[], i: number): void => {
+    const figs = after.get(i)
+    if (figs === undefined) return
+    if (figs.left.length > 0) out.push(imageParagraph(`${keyPrefix}${i}`, figs.left, blockId, list))
+    if (figs.center.length > 0) out.push(imageParagraph(`${keyPrefix}c${i}`, figs.center, blockId, list, 'center'))
   }
   const out: DocParagraph[] = []
   paras.forEach((p, i) => {
     out.push(p)
-    const figs = after.get(i)
-    if (figs !== undefined) out.push(imageParagraph(`${keyPrefix}${i}`, figs, blockId, list))
+    pushAfter(out, i)
   })
-  if (paras.length === 0) {
-    const figs = after.get(0)
-    if (figs !== undefined) out.push(imageParagraph(`${keyPrefix}0`, figs, blockId, list))
-  }
+  if (paras.length === 0) pushAfter(out, 0)
   return out
 }
 
@@ -681,10 +705,28 @@ function buildComposite(
  * 自动模式下估算每个选项的宽度：能放进四分之一栏就排 4 列，
  * 能放进半栏就排 2 列，否则每行 1 项。列的位置由 OptionStops 决定（对应 Word 制表位）。
  */
-export function resolveOptionColumns(options: ChoiceOption[], setting: OptionColumns, stops: OptionStops = DEFAULT_OPTION_STOPS): 1 | 2 | 4 {
+/** 右侧有浮动图时，将选项制表位按比例缩进到 [indent, rightEdgeTwip] 之内 */
+function fitOptionStops(stops: OptionStops, rightEdgeTwip: number): OptionStops {
+  const indent = STYLE_SPECS.option.indentLeftTwip
+  const full = contentWidthTwip(A4_PAGE)
+  if (rightEdgeTwip >= full) return stops
+  const scale = (rightEdgeTwip - indent) / (full - indent)
+  const map = (x: number): number => Math.round(indent + (x - indent) * scale)
+  return {
+    two: [map(stops.two[0])],
+    four: [map(stops.four[0]), map(stops.four[1]), map(stops.four[2])]
+  }
+}
+
+export function resolveOptionColumns(
+  options: ChoiceOption[],
+  setting: OptionColumns,
+  stops: OptionStops = DEFAULT_OPTION_STOPS,
+  rightEdgeTwip = contentWidthTwip(A4_PAGE)
+): 1 | 2 | 4 {
   if (setting !== 'auto') return setting
   const indent = STYLE_SPECS.option.indentLeftTwip
-  const right = contentWidthTwip(A4_PAGE)
+  const right = rightEdgeTwip
   /** 各列中最窄的一列，留一个字的间隙 */
   const narrowest = (edges: readonly number[]): number =>
     Math.min(...edges.slice(0, -1).map((e, i) => edges[i + 1]! - e)) - CHAR_TWIP
@@ -744,7 +786,7 @@ interface RefBase {
 }
 
 /** 行内内容 → DocRun；提供 base 时为公式记下其在工程数据中的位置 */
-function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
+function toRuns(p: RichParagraph, base?: RefBase, maxTableWidthTwip = contentWidthTwip(A4_PAGE)): DocRun[] {
   return p.inlines.map((i, index): DocRun => {
     switch (i.type) {
       case 'text':
@@ -766,16 +808,16 @@ function toRuns(p: RichParagraph, base?: RefBase): DocRun[] {
       case 'table': {
         // 表格的位置：预览中拖动列边框后写回列宽
         const ref = base === undefined ? undefined : { blockId: base.blockId, path: [...base.path, 'inlines', index] }
-        return { kind: 'table', table: toDocTable(i, ref), ...(ref !== undefined ? { ref } : {}) }
+        return { kind: 'table', table: toDocTable(i, ref, maxTableWidthTwip), ...(ref !== undefined ? { ref } : {}) }
       }
     }
   })
 }
 
 /** 表格 → DocTable：列宽不超过栏宽，单元格内容转为 DocRun */
-function toDocTable(t: TableInline, base?: RefBase): DocTable {
+function toDocTable(t: TableInline, base?: RefBase, maxTableWidthTwip = contentWidthTwip(A4_PAGE)): DocTable {
   return {
-    colWidthsTwip: columnWidths(t, contentWidthTwip(A4_PAGE)),
+    colWidthsTwip: columnWidths(t, maxTableWidthTwip),
     rows: t.rows.map((r, ri) => ({
       cells: r.cells.map((c, ci) => ({
         // 单元格中的文字也记下来源（可在预览中选中改格式、点击编辑公式）
@@ -876,13 +918,13 @@ function hasRightAligned(p: DocParagraph): boolean {
 }
 
 /** 同一位置的一张或多张图：放在同一段里并排显示 */
-function imageParagraph(key: string, items: FigItem[], blockId: string, list?: FigureListName): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
+function imageParagraph(key: string, items: FigItem[], blockId: string, list?: FigureListName, align?: 'center'): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
   const runs: DocRun[] = []
   items.forEach(({ fig, index }, j) => {
     if (j > 0) runs.push({ kind: 'text', text: '\u3000' })
     runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index, ...(list !== undefined ? { list } : {}) } })
   })
-  return { key, sourceBlockId: blockId, style: 'body', runs }
+  return { key, sourceBlockId: blockId, style: 'body', ...(align !== undefined ? { align } : {}), runs }
 }
 
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {

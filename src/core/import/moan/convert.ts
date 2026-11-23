@@ -212,13 +212,16 @@ function questionBlock(item: MoanItem, variant: boolean, rich: (html: string | n
     }
     return true
   })
-  const { stem: body, options, optionColumns } = extractOptions(stem)
+  const { stem: extractedBody, options, optionColumns } = extractOptions(stem)
+  const body = unwrapOptionTables(extractedBody)
   const split = splitReview(rich(item.review_topic, `${where}解析`))
   const review = split.review
   // 答案、解析中单独成段的图片作为答案插图 / 解析插图（先取出图片，再在解析第一段前加【解析】）
-  const { content: analysis, figures: analysisFigures } = imageParagraphsToFigures(split.analysis)
+  const { content: rawAnalysis, figures: analysisFigures } = imageParagraphsToFigures(split.analysis)
+  const analysis = unwrapOptionTables(rawAnalysis)
   if (analysis.length > 0) analysis[0] = { ...analysis[0]!, inlines: [{ type: 'text', text: '【解析】' }, ...analysis[0]!.inlines] }
-  const { content: answer, figures: answerFigures } = imageParagraphsToFigures(rich(item.answer, `${where}答案`))
+  const { content: rawAnswer, figures: answerFigures } = imageParagraphsToFigures(rich(item.answer, `${where}答案`))
+  const answer = unwrapOptionTables(rawAnswer)
   const stars = Number(item.difficultyLevel_id)
   const questionTypeId = Number(item.questionType_id)
   const q = createQuestion({
@@ -303,6 +306,33 @@ export function extractOptions(stem: RichText): { stem: RichText; options: Choic
   return { stem: stem.slice(0, start), options }
 }
 
+function optionTableCells(table: TableInline): RichParagraph[][] | null {
+  // 按阅读顺序（逐行、从左到右）取出非空的格
+  const cells = table.rows.flatMap((r) => r.cells).map((c) => c.content.filter((p) => p.inlines.length > 0)).filter((c) => c.length > 0)
+  if (cells.length < 2 || !cells.every((c, k) => optionLabel(c[0]!) === String.fromCharCode(65 + k))) return null
+  return cells
+}
+
+/**
+ * 题目中间（如某道小问之下）若仍有用表格排版的选项，去掉表格外框，只保留各选项段落；
+ * 题干中的实验数据等普通表格不满足 A./B./… 选项特征，原样保留。
+ */
+export function unwrapOptionTables(paragraphs: RichText): RichText {
+  const out: RichParagraph[] = []
+  for (const p of paragraphs) {
+    const first = p.inlines[0]
+    if (p.inlines.length === 1 && first?.type === 'table') {
+      const cells = optionTableCells(first)
+      if (cells !== null) {
+        for (const c of cells) out.push(...c)
+        continue
+      }
+    }
+    out.push(p)
+  }
+  return out
+}
+
 function optionsFromTable(stem: RichText): { stem: RichText; options: ChoiceOption[]; optionColumns?: OptionColumns } | null {
   // 去掉末尾的空段，取最后一段
   let end = stem.length
@@ -310,9 +340,8 @@ function optionsFromTable(stem: RichText): { stem: RichText; options: ChoiceOpti
   const last = stem[end - 1]
   if (end < 2 || last === undefined || last.inlines.length !== 1 || last.inlines[0]!.type !== 'table') return null
   const table = last.inlines[0] as TableInline
-  // 按阅读顺序（逐行、从左到右）取出非空的格
-  const cells = table.rows.flatMap((r) => r.cells).map((c) => c.content.filter((p) => p.inlines.length > 0)).filter((c) => c.length > 0)
-  if (cells.length < 2 || !cells.every((c, k) => optionLabel(c[0]!) === String.fromCharCode(65 + k))) return null
+  const cells = optionTableCells(table)
+  if (cells === null) return null
   // 一格多段时并成一段（选项只有一段），段间空一格
   const options = cells.map((c, k): ChoiceOption => {
     const first = stripLabel(c[0]!)

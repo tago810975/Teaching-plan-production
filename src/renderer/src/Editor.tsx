@@ -40,6 +40,7 @@ import { useMathUpright } from './state/mathUpright'
 /** 编辑器用到的文件操作（作用于本标签页） */
 export interface EditorFiles {
   save(saveAs?: boolean): Promise<boolean>
+  rename(newStem: string): Promise<string | null>
   /** 回到首页（不关闭本标签页） */
   goHome(): void
 }
@@ -93,6 +94,25 @@ function EditorBody({
 }: Props) {
   const [exportedFiles, setExportedFiles] = useState<string[] | null>(null)
   const { widths: panelWidths, setWidth: setPanelWidth, reset: resetPanel } = usePanelWidths()
+  const [titleDraft, setTitleDraft] = useState(state.bundle.project.meta.title)
+  const titleBusy = useRef(false)
+  useEffect(() => {
+    setTitleDraft(state.bundle.project.meta.title)
+  }, [state.bundle.project.meta.title, state.filePath])
+  const commitTitle = (): void => {
+    if (titleBusy.current) return
+    const next = titleDraft.trim()
+    if (next === '' || next === state.bundle.project.meta.title) {
+      setTitleDraft(state.bundle.project.meta.title)
+      return
+    }
+    titleBusy.current = true
+    void files.rename(next).then((err) => {
+      if (err !== null) setTitleDraft(state.bundle.project.meta.title)
+    }).finally(() => {
+      titleBusy.current = false
+    })
+  }
   const panelWidthsRef = useRef(panelWidths)
   panelWidthsRef.current = panelWidths
   const workspaceRef = useRef<HTMLElement>(null)
@@ -356,10 +376,21 @@ function EditorBody({
           </button>
           <input
             className="doc-title"
-            value={project.meta.title}
+            value={titleDraft}
             aria-label="教学案名称"
             spellCheck={false}
-            onChange={(e) => dispatch({ type: 'set-title', title: e.target.value })}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                setTitleDraft(project.meta.title)
+                e.currentTarget.blur()
+              }
+            }}
           />
           <span className={state.dirty ? 'doc-status is-dirty' : 'doc-status'}>{status}</span>
         </div>

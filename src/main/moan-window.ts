@@ -88,6 +88,8 @@ export function openMoanWindow(parent: BrowserWindow | null, hooks: MoanWindowHo
     }
   })
   const wc = win.webContents
+  const ses = wc.session
+  const wcId = wc.id
 
   let status = ''
   const updateTitle = (): void => {
@@ -126,7 +128,45 @@ export function openMoanWindow(parent: BrowserWindow | null, hooks: MoanWindowHo
         label: '页面',
         submenu: [
           { label: '后退', accelerator: 'Alt+Left', click: () => wc.navigationHistory.goBack() },
-          { label: '刷新', accelerator: 'F5', role: 'reload' }
+          {
+            label: '刷新',
+            accelerator: 'F5',
+            click: () => {
+              if (!st.busy) st.setStatus('')
+              void wc.session.closeAllConnections().finally(() => {
+                if (!win.isDestroyed()) wc.reload()
+              })
+            }
+          },
+          {
+            label: '强制刷新（忽略缓存）',
+            accelerator: 'CmdOrCtrl+F5',
+            click: () => {
+              if (!st.busy) st.setStatus('')
+              void wc.session.closeAllConnections().finally(() => {
+                if (!win.isDestroyed()) wc.reloadIgnoringCache()
+              })
+            }
+          },
+          { type: 'separator' },
+          {
+            label: '清除登录状态与缓存并刷新',
+            click: () => {
+              if (st.busy) return
+              st.setStatus('正在清除缓存…')
+              void Promise.all([
+                wc.session.closeAllConnections(),
+                wc.session.clearCache(),
+                wc.session.clearStorageData()
+              ]).finally(() => {
+                if (win.isDestroyed()) return
+                st.setStatus('')
+                void wc.loadURL(url)
+              })
+            }
+          },
+          { type: 'separator' },
+          { label: '开发者工具', accelerator: 'F12', click: () => wc.openDevTools({ mode: 'detach' }) }
         ]
       }
     ])
@@ -169,6 +209,23 @@ export function openMoanWindow(parent: BrowserWindow | null, hooks: MoanWindowHo
   }
   wc.on('did-navigate', (_e, u) => onPage(u))
   wc.on('did-navigate-in-page', (_e, u) => onPage(u))
+  wc.on('did-finish-load', () => {
+    if (!st.busy) st.setStatus('')
+  })
+  wc.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3) return
+    st.recorder.note(`页面加载失败：${errorCode} ${errorDescription} (${validatedURL})`)
+    if (!st.busy) st.setStatus(`页面加载失败（${errorDescription}），请检查网络后按 F5 刷新`)
+  })
+  wc.session.webRequest.onErrorOccurred((details) => {
+    if (win.isDestroyed() || details.webContentsId !== wc.id) return
+    if (details.error === 'net::ERR_ABORTED' || details.error === 'net::ERR_CACHE_MISS') return
+    if (!details.url.includes('modijiaoyu.com')) return
+    st.recorder.note(`网络请求失败：${details.method} ${details.url} -> ${details.error}`)
+    if (!st.busy && details.url.includes('server.modijiaoyu.com')) {
+      st.setStatus(`无法连接墨案服务器（${details.error}），请检查网络规则后按 F5 刷新`)
+    }
+  })
 
   win.on('close', (event) => {
     if (!st.busy) return
@@ -176,7 +233,8 @@ export function openMoanWindow(parent: BrowserWindow | null, hooks: MoanWindowHo
     void dialog.showMessageBox(win, { type: 'info', message: '正在导入，请等它完成后再关闭窗口。', buttons: ['好'] })
   })
   win.on('closed', () => {
-    states.delete(wc.id)
+    ses.webRequest.onErrorOccurred(null)
+    states.delete(wcId)
     if (current === st) current = null
   })
 
@@ -189,7 +247,10 @@ export function openMoanWindow(parent: BrowserWindow | null, hooks: MoanWindowHo
   }
 
   updateTitle()
-  void wc.loadURL(url)
+  // 打开窗口前先关闭旧的半开连接，避免网络配置工具切换模式/DNS 后复用失效连接
+  void wc.session.closeAllConnections().catch(() => undefined).finally(() => {
+    if (!win.isDestroyed()) void wc.loadURL(url)
+  })
 }
 
 function sameSite(target: string, base: string): boolean {

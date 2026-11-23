@@ -18,7 +18,7 @@ export const PROJECT_FILE_MIMETYPE = 'application/x-teaching-plan+zip'
  * 当前格式版本。修改 project.json 结构时递增，
  * 并在 codec.ts 的 migrate() 中补充旧版本的迁移逻辑。
  */
-export const CURRENT_FORMAT_VERSION = 18
+export const CURRENT_FORMAT_VERSION = 19
 
 /*
  * 版本记录：
@@ -50,6 +50,7 @@ export const CURRENT_FORMAT_VERSION = 18
  *        迁移：锚定在题干首段的右侧图、自由位置图的上下偏移乘以 8/7，使图片相对题干文字的位置保持不变
  *        （此前在预览中摆好的位置，导出到 Word 后偏上）
  * 18 —— 答案、解析中的插图 question.answerFigures / analysisFigures（仅教师版，位置同知识点插图）。只增加可选字段，无需迁移
+ * 19 —— 图片位置新增 center（居中）。只增加取值，无需迁移
  */
 
 export interface Manifest {

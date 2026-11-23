@@ -116,7 +116,7 @@ const figure = z.object({
   assetId: z.string(),
   widthEmu: z.number().positive(),
   heightEmu: z.number().positive(),
-  placement: z.enum(['below', 'right', 'right-items', 'below-item', 'below-all', 'free']),
+  placement: z.enum(['below', 'center', 'right', 'right-items', 'below-item', 'below-all', 'free']),
   anchorParagraph: z.number().int().min(0).optional(),
   anchorItem: z.number().int().min(0).optional(),
   offsetXEmu: z.number().optional(),

@@ -112,6 +112,7 @@ export function App() {
               onOpenOther={() => void files.openProject()}
               onNew={files.newProject}
               onOpenDemo={() => void openDemo()}
+              onRename={files.renamePath}
               onCreateFromDocx={(filePath) => setFromDocx(filePath !== undefined ? { filePath } : {})}
             />
           </>
@@ -183,7 +184,11 @@ function TabEditor(props: {
   const id = tab.id
   const dispatch = useCallback((action: EditorAction) => workspaceDispatch({ type: 'doc', id, action }), [workspaceDispatch, id])
   const editorFiles: EditorFiles = useMemo(
-    () => ({ save: (saveAs?: boolean) => files.save(id, saveAs), goHome: () => workspaceDispatch({ type: 'activate', id: null }) }),
+    () => ({
+      save: (saveAs?: boolean) => files.save(id, saveAs),
+      rename: (newStem: string) => files.renameTab(id, newStem),
+      goHome: () => workspaceDispatch({ type: 'activate', id: null })
+    }),
     [files, id, workspaceDispatch]
   )
 

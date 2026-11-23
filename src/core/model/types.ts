@@ -152,7 +152,7 @@ export interface ChoiceOption {
  * - below-all：全部题目文字（选项与小问）之后
  * - free：自由位置，浮于文字上方，在预览中拖动摆放
  */
-export type FigurePlacement = 'below' | 'right' | 'right-items' | 'below-item' | 'below-all' | 'free'
+export type FigurePlacement = 'below' | 'center' | 'right' | 'right-items' | 'below-item' | 'below-all' | 'free'
 
 export interface QuestionFigure {
   assetId: string

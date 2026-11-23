@@ -162,3 +162,42 @@ describe('导入：知识点中的图片成为可编辑的插图', async () => {
     expect(JSON.stringify(k.content)).not.toContain('"image"')
   })
 })
+
+describe('图片居中与右侧图旁的 2/4 列选项自适应间距', () => {
+  it('图片位置设为 center 时，预览与导出 Word 都居中对齐', async () => {
+    const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png')), 'image/png')
+    const p = questionProject([{ ...fig('center'), assetId: png.id }], false)
+    const ir = buildDocument(p, 'student')
+    const imgPara = ir.paragraphs.find((dp) => dp.runs.some((r) => r.kind === 'image'))!
+    expect(imgPara.align).toBe('center')
+    const bytes = await writeDocx({
+      ir,
+      assets: { [png.id]: png },
+      title: 't',
+      template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
+    })
+    const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
+    expect(doc).toContain('<w:jc w:val="center"/>')
+  })
+
+  it('选择题右侧有图且每行 2 项或 4 项时，制表位按图片宽度自适应缩进，不超出图左侧边界', () => {
+    // 2 cm 宽的右侧图（约 1134 twip + 180 twip 间距 = 1314 twip，右侧边界约 9152 twip）
+    const p2 = questionProject([fig('right', { widthEmu: 720000 })], false)
+    const q2 = p2.blocks[0]!
+    if (q2.type !== 'question') throw new Error()
+    q2.question.layout.optionColumns = 2
+    const ir2 = buildDocument(p2, 'student')
+    const opt2 = ir2.paragraphs.find((dp) => dp.style === 'option')!
+    expect(opt2.tabStopsTwip).toHaveLength(1)
+    expect(opt2.tabStopsTwip![0]!).toBeLessThan(5233)
+
+    const p4 = questionProject([fig('right', { widthEmu: 720000 })], false)
+    const q4 = p4.blocks[0]!
+    if (q4.type !== 'question') throw new Error()
+    q4.question.layout.optionColumns = 4
+    const ir4 = buildDocument(p4, 'student')
+    const opt4 = ir4.paragraphs.find((dp) => dp.style === 'option')!
+    expect(opt4.tabStopsTwip).toHaveLength(3)
+    expect(opt4.tabStopsTwip![2]!).toBeLessThan(7970)
+  })
+})

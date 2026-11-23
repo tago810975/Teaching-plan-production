@@ -23,6 +23,10 @@ export interface WorkspaceFiles {
   closeTab(id: string): Promise<boolean>
   /** 保存某个标签页；返回是否保存成功（用户取消“另存为”时为 false） */
   save(id: string, saveAs?: boolean): Promise<boolean>
+  /** 重命名某个标签页（有文件时同步改 .tplan 文件名）；失败返回错误信息 */
+  renameTab(id: string, newStem: string): Promise<string | null>
+  /** 重命名磁盘文件（若已在标签页中打开，同步更新标签页路径与名称）；失败返回错误信息 */
+  renamePath(filePath: string, newStem: string): Promise<string | null>
   error: string | null
   dismissError(): void
 }
@@ -95,6 +99,38 @@ export function useWorkspaceFiles(ws: Workspace, dispatch: Dispatch<WorkspaceAct
       return true
     },
     [dispatch]
+  )
+
+  const renamePath = useCallback(
+    async (filePath: string, newStem: string): Promise<string | null> => {
+      const r = await window.api.renameFile(filePath, newStem)
+      if (!r.ok) {
+        setError(r.error)
+        return r.error
+      }
+      const title = newStem.trim()
+      const open = findTabByPath(wsRef.current, filePath)
+      if (open !== undefined) {
+        dispatch({ type: 'doc', id: open.id, action: { type: 'renamed', filePath: r.value, title } })
+      }
+      return null
+    },
+    [dispatch]
+  )
+
+  const renameTab = useCallback(
+    async (id: string, newStem: string): Promise<string | null> => {
+      const tab = wsRef.current.tabs.find((t) => t.id === id)
+      if (tab === undefined) return null
+      const title = newStem.trim()
+      if (title === '') return null
+      if (tab.state.filePath === null) {
+        dispatch({ type: 'doc', id, action: { type: 'set-title', title } })
+        return null
+      }
+      return renamePath(tab.state.filePath, title)
+    },
+    [dispatch, renamePath]
   )
 
   const closeTab = useCallback(
@@ -176,7 +212,7 @@ export function useWorkspaceFiles(ws: Workspace, dispatch: Dispatch<WorkspaceAct
     window.api.setWindowState({ title, dirty, dirtyTitles: dirtyKey === '' ? [] : dirtyKey.split('\u0000') })
   }, [title, dirty, dirtyKey])
 
-  return { newProject, createProject, openAt, openProject, openBundle, closeTab, save, error, dismissError: () => setError(null) }
+  return { newProject, createProject, openAt, openProject, openBundle, closeTab, save, renameTab, renamePath, error, dismissError: () => setError(null) }
 }
 
 function samePathLoose(a: string, b: string): boolean {

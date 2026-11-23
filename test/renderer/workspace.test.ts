@@ -104,4 +104,16 @@ describe('多个教学案（标签页）', () => {
     expect(workspaceReducer(ws, { type: 'doc', id: 'a', action: { type: 'undo' } })).toBe(ws)
     expect(workspaceReducer(ws, { type: 'activate', id: 'a' })).toBe(ws)
   })
+
+  it('同步重命名：更新标签页名称与文件路径，不产生未保存状态也不记入撤销', () => {
+    const ws = run(
+      EMPTY_WORKSPACE,
+      { type: 'open', bundle: bundle('甲'), filePath: '/dir/甲.tplan', tabId: 'a' },
+      { type: 'doc', id: 'a', action: { type: 'renamed', filePath: '/dir/乙.tplan', title: '乙' } }
+    )
+    expect(ws.tabs[0]!.state.filePath).toBe('/dir/乙.tplan')
+    expect(ws.tabs[0]!.state.bundle.project.meta.title).toBe('乙')
+    expect(ws.tabs[0]!.state.dirty).toBe(false)
+    expect(ws.tabs[0]!.state.history.past).toHaveLength(0)
+  })
 })
