@@ -1,0 +1,18 @@
+:root {
+  --vp-c-brand-1: #2b6469;
+  --vp-c-brand-2: #225155;
+  --vp-c-brand-3: #1b4246;
+  --vp-c-brand-soft: rgba(43, 100, 105, 0.12);
+}
+
+.dark {
+  --vp-c-brand-1: #5cb3b9;
+  --vp-c-brand-2: #4aa1a7;
+  --vp-c-brand-3: #3b8d93;
+  --vp-c-brand-soft: rgba(92, 179, 185, 0.16);
+}
+
+.VPHero .VPImage {
+  max-width: 196px;
+  max-height: 196px;
+}

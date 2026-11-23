@@ -1,0 +1,50 @@
+# 将 website/ 构建产物发布到公开仓库 tago810975/TeachingPlan-downloads 的 gh-pages 分支
+# 每次推送 website/ 变更到 main 分支时自动运行，也可在 Actions 页面手动触发
+name: 部署官网到 GitHub Pages
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: 安装官网依赖
+        working-directory: website
+        run: npm ci
+
+      - name: 构建 VitePress 静态站点
+        working-directory: website
+        env:
+          SITE_BASE: /TeachingPlan-downloads/
+        run: npm run build
+
+      - name: 推送到公开仓库 gh-pages 分支
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.RELEASE_TOKEN }}
+          external_repository: tago810975/TeachingPlan-downloads
+          publish_branch: gh-pages
+          publish_dir: ./website/.vitepress/dist
+          enable_jekyll: false
+          commit_message: 'chore: deploy website from Teaching-plan-production'

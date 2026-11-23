@@ -7,3 +7,5 @@ release/
 Thumbs.db
 *.tplan.tmp-*
 *.tsbuildinfo
+website/.vitepress/cache/
+website/.vitepress/dist/
