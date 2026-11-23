@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="#d6dedb" />
+  <!-- 学生版底层页 -->
+  <rect x="34" y="26" width="66" height="82" rx="8" fill="#f3f5f4" stroke="#5b686b" stroke-width="3" />
+  <!-- 教师版上层页 -->
+  <path
+    d="M26 26C26 21.5817 29.5817 18 34 18H70L88 36V94C88 98.4183 84.4183 102 80 102H34C29.5817 102 26 98.4183 26 94V26Z"
+    fill="#ffffff"
+    stroke="#1f2a2e"
+    stroke-width="3.5"
+    stroke-linejoin="round"
+  />
+  <!-- 折角 -->
+  <path d="M70 18V32C70 34.2091 71.7909 36 74 36H88" fill="#dfe5e3" stroke="#1f2a2e" stroke-width="3.5" stroke-linejoin="round" />
+  <!-- 版面线条 -->
+  <rect x="38" y="34" width="22" height="5" rx="2.5" fill="#1f2a2e" />
+  <rect x="38" y="48" width="38" height="4" rx="2" fill="#5b686b" />
+  <rect x="38" y="59" width="32" height="4" rx="2" fill="#9aa6a8" />
+  <!-- 重点批注红线（呼应批改红强调色） -->
+  <rect x="38" y="72" width="26" height="4.5" rx="2.25" fill="#b3261e" />
+  <circle cx="72" cy="74.25" r="3.5" fill="#b3261e" />
+  <rect x="38" y="84" width="36" height="4" rx="2" fill="#9aa6a8" />
+</svg>
