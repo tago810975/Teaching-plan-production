@@ -62,7 +62,18 @@
 
 ---
 
-## 四、本地预览与构建测试
+## 四、后续如何上传与更新教程视频（Cloudflare R2）
+
+官网视频配置文件为 **`website/.vitepress/data/videos.ts`**，已绑定 R2 公开访问前缀 `https://pub-93dca24cfb2d4aa8bc524beb0c1454a0.r2.dev`。
+
+1. 登录 Cloudflare Dashboard → **R2 对象存储** → 进入你的存储桶 → 把录制好的 `.mp4` 视频拖入上传（建议使用配置中 `suggestedFile` 提示的英文文件名，例如 `01-getting-started.mp4`）。
+   - 如果你在 Cloudflare Pages 云端还部署了 `CloudFlare-ImgBed` 并绑定了同一个 R2 存储桶，也可以直接通过图床后台上传并复制完整直链。
+2. 打开 **`website/.vitepress/data/videos.ts`**，在对应条目里把 `file` 填上文件名（或完整 `https://...` 外链），可选填 `duration`（如 `'02:15'`）和 `poster` 封面图。
+3. 提交并 `git push` 到 `main`，双站会自动上线对应视频。
+
+---
+
+## 五、本地预览与构建测试
 
 在项目根目录或 `website/` 目录中，使用以下命令即可本地预览：
 
