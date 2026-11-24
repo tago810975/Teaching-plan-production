@@ -29,81 +29,81 @@ export const TUTORIAL_VIDEOS = {
   'getting-started': {
     title: '快速上手：首页管理、新建工程与导出双版 Word',
     description: '演示教学案库分类、新建教学案、三栏界面与一键同时导出教案 (T) / 学案 (S)。',
-    file: '',
+    file: '01-getting-started.mp4',
     poster: '',
-    duration: '',
+    duration: '01:20',
     suggestedFile: '01-getting-started.mp4'
   },
   'import-word': {
     title: '从 Word 文档与组卷网导入题目',
     description: '演示直接双击或导入 Word / 组卷网题集，自动识别题号、选项、综合题与公式。',
-    file: '',
+    file: '02-import-word.mp4',
     poster: '',
-    duration: '',
+    duration: '00:53',
     suggestedFile: '02-import-word.mp4'
   },
   'import-image': {
     title: '从图片导入：AI 识图与 WorkBuddy 一键识别',
     description: '演示粘贴截图、自动框选插图、复制给 AI 识别或连接 WorkBuddy 自动回填结果。',
-    file: '',
+    file: '03-import-image.mp4',
     poster: '',
-    duration: '',
+    duration: '00:59',
     suggestedFile: '03-import-image.mp4'
   },
   'import-moan': {
     title: '从墨案迁移教案与导入知识点',
     description: '演示内置墨案窗口单篇/整夹批量迁移教案，以及按知识点模式导入知识梳理。',
-    file: '',
+    file: '04-import-moan.mp4',
     poster: '',
-    duration: '',
+    duration: '00:59',
     suggestedFile: '04-import-moan.mp4'
   },
   'editing-question': {
     title: '题目编辑、变式题、综合题与快捷排版',
     description: '演示难度、变式题、审题/重点题、综合题拆合、作业单插入、右键快捷版式与大纲拖拽。',
-    file: '',
+    file: '05-editing-question.mp4',
     poster: '',
-    duration: '',
+    duration: '01:04',
     suggestedFile: '05-editing-question.mp4'
   },
   'editing-formula-table': {
     title: '知识点挖空重点、表格与可视化公式编辑',
     description: '演示重点标红挖空默写、表格合并与列宽拖拽、文字格式及可视化公式输入。',
-    file: '',
+    file: '06-editing-formula-table.mp4',
     poster: '',
-    duration: '',
+    duration: '00:46',
     suggestedFile: '06-editing-formula-table.mp4'
   },
   'images-layout': {
     title: '插图排版位置、预览双向定位与选项图片缩放',
     description: '演示题图/答案插图位置切换、自由拖动绕排以及选择题图片选项统一大小。',
-    file: '',
+    file: '07-images-layout.mp4',
     poster: '',
-    duration: '',
+    duration: '00:47',
     suggestedFile: '07-images-layout.mp4'
   },
   'images-enhance': {
     title: '插图自动框选、变清晰、去白底与调色',
     description: '演示扫描件去灰底变清晰、去白底透明、一键加深、手动调色与批量处理插图。',
-    file: '',
+    file: '08-images-enhance.mp4',
     poster: '',
-    duration: '',
+    duration: '00:50',
     suggestedFile: '08-images-enhance.mp4'
   },
   'templates-custom': {
     title: '格式预设切换与自制/分享模板',
     description: '演示四套内置预设效果对比，以及复制修改 preset.json、重新载入与导出 zip 分享。',
-    file: '',
+    file: '09-templates-custom.mp4',
     poster: '',
-    duration: '',
+    duration: '00:50',
     suggestedFile: '09-templates-custom.mp4'
   },
   'themes-settings': {
     title: '软件设置、配色与风格主题切换',
     description: '演示教学案库设置、七套配色主题（含赤黑与月潮动效开关）及知识点汇总导出。',
-    file: '',
+    file: '10-themes-settings.mp4',
     poster: '',
-    duration: '',
+    duration: '00:51',
     suggestedFile: '10-themes-settings.mp4'
   }
 } as const satisfies Record<string, TutorialVideoItem>
