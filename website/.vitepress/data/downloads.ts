@@ -79,7 +79,7 @@ const SHARED_CHANNELS: DownloadChannel[] = [
 ]
 
 export const DOWNLOAD_CONFIG: DownloadConfig = {
-  version: '0.3.0',
+  version: '0.4.0',
   releaseRepo: 'https://github.com/tago810975/Teaching-plan-production',
   latestReleaseUrl: LATEST_RELEASE_URL,
   allReleasesUrl: 'https://github.com/tago810975/Teaching-plan-production/releases',
@@ -88,14 +88,14 @@ export const DOWNLOAD_CONFIG: DownloadConfig = {
       id: 'windows',
       name: 'Windows 版',
       subtitle: 'Windows 10 / 11（64 位安装程序）',
-      fileHint: 'TeachingPlan-0.3.0-Windows-setup.exe',
+      fileHint: 'TeachingPlan-0.4.0-Windows-setup.exe',
       channels: SHARED_CHANNELS
     },
     {
       id: 'macos',
       name: 'macOS 版',
       subtitle: 'Apple Silicon（arm64）/ Intel（x64）',
-      fileHint: 'TeachingPlan-0.3.0-Mac-arm64.dmg / x64.dmg',
+      fileHint: 'TeachingPlan-0.4.0-Mac-arm64.dmg / x64.dmg',
       channels: SHARED_CHANNELS
     }
   ]
