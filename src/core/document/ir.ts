@@ -150,6 +150,9 @@ export interface DocParagraph {
   noWrap?: boolean
   /** 首行缩进（twip），来自段落格式 */
   firstLineIndentTwip?: number
+  /** 段前 / 段后间距（twip），未设时使用所属样式的默认值 */
+  spaceBeforeTwip?: number
+  spaceAfterTwip?: number
   /** 行距（240 = 单倍，与 Word 的 lineRule="auto" 一致），覆盖样式的行距；来自版式设置的行距 */
   lineAuto?: number
   /** 左缩进（twip），覆盖样式中的左缩进与悬挂缩进（如不编号的题干） */

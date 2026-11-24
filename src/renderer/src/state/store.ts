@@ -7,11 +7,12 @@
  */
 import { createEmptyBundle } from '@core/model/factory'
 import type { FigureRef, InlineRef } from '@core/document/ir'
-import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
+import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionBlock, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
 import { withFigures } from '@core/model/figure-lists'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
 import { moveQuestion, moveQuestionAt, moveQuestionTo, type QuestionDrop } from '@core/model/move-question'
+import { mergeQuestionsToComposite, splitComposite } from '@core/model/composite-ops'
 import { replaceFigureAssets, type FigureAssetChange } from '@core/model/figure-refs'
 
 /** 选中页眉时 selectedBlockId 的取值 */
@@ -106,12 +107,22 @@ export type EditorAction =
   | { type: 'set-variant'; variant: Variant }
   | { type: 'select'; blockId: string | null; focus?: Omit<FocusRequest, 'blockId' | 'nonce'> }
   | { type: 'update-block'; blockId: string; update: (block: Block) => Block }
+  /** 批量修改多个内容块（大纲多选后批量设版式）：一步撤销 */
+  | { type: 'update-blocks'; blockIds: string[]; update: (block: Block) => Block }
   | { type: 'move-block'; blockId: string; delta: -1 | 1 }
   /** 大纲中拖放题目：放到顶层或某道综合题中的指定位置（按移动前的顺序） */
   | { type: 'move-question-at'; blockId: string; drop: QuestionDrop }
   /** 把题目移到某道综合题的最后（compositeId），或移出综合题（null） */
   | { type: 'move-question-to'; blockId: string; compositeId: string | null }
+  /** 批量把多道题目移到某道综合题的最后（compositeId），或移出综合题（null）：一步撤销 */
+  | { type: 'move-questions-to'; blockIds: string[]; compositeId: string | null }
+  /** 把一道综合题拆成独立的单题（先自动把共用答案与解析分到各小题）：一步撤销 */
+  | { type: 'split-composite'; blockId: string }
+  /** 把多道选中的题目合并为一道综合题：一步撤销 */
+  | { type: 'merge-to-composite'; blockIds: string[] }
   | { type: 'delete-block'; blockId: string }
+  /** 批量删除多个内容块（含综合题中的小题）：一步撤销 */
+  | { type: 'delete-blocks'; blockIds: string[] }
   /** 拖拽排序：把内容块移到第 toIndex 个位置之前（toIndex 按移动前的顺序计算） */
   | { type: 'move-block-to'; blockId: string; toIndex: number }
   | { type: 'set-title'; title: string }
@@ -130,8 +141,8 @@ export type EditorAction =
   | { type: 'add-asset'; asset: Asset }
   /** 批量替换插图的图片（变清晰、换成重绘的 SVG）：一步撤销 */
   | { type: 'replace-figure-assets'; assets: Asset[]; changes: FigureAssetChange[] }
-  /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。插入后选中第一个 */
-  | { type: 'insert-blocks'; blocks: Block[]; assets?: Record<string, Asset>; afterBlockId: string | null }
+  /** 插入内容块：放在 afterBlockId 之后；为 null 时放在末尾。可选在同一步移除 removeBlockIds（同文档剪切粘贴，一步撤销） */
+  | { type: 'insert-blocks'; blocks: Block[]; assets?: Record<string, Asset>; afterBlockId: string | null; removeBlockIds?: string[] }
   /**
    * 撤销 / 重做。focus：执行时光标所在的输入框与位置；撤销后仍选中同一内容时，光标放回原处
    */
@@ -326,10 +337,75 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       }
     case 'update-block':
       return withBlocks(state, (blocks) => mapBlockById(blocks, action.blockId, action.update))
+    case 'update-blocks': {
+      const ids = new Set(action.blockIds)
+      if (ids.size === 0) return state
+      let changed = false
+      const next = withBlocks(state, (blocks) => {
+        const mapped = blocks.map((b) => {
+          if (ids.has(b.id)) {
+            const updated = action.update(b)
+            if (updated !== b) changed = true
+            return updated
+          }
+          if (b.type === 'composite' && b.items.some((it) => ids.has(it.id))) {
+            let itemsChanged = false
+            const items = b.items.map((it) => {
+              if (!ids.has(it.id)) return it
+              const updated = action.update(it) as typeof it
+              if (updated !== it) itemsChanged = true
+              return updated
+            })
+            if (itemsChanged) {
+              changed = true
+              return { ...b, items }
+            }
+          }
+          return b
+        })
+        return changed ? mapped : blocks
+      })
+      return changed ? { ...next, revision: next.revision + 1 } : state
+    }
     case 'move-question-at':
       return withBlocks(state, (blocks) => moveQuestionAt(blocks, action.blockId, action.drop))
     case 'move-question-to':
       return withBlocks(state, (blocks) => moveQuestionTo(blocks, action.blockId, action.compositeId))
+    case 'move-questions-to': {
+      const ids = new Set(action.blockIds)
+      if (ids.size === 0) return state
+      let changed = false
+      const next = withBlocks(state, (blocks) => {
+        const ordered: string[] = []
+        for (const b of blocks) {
+          if (b.type === 'question' && ids.has(b.id)) ordered.push(b.id)
+          else if (b.type === 'composite') {
+            for (const it of b.items) {
+              if (ids.has(it.id)) ordered.push(it.id)
+            }
+          }
+        }
+        // 移出综合题时按逆序依次置后，使原本在前的题目仍排在前面
+        const seq = action.compositeId === null ? ordered.slice().reverse() : ordered
+        let out = blocks
+        for (const id of seq) out = moveQuestionTo(out, id, action.compositeId)
+        if (out !== blocks) changed = true
+        return out
+      })
+      return changed ? { ...next, revision: next.revision + 1 } : state
+    }
+    case 'split-composite': {
+      const res = splitComposite(state.bundle.project.blocks, action.blockId)
+      if (res === null) return state
+      const next = withBlocks(state, () => res.blocks)
+      return { ...next, selectedBlockId: res.firstId, revision: next.revision + 1 }
+    }
+    case 'merge-to-composite': {
+      const res = mergeQuestionsToComposite(state.bundle.project.blocks, action.blockIds)
+      if (res === null) return state
+      const next = withBlocks(state, () => res.blocks)
+      return { ...next, selectedBlockId: res.compositeId, revision: next.revision + 1 }
+    }
     case 'move-block':
       return withBlocks(state, (blocks) => {
         // 题目（含综合题中的小题）：可以移出、移进综合题
@@ -367,6 +443,29 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       )
       return next.selectedBlockId === action.blockId ? { ...next, selectedBlockId: null } : next
     }
+    case 'delete-blocks': {
+      const ids = new Set(action.blockIds)
+      if (ids.size === 0) return state
+      let changed = false
+      const next = withBlocks(state, (blocks) => {
+        const out: Block[] = []
+        for (const b of blocks) {
+          if (ids.has(b.id)) {
+            changed = true
+            continue
+          }
+          if (b.type === 'composite' && b.items.some((it) => ids.has(it.id))) {
+            changed = true
+            out.push({ ...b, items: b.items.filter((it) => !ids.has(it.id)) })
+            continue
+          }
+          out.push(b)
+        }
+        return changed ? out : blocks
+      })
+      if (!changed) return state
+      return next.selectedBlockId !== null && ids.has(next.selectedBlockId) ? { ...next, selectedBlockId: null } : next
+    }
     case 'update-header': {
       const { project, assets } = state.bundle
       const header: PageHeader = { ...project.header, ...action.patch }
@@ -391,10 +490,38 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       return { ...state, bundle: { ...state.bundle, assets: { ...state.bundle.assets, [action.asset.id]: action.asset } } }
     case 'insert-blocks': {
       if (action.blocks.length === 0) return state
+      const removeSet = action.removeBlockIds !== undefined && action.removeBlockIds.length > 0 ? new Set(action.removeBlockIds) : null
       const next = withBlocks(state, (blocks) => {
-        const i = action.afterBlockId === null ? -1 : blocks.findIndex((b) => b.id === action.afterBlockId)
-        const at = i === -1 ? blocks.length : i + 1
-        return [...blocks.slice(0, at), ...action.blocks, ...blocks.slice(at)]
+        let inserted: Block[]
+        if (action.afterBlockId === null) {
+          inserted = [...blocks, ...action.blocks]
+        } else {
+          const i = blocks.findIndex((b) => b.id === action.afterBlockId)
+          if (i !== -1) {
+            inserted = [...blocks.slice(0, i + 1), ...action.blocks, ...blocks.slice(i + 1)]
+          } else {
+            // 若选中的是综合题内的某道小题：待插入的全是题目时紧贴插到它下方（留在综合题内）；否则插到该综合题后面
+            let matched: Block[] | null = null
+            for (let ci = 0; ci < blocks.length; ci++) {
+              const cb = blocks[ci]!
+              if (cb.type !== 'composite') continue
+              const ki = cb.items.findIndex((it) => it.id === action.afterBlockId)
+              if (ki === -1) continue
+              if (action.blocks.every((b) => b.type === 'question')) {
+                const items = [...cb.items.slice(0, ki + 1), ...(action.blocks as QuestionBlock[]), ...cb.items.slice(ki + 1)]
+                matched = blocks.map((b, idx) => (idx === ci ? { ...cb, items } : b))
+              } else {
+                matched = [...blocks.slice(0, ci + 1), ...action.blocks, ...blocks.slice(ci + 1)]
+              }
+              break
+            }
+            inserted = matched ?? [...blocks, ...action.blocks]
+          }
+        }
+        if (removeSet === null) return inserted
+        return inserted
+          .filter((b) => !removeSet.has(b.id))
+          .map((b) => (b.type === 'composite' && b.items.some((it) => removeSet.has(it.id)) ? { ...b, items: b.items.filter((it) => !removeSet.has(it.id)) } : b))
       })
       return {
         ...next,

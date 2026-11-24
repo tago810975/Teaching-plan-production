@@ -447,6 +447,9 @@ body.is-resizing * {
 .outline-item.is-selected {
   background: var(--red-pen-soft);
 }
+.outline-item.is-multi-selected {
+  box-shadow: inset 3px 0 0 var(--red-pen);
+}
 .outline-item.is-selected .outline-no {
   color: var(--red-pen);
   font-weight: 600;
@@ -496,9 +499,16 @@ body.is-resizing * {
 .outline-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   padding: 8px 10px;
   border-top: var(--hairline) solid var(--rule);
+}
+.outline-multi-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red-pen);
+  margin-right: 2px;
 }
 
 .inspector-body {
@@ -1439,6 +1449,10 @@ button.link.danger {
 .outline-list li.is-dragging .outline-item {
   opacity: 0.35;
 }
+.outline-list li.is-cut .outline-item {
+  opacity: 0.42;
+  transition: opacity 150ms ease;
+}
 .outline-drop-line {
   position: absolute;
   left: 6px;
@@ -2293,6 +2307,11 @@ body.is-dragging-outline * {
   margin-top: 8px;
   padding-top: 8px;
   border-top: var(--hairline) solid var(--rule);
+}
+.quick-menu-actions--clip {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: none;
 }
 .quick-menu-actions .danger {
   margin-left: auto;

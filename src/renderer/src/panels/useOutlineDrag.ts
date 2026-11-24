@@ -43,7 +43,8 @@ export interface DragState {
 
 export function useOutlineDrag(
   listRef: RefObject<HTMLOListElement | null>,
-  onMove: (blockId: string, target: DropTarget, isQuestion: boolean) => void
+  onMove: (blockId: string, target: DropTarget, isQuestion: boolean) => void,
+  onDragStart?: () => void
 ): {
   drag: DragState | null
   onItemPointerDown: (e: ReactPointerEvent<HTMLElement>, blockId: string, label: string, isQuestion: boolean) => void
@@ -61,7 +62,7 @@ export function useOutlineDrag(
 
   /** 根据指针位置计算插入位置与插入线 */
   const locate = useCallback(
-    (clientX: number, clientY: number, isQuestion: boolean): { target: DropTarget; lineTop: number; nested: boolean } => {
+    (clientX: number, clientY: number, isQuestion: boolean, draggedId: string, initial = false): { target: DropTarget; lineTop: number; nested: boolean } => {
       const list = listRef.current
       if (list === null) return { target: { kind: 'top', index: 0 }, lineTop: 0, nested: false }
       const listRect = list.getBoundingClientRect()
@@ -70,20 +71,44 @@ export function useOutlineDrag(
       // 其他内容：只有顶层条目参与排序（综合题中的小题随综合题移动）
       const tops = Array.from(list.querySelectorAll<HTMLElement>(':scope > li[data-top-index]'))
       if (!isQuestion) {
-        for (let i = 0; i < tops.length; i++) {
-          const r = tops[i]!.getBoundingClientRect()
-          if (clientY < r.top + r.height / 2) return { target: { kind: 'top', index: i }, lineTop: top(r), nested: false }
-        }
-        const last = tops[tops.length - 1]?.getBoundingClientRect()
-        return { target: { kind: 'top', index: tops.length }, lineTop: last ? bottom(last) : 0, nested: false }
+        const selfTopIndex = tops.findIndex((row) => row.dataset.dragId === draggedId)
+        let i = tops.findIndex((row) => clientY < row.getBoundingClientRect().bottom)
+        if (i === -1) i = tops.length
+        // 初始长按保持在当前块上方
+        if (initial && selfTopIndex !== -1) i = selfTopIndex
+        const nextTop = tops[i]
+        const prevTop = tops[i - 1]
+        const lineTop = nextTop !== undefined ? top(nextTop.getBoundingClientRect()) : prevTop !== undefined ? bottom(prevTop.getBoundingClientRect()) : 0
+        return { target: { kind: 'top', index: i }, lineTop, nested: false }
       }
-      // 题目：顶层条目与小题都参与；找出指针所在的空隙（上一行 prev、下一行 next）
+      // 题目：顶层条目与小题都参与；指针落在某行内时统一把插入线显示在该行上方，移出最末行底部后显示在最后
       const rows = Array.from(list.querySelectorAll<HTMLElement>(':scope > li'))
-      let i = rows.findIndex((row) => {
-        const r = row.getBoundingClientRect()
-        return clientY < r.top + r.height / 2
-      })
+      const selfIndex = rows.findIndex((row) => row.dataset.dragId === draggedId)
+      const selfRow = selfIndex !== -1 ? rows[selfIndex] : undefined
+      // 刚进入长按拖拽时，统一将插入线显示在当前被按住的题目上方（无位移原位）
+      if (initial && selfRow !== undefined) {
+        const lineTop = top(selfRow.getBoundingClientRect())
+        if (selfRow.dataset.parentId !== undefined) {
+          return {
+            target: { kind: 'item', compositeId: selfRow.dataset.parentId, index: Number(selfRow.dataset.itemIndex) },
+            lineTop,
+            nested: true
+          }
+        }
+        if (selfRow.dataset.topIndex !== undefined) {
+          return { target: { kind: 'top', index: Number(selfRow.dataset.topIndex) }, lineTop, nested: false }
+        }
+      }
+      let i = rows.findIndex((row) => clientY < row.getBoundingClientRect().bottom)
       if (i === -1) i = rows.length
+      // 鼠标移在被拖动题目自身上方且紧挨着综合题时，若仍在自己这一行内保持原位不误入综合题
+      if (selfRow !== undefined && i === selfIndex && selfRow.dataset.topIndex !== undefined && rows[i - 1]?.dataset.parentId === undefined && rows[i - 1]?.dataset.compositeId === undefined) {
+        return {
+          target: { kind: 'top', index: Number(selfRow.dataset.topIndex) },
+          lineTop: top(selfRow.getBoundingClientRect()),
+          nested: false
+        }
+      }
       const prev = rows[i - 1]
       const next = rows[i]
       const lineTop = next !== undefined ? top(next.getBoundingClientRect()) : prev !== undefined ? bottom(prev.getBoundingClientRect()) : 0
@@ -106,7 +131,7 @@ export function useOutlineDrag(
     const d = dragRef.current
     if (d === null) return
     const { x, y } = pointer.current
-    setDrag({ ...d, ...locate(x, y, d.isQuestion), ghostX: x, ghostY: y })
+    setDrag({ ...d, ...locate(x, y, d.isQuestion, d.blockId), ghostX: x, ghostY: y })
   }, [locate])
 
   const finish = useCallback(
@@ -125,7 +150,8 @@ export function useOutlineDrag(
 
   const onItemPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLElement>, blockId: string, label: string, isQuestion: boolean) => {
-      if (e.button !== 0) return
+      // Shift / Ctrl / Cmd 多选操作时不启动长按拖拽
+      if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey) return
       pointer.current = { x: e.clientX, y: e.clientY }
       const timer = window.setTimeout(() => {
         const p = pending.current
@@ -133,13 +159,21 @@ export function useOutlineDrag(
         if (p === null) return
         listRef.current?.setPointerCapture(p.pointerId)
         document.body.classList.add('is-dragging-outline')
-        const start: DragState = { blockId: p.blockId, label: p.label, isQuestion: p.isQuestion, ...locate(pointer.current.x, pointer.current.y, p.isQuestion), ghostX: pointer.current.x, ghostY: pointer.current.y }
+        onDragStart?.()
+        const start: DragState = {
+          blockId: p.blockId,
+          label: p.label,
+          isQuestion: p.isQuestion,
+          ...locate(pointer.current.x, pointer.current.y, p.isQuestion, p.blockId, true),
+          ghostX: pointer.current.x,
+          ghostY: pointer.current.y
+        }
         dragRef.current = start
         setDrag(start)
       }, LONG_PRESS_MS)
       pending.current = { timer, x: e.clientX, y: e.clientY, pointerId: e.pointerId, blockId, label, isQuestion }
     },
-    [listRef, locate]
+    [listRef, locate, onDragStart]
   )
 
   // 指针移动、松开、取消，以及 Esc 与滚轮

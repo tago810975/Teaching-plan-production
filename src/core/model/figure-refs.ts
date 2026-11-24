@@ -49,6 +49,12 @@ export function listFigures(blocks: readonly Block[]): FigureEntry[] {
     else if (b.type === 'knowledge') b.figures.forEach((figure, figureIndex) => out.push({ ref: { blockId: b.id, figureIndex }, list: 'figures', figure, owner: 'knowledge', title: b.title }))
     else if (b.type === 'composite') {
       b.figures.forEach((figure, figureIndex) => out.push({ ref: { blockId: b.id, figureIndex }, list: 'figures', figure, owner: 'composite', title: b.title }))
+      ;(b.answerFigures ?? []).forEach((figure, figureIndex) =>
+        out.push({ ref: { blockId: b.id, figureIndex, list: 'answer' }, list: 'answer', figure, owner: 'composite', title: b.title })
+      )
+      ;(b.analysisFigures ?? []).forEach((figure, figureIndex) =>
+        out.push({ ref: { blockId: b.id, figureIndex, list: 'analysis' }, list: 'analysis', figure, owner: 'composite', title: b.title })
+      )
       for (const it of b.items) pushQuestion(it.id, it.question)
     }
   }
@@ -93,7 +99,17 @@ export function replaceFigureAssets(blocks: Block[], changes: readonly FigureAss
         const ic = byBlock.get(it.id)
         return ic === undefined ? it : { ...it, question: fixQuestion(it.question, ic) }
       })
-      return { ...b, ...(cs !== undefined ? { figures: apply(b.figures, 'figures', cs) } : {}), items }
+      return {
+        ...b,
+        ...(cs !== undefined
+          ? {
+              figures: apply(b.figures, 'figures', cs),
+              ...(b.answerFigures !== undefined ? { answerFigures: apply(b.answerFigures, 'answer', cs) } : {}),
+              ...(b.analysisFigures !== undefined ? { analysisFigures: apply(b.analysisFigures, 'analysis', cs) } : {})
+            }
+          : {}),
+        items
+      }
     }
     return b
   })

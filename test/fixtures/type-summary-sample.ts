@@ -59,7 +59,7 @@ async function headerImage(file: string, widthEmu: number, heightEmu: number, as
 }
 
 export async function createTypeSummarySample(): Promise<ProjectBundle> {
-  const preset = getPreset('physics-typesummary-v1')
+  const preset = getPreset('typesummary-v1')
   const bundle = createEmptyBundle(new Date('2026-11-10T00:00:00Z'))
   const { project, assets } = bundle
   project.presetId = preset.id

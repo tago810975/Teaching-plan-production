@@ -117,7 +117,7 @@ export function buildDocument(project: Project, variant: Variant): DocIR {
       case 'composite': {
         const kt = project.layout.keepQuestionTogether[variant]
         out.push(
-          ...buildComposite(block, variant, (item) =>
+          ...buildComposite(block, variant, preset, fields, (item) =>
             buildQuestion(item.id, item.question, nextLabel(item.question), variant, kt, project.layout.optionStops, preset, project.layout.difficultyDisplay, fields)
           )
         )
@@ -371,8 +371,8 @@ function buildQuestion(
       below.push(item)
     }
   }
-  if (below.length > 0) push(imageParagraph(key('fig-below'), below, blockId))
-  if (belowCenter.length > 0) push(imageParagraph(key('fig-center'), belowCenter, blockId, undefined, 'center'))
+  if (below.length > 0) for (const ip of imageParagraphs(key('fig-below'), below, blockId)) push(ip)
+  if (belowCenter.length > 0) for (const ip of imageParagraphs(key('fig-center'), belowCenter, blockId, undefined, 'center')) push(ip)
 
   /** 选项或小问的第一段：挂“位于选项/小问右侧”的图（多张时其余排在全部文字之后） */
   let itemsHostKey: string | null = null
@@ -440,10 +440,10 @@ function buildQuestion(
       attachRightItems(paras[paras.length - 1]!)
     })
     const list = belowItem.get(i)
-    if (list !== undefined) push(imageParagraph(key(`fig-sub${i}`), list, blockId))
+    if (list !== undefined) for (const ip of imageParagraphs(key(`fig-sub${i}`), list, blockId)) push(ip)
   })
 
-  if (belowAll.length > 0) push(imageParagraph(key('fig-all'), belowAll, blockId))
+  if (belowAll.length > 0) for (const ip of imageParagraphs(key('fig-all'), belowAll, blockId)) push(ip)
 
   /** 题目主体（题干、题图、选项、小问）的段落数，主体始终保持在同一页 */
   const bodyCount = paras.length
@@ -595,13 +595,13 @@ function contentWithFigures(
   paras.forEach((p, i) => {
     out.push(p)
     const figsAfter = after.get(i)
-    if (figsAfter !== undefined) out.push(imageParagraph(key(`fig${i}`), figsAfter, blockId))
+    if (figsAfter !== undefined) out.push(...imageParagraphs(key(`fig${i}`), figsAfter, blockId))
     const spacer = spacerAfter(content[i], key(`gap${i}`), blockId)
     if (spacer !== null) out.push(spacer)
   })
   if (paras.length === 0) {
     const figsAfter = after.get(0)
-    if (figsAfter !== undefined) out.push(imageParagraph(key('fig0'), figsAfter, blockId))
+    if (figsAfter !== undefined) out.push(...imageParagraphs(key('fig0'), figsAfter, blockId))
   }
   return out
 }
@@ -630,8 +630,8 @@ function placeFigures(paras: DocParagraph[], figures: QuestionFigure[], blockId:
   const pushAfter = (out: DocParagraph[], i: number): void => {
     const figs = after.get(i)
     if (figs === undefined) return
-    if (figs.left.length > 0) out.push(imageParagraph(`${keyPrefix}${i}`, figs.left, blockId, list))
-    if (figs.center.length > 0) out.push(imageParagraph(`${keyPrefix}c${i}`, figs.center, blockId, list, 'center'))
+    if (figs.left.length > 0) out.push(...imageParagraphs(`${keyPrefix}${i}`, figs.left, blockId, list))
+    if (figs.center.length > 0) out.push(...imageParagraphs(`${keyPrefix}c${i}`, figs.center, blockId, list, 'center'))
   }
   const out: DocParagraph[] = []
   paras.forEach((p, i) => {
@@ -647,14 +647,27 @@ function placeFigures(paras: DocParagraph[], figures: QuestionFigure[], blockId:
 function buildComposite(
   c: CompositeBlock,
   variant: Variant,
+  preset: FormatPreset,
+  fields: Required<QuestionFields>,
   buildItem: (item: QuestionBlock) => DocParagraph[]
 ): DocParagraph[] {
   const paras: DocParagraph[] = []
   const key = (suffix: string): string => `${c.id}:${suffix}`
+  const importantMark: DocRun = { kind: 'text', text: IMPORTANT_LABEL, marks: { bold: true, color: preset.keyPoint.marks.color } }
+  const showImportant = fields.important && c.important === true && variant === 'teacher'
   if (c.title.trim() !== '') {
-    paras.push({ key: key('title'), sourceBlockId: c.id, style: 'compositeTitle', runs: [{ kind: 'text', text: c.title }], keepNext: true, editTarget: { field: 'title', paragraph: 0 } })
+    const titleRuns: DocRun[] = [{ kind: 'text', text: c.title }]
+    if (showImportant) titleRuns.unshift(importantMark)
+    paras.push({ key: key('title'), sourceBlockId: c.id, style: 'compositeTitle', runs: titleRuns, keepNext: true, editTarget: { field: 'title', paragraph: 0 } })
   }
   const background = contentWithFigures(c.id, 'background', c.background, c.figures, 'compositeBackground')
+  if (c.title.trim() === '' && showImportant) {
+    if (background.length > 0 && background[0]!.style === 'compositeBackground') {
+      background[0] = { ...background[0]!, runs: [importantMark, ...background[0]!.runs] }
+    } else {
+      background.unshift({ key: key('important'), sourceBlockId: c.id, style: 'compositeBackground', runs: [importantMark], keepNext: true })
+    }
+  }
   // 背景与第一道小题保持在同一页
   background.forEach((p) => (p.keepNext = true))
   paras.push(...background)
@@ -662,20 +675,45 @@ function buildComposite(
 
   if (variant === 'teacher') {
     const start = paras.length
-    c.answer.forEach((p, i) => {
-      paras.push({
-        key: key(`ans${i}`),
-        sourceBlockId: c.id,
-        style: 'answer',
-        ...(i === 0 ? { label: '【答案】' } : {}),
-        ...fontProp(p),
-        editTarget: { field: 'answer', paragraph: i },
-        runs: toRuns(p, { blockId: c.id, path: ['answer', i] })
+    const answerParas: DocParagraph[] = c.answer.map((p, i) => ({
+      key: key(`ans${i}`),
+      sourceBlockId: c.id,
+      style: 'answer',
+      ...(i === 0 ? { label: '【答案】' } : {}),
+      ...fontProp(p),
+      anchorIndex: i,
+      anchorGroup: 'answer',
+      editTarget: { field: 'answer', paragraph: i },
+      runs: toRuns(p, { blockId: c.id, path: ['answer', i] })
+    }))
+    paras.push(...placeFigures(answerParas, c.answerFigures ?? [], c.id, 'answer', key('ansfig')))
+    if ((c.knowledgePoints?.length ?? 0) > 0) {
+      paras.push({ ...fixedLabelPara(key('kp'), 'knowledge', c.knowledgePoints!.join('；')), sourceBlockId: c.id, editTarget: { field: 'knowledgePoints', paragraph: 0 } })
+    }
+    if (c.keyPoint !== undefined && c.keyPoint !== '') {
+      paras.push({ ...fixedLabelPara(key('key'), 'keyPoint', c.keyPoint), sourceBlockId: c.id, editTarget: { field: 'keyPoint', paragraph: 0 } })
+    }
+    if (c.difficultPoint !== undefined && c.difficultPoint !== '') {
+      paras.push({ ...fixedLabelPara(key('diff'), 'difficultPoint', c.difficultPoint), sourceBlockId: c.id, editTarget: { field: 'difficultPoint', paragraph: 0 } })
+    }
+    if (fields.review && c.review !== undefined) {
+      c.review.forEach((p, i) => {
+        const runs = toRuns(p, { blockId: c.id, path: ['review', i] })
+        if (i === 0) runs.unshift({ kind: 'text', text: REVIEW_LABEL })
+        paras.push({ key: key(`rev${i}`), sourceBlockId: c.id, style: 'analysis', ...formatProps(p), editTarget: { field: 'review', paragraph: i }, runs })
       })
-    })
-    c.analysis.forEach((p, i) => {
-      paras.push({ key: key(`ana${i}`), sourceBlockId: c.id, style: 'analysis', ...formatProps(p), editTarget: { field: 'analysis', paragraph: i }, runs: toRuns(p, { blockId: c.id, path: ['analysis', i] }) })
-    })
+    }
+    const analysisParas: DocParagraph[] = c.analysis.map((p, i) => ({
+      key: key(`ana${i}`),
+      sourceBlockId: c.id,
+      style: 'analysis',
+      ...formatProps(p),
+      anchorIndex: i,
+      anchorGroup: 'analysis',
+      editTarget: { field: 'analysis', paragraph: i },
+      runs: toRuns(p, { blockId: c.id, path: ['analysis', i] })
+    }))
+    paras.push(...placeFigures(analysisParas, c.analysisFigures ?? [], c.id, 'analysis', key('anafig')))
     for (let i = start; i < paras.length; i++) paras[i]!.shaded = true
   }
 
@@ -917,14 +955,56 @@ function hasRightAligned(p: DocParagraph): boolean {
   return (p.floatingImages ?? []).some((f) => f.movable === 'vertical')
 }
 
-/** 同一位置的一张或多张图：放在同一段里并排显示 */
-function imageParagraph(key: string, items: FigItem[], blockId: string, list?: FigureListName, align?: 'center'): Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string } {
-  const runs: DocRun[] = []
-  items.forEach(({ fig, index }, j) => {
-    if (j > 0) runs.push({ kind: 'text', text: '\u3000' })
-    runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index, ...(list !== undefined ? { list } : {}) } })
+/** 非环绕图片段的默认段前/段后间距（twip，与题目段后、选项段前段后一致 = 6pt） */
+const FIGURE_SPACE_TWIP = 120
+/** 同段并排图片之间的空白宽度（\u3000 约一个五号汉字宽） */
+const FIGURE_GAP_EMU = CHAR_TWIP * 635
+
+/**
+ * 同一位置的一张或多张非环绕图：能并排放在一行（总宽不超过栏宽）的图放在同一段；
+ * 放不下时自动拆成多段，并赋予统一的段前/段后间距，使图与文字、上下图之间不会紧贴。
+ */
+function imageParagraphs(
+  key: string,
+  items: FigItem[],
+  blockId: string,
+  list?: FigureListName,
+  align?: 'center'
+): Array<Omit<DocParagraph, 'sourceBlockId'> & { sourceBlockId: string }> {
+  const rows: FigItem[][] = []
+  let row: FigItem[] = []
+  let width = 0
+  for (const item of items) {
+    const w = item.fig.widthEmu
+    const nextWidth = row.length === 0 ? w : width + FIGURE_GAP_EMU + w
+    if (row.length > 0 && nextWidth > COLUMN_EMU) {
+      rows.push(row)
+      row = [item]
+      width = w
+    } else {
+      row.push(item)
+      width = nextWidth
+    }
+  }
+  if (row.length > 0) rows.push(row)
+
+  return rows.map((r, rowIndex) => {
+    const runs: DocRun[] = []
+    r.forEach(({ fig, index }, j) => {
+      if (j > 0) runs.push({ kind: 'text', text: '\u3000' })
+      runs.push({ kind: 'image', assetId: fig.assetId, widthEmu: fig.widthEmu, heightEmu: fig.heightEmu, ref: { blockId, figureIndex: index, ...(list !== undefined ? { list } : {}) } })
+    })
+    return {
+      key: rowIndex === 0 ? key : `${key}-r${rowIndex}`,
+      sourceBlockId: blockId,
+      style: 'body',
+      ...(align !== undefined ? { align } : {}),
+      // 首行上下各 120 twip；后续换行图片段紧接其后，只留段后 120 twip，保证图与图间距也是 120 twip
+      spaceBeforeTwip: rowIndex === 0 ? FIGURE_SPACE_TWIP : 0,
+      spaceAfterTwip: FIGURE_SPACE_TWIP,
+      runs
+    }
   })
-  return { key, sourceBlockId: blockId, style: 'body', ...(align !== undefined ? { align } : {}), runs }
 }
 
 function textPara(blockId: string, style: StyleKey, text: string): DocParagraph {

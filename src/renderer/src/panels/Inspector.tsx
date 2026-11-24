@@ -140,6 +140,7 @@ export function Inspector({ block, header, layout, assetUrls, dispatch, revision
             assetUrls={assetUrls}
             dispatch={dispatch}
             questionNumbers={questionNumbers}
+            fields={resolveQuestionFields(projectLayout ?? {}, preset)}
           />
         ) : block.type === 'paragraph' ? (
           <Field
@@ -448,16 +449,65 @@ function CompositeForm({
   update,
   assetUrls,
   dispatch,
-  questionNumbers
+  questionNumbers,
+  fields
 }: {
   block: CompositeBlock
   update: (fn: (b: CompositeBlock) => CompositeBlock) => void
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
   questionNumbers: ReadonlyMap<string, string>
+  fields: QuestionFields
 }) {
   const set = (patch: Partial<CompositeBlock>): void => update((b) => ({ ...b, ...patch }))
   const setLayout = (patch: Partial<BlockLayout>): void => update((b) => ({ ...b, layout: { ...b.layout, ...patch } }))
+  const [tab, setTab] = useQuestionTab()
+
+  // 预览中点了仅教师版内容（答案、解析、知识点等），自动切到“仅教师版”；点了标题或背景材料切回“综合题”
+  const focus = useContext(FieldFocusContext)
+  useEffect(() => {
+    if (focus === null || focus.blockId !== block.id) return
+    setTab(TEACHER_FIELDS.has(focus.field) || /^figure:(answer|analysis):/.test(focus.field) ? 'teacher' : 'body')
+  }, [focus, setTab, block.id])
+
+  const tabs = (
+    <div className="inspector-tabs">
+      <Segmented<QuestionTab>
+        value={tab}
+        options={[
+          ['body', '综合题'],
+          ['teacher', '仅教师版']
+        ]}
+        onChange={setTab}
+      />
+    </div>
+  )
+
+  const layoutSection = <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整题同页" />
+
+  if (tab === 'teacher') {
+    return (
+      <>
+        {tabs}
+        <TeacherFields
+          blockId={block.id}
+          data={block}
+          set={(patch) => set(patch as Partial<CompositeBlock>)}
+          assetUrls={assetUrls}
+          dispatch={dispatch}
+          fields={fields}
+          answerHint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写"
+          prefix={
+            <Field label="位置" hint="集中在整道综合题最后，或分到每道小题后面（按题号拆开 / 合并，可撤销）">
+              <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
+            </Field>
+          }
+        />
+        {layoutSection}
+      </>
+    )
+  }
+
   const addItem = (kind: 'single-choice' | 'solve'): void => {
     const options = kind === 'single-choice' ? ['A', 'B', 'C', 'D'].map((label) => ({ label, content: { inlines: [] } })) : []
     const item = { id: newId(), type: 'question' as const, question: createQuestion({ kind, options }) }
@@ -466,6 +516,7 @@ function CompositeForm({
   }
   return (
     <>
+      {tabs}
       <Field label="标题" hint="如“材料一”；居中显示">
         <TextInput fieldId="title" value={block.title} onChange={(title) => set({ title })} />
       </Field>
@@ -506,25 +557,18 @@ function CompositeForm({
           <button type="button" onClick={() => addItem('solve')}>
             添加解答题
           </button>
+          {block.items.length > 0 && (
+            <button
+              type="button"
+              title="拆成独立的单题；拆开前会先把集中答案与解析分到各小题，可按 Ctrl+Z 撤销"
+              onClick={() => dispatch({ type: 'split-composite', blockId: block.id })}
+            >
+              拆成单题
+            </button>
+          )}
         </div>
       </fieldset>
-      <fieldset className="group group--teacher">
-        <legend>仅教师版：答案与解析</legend>
-        <Field label="位置" hint="集中在整道综合题最后，或分到每道小题后面（按题号拆开 / 合并，可撤销）">
-          <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
-        </Field>
-        <Field
-          label="答案"
-          hint="如“1.横波 2. 1.8 3.A”；也可以在各小题中分别填写"
-          aside={fontSelect('答案', block.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}
-        >
-          <RichTextField fieldId="answer" value={block.answer} rows={3} onChange={(answer) => set({ answer })} />
-        </Field>
-        <Field label="解析" aside={fontSelect('解析', block.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
-          <RichTextField fieldId="analysis" value={block.analysis} rows={6} onChange={(analysis) => set({ analysis })} />
-        </Field>
-      </fieldset>
-      <LayoutFields layout={block.layout} onChange={setLayout} keepLabel="整题同页" />
+      {layoutSection}
     </>
   )
 }
@@ -793,7 +837,7 @@ function QuestionForm({
     return (
       <>
         {tabs}
-        <TeacherFields blockId={block.id} q={q} set={set} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
+        <TeacherFields blockId={block.id} data={q} set={(patch) => set(patch as Partial<Question>)} assetUrls={assetUrls} dispatch={dispatch} fields={fields} />
         {layoutSection}
       </>
     )
@@ -981,41 +1025,59 @@ function useQuestionTab(): [QuestionTab, (t: QuestionTab) => void] {
   return [tab, setTab]
 }
 
+/** 题目与综合题共用的“仅教师版”数据结构 */
+interface TeacherContent {
+  important?: boolean
+  answer: RichText
+  answerFigures?: QuestionFigure[]
+  knowledgePoints?: string[]
+  keyPoint?: string
+  difficultPoint?: string
+  review?: RichText
+  analysis: RichText
+  analysisFigures?: QuestionFigure[]
+}
+
 /**
- * 题目的“仅教师版”内容：重点题、答案（及答案插图）、知识点、重点、难点、审题、解析（及解析插图）。
+ * 题目与综合题共用的“仅教师版”内容：重点题、答案（及答案插图）、知识点、重点、难点、审题、解析（及解析插图）。
  * 答案、解析的插图与知识点插图相同，可放在某段之后、某段右侧或自由位置。
  */
 function TeacherFields({
   blockId,
-  q,
+  data,
   set,
   assetUrls,
   dispatch,
-  fields
+  fields,
+  prefix,
+  answerHint
 }: {
   blockId: string
-  q: Question
-  set: (patch: Partial<Question>) => void
+  data: TeacherContent
+  set: (patch: Partial<TeacherContent>) => void
   assetUrls: ReadonlyMap<string, string>
   dispatch: Dispatch<EditorAction>
   fields: QuestionFields
+  prefix?: ReactNode
+  answerHint?: string
 }) {
   const addAsset = (asset: Asset): void => dispatch({ type: 'add-asset', asset })
   return (
     <>
       <p className="field-hint">以下内容只出现在教师版（教案）中。</p>
+      {prefix}
       {fields.important && (
-        <label className="checkbox" title="教师版题干前显示【重点题】">
-          <input type="checkbox" checked={q.important === true} onChange={(e) => set({ important: e.target.checked ? true : undefined })} />
+        <label className="checkbox" title="教师版题目前显示【重点题】">
+          <input type="checkbox" checked={data.important === true} onChange={(e) => set({ important: e.target.checked ? true : undefined })} />
           重点题
         </label>
       )}
-      <Field label="答案" aside={fontSelect('答案', q.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}>
-        <RichTextField fieldId="answer" value={q.answer} rows={3} onChange={(answer) => set({ answer })} />
+      <Field label="答案" {...(answerHint !== undefined ? { hint: answerHint } : {})} aside={fontSelect('答案', data.answer, STYLE_SPECS.answer.fontRole, (answer) => set({ answer }), dispatch)}>
+        <RichTextField fieldId="answer" value={data.answer} rows={3} onChange={(answer) => set({ answer })} />
       </Field>
       <ImageParagraphsNotice
-        content={q.answer}
-        figures={q.answerFigures ?? []}
+        content={data.answer}
+        figures={data.answerFigures ?? []}
         onApply={(answer, answerFigures) => set({ answer, answerFigures })}
       />
       <FigureList
@@ -1023,8 +1085,8 @@ function TeacherFields({
         list="answer"
         title="答案插图"
         kind="knowledge"
-        paragraphs={q.answer}
-        figures={q.answerFigures ?? []}
+        paragraphs={data.answer}
+        figures={data.answerFigures ?? []}
         assetUrls={assetUrls}
         onChange={(answerFigures) => set({ answerFigures: answerFigures.length > 0 ? answerFigures : undefined })}
         onAddAsset={addAsset}
@@ -1032,7 +1094,7 @@ function TeacherFields({
       <Field label="知识点" hint="多个知识点用顿号或逗号分隔">
         <TextInput
           fieldId="knowledgePoints"
-          value={q.knowledgePoints.join('、')}
+          value={(data.knowledgePoints ?? []).join('、')}
           onChange={(v) =>
             set({
               knowledgePoints: v
@@ -1044,22 +1106,22 @@ function TeacherFields({
         />
       </Field>
       <Field label="重点">
-        <TextInput fieldId="keyPoint" value={q.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
+        <TextInput fieldId="keyPoint" value={data.keyPoint ?? ''} onChange={(v) => set({ keyPoint: v || undefined })} />
       </Field>
       <Field label="难点">
-        <TextInput fieldId="difficultPoint" value={q.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
+        <TextInput fieldId="difficultPoint" value={data.difficultPoint ?? ''} onChange={(v) => set({ difficultPoint: v || undefined })} />
       </Field>
       {fields.review && (
         <Field label="审题" hint="排在解析之前，教师版显示【审题】">
-          <RichTextField fieldId="review" value={q.review ?? []} rows={2} onChange={(review) => set({ review: review.length > 0 ? review : undefined })} />
+          <RichTextField fieldId="review" value={data.review ?? []} rows={2} onChange={(review) => set({ review: review.length > 0 ? review : undefined })} />
         </Field>
       )}
-      <Field label="解析" aside={fontSelect('解析', q.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
-        <RichTextField fieldId="analysis" value={q.analysis} rows={8} onChange={(analysis) => set({ analysis })} />
+      <Field label="解析" aside={fontSelect('解析', data.analysis, STYLE_SPECS.analysis.fontRole, (analysis) => set({ analysis }), dispatch)}>
+        <RichTextField fieldId="analysis" value={data.analysis} rows={8} onChange={(analysis) => set({ analysis })} />
       </Field>
       <ImageParagraphsNotice
-        content={q.analysis}
-        figures={q.analysisFigures ?? []}
+        content={data.analysis}
+        figures={data.analysisFigures ?? []}
         onApply={(analysis, analysisFigures) => set({ analysis, analysisFigures })}
       />
       <FigureList
@@ -1067,8 +1129,8 @@ function TeacherFields({
         list="analysis"
         title="解析插图"
         kind="knowledge"
-        paragraphs={q.analysis}
-        figures={q.analysisFigures ?? []}
+        paragraphs={data.analysis}
+        figures={data.analysisFigures ?? []}
         assetUrls={assetUrls}
         onChange={(analysisFigures) => set({ analysisFigures: analysisFigures.length > 0 ? analysisFigures : undefined })}
         onAddAsset={addAsset}

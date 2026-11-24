@@ -136,6 +136,10 @@
 .page .para.is-selected {
   background-color: rgba(179, 38, 30, 0.045);
 }
+.page .para.is-cut {
+  opacity: 0.42;
+  transition: opacity 150ms ease;
+}
 .page .para.is-selected::before {
   content: '';
   position: absolute;

@@ -12,11 +12,11 @@ import { isMoanSessionReady, type MoanSession } from '@core/import/moan/session'
 import { createAsset } from '@core/project-file/codec'
 import { getPreset } from '@core/presets'
 import type { Asset } from '@core/model/types'
-import { DEFAULT_TEMPLATE_ID } from '@core/model/factory'
+import { DEFAULT_PRESET_ID, DEFAULT_TEMPLATE_ID } from '@core/model/factory'
 import { createProject, getLibraryDir } from './library'
 import { socketCallScript } from './moan-page-scripts'
 
-export const MOAN_PRESET_ID = 'math-v1'
+export const MOAN_PRESET_ID = DEFAULT_PRESET_ID
 export const MOAN_IMPORT_DIR = '墨案导入'
 
 export class MoanImportError extends Error {
@@ -115,8 +115,8 @@ export async function importMoanPlan(
   const dir = join(await getLibraryDir(), MOAN_IMPORT_DIR, ...(options.subDir !== undefined && options.subDir !== '' ? [safeDirName(options.subDir)] : []))
   const opened = await createProject(result.title, dir, DEFAULT_TEMPLATE_ID, { blocks: result.blocks, assets }, MOAN_PRESET_ID, (bundle) => {
     bundle.project.header = { ...bundle.project.header, right: result.headerRight }
-    // 墨案的教案不显示难度，导入后保持一致（难度数据保留，可在版式设置中打开）
-    bundle.project.layout = { ...bundle.project.layout, difficultyDisplay: 'none' }
+    // 墨案的教案不显示难度，但保留审题与重点题标记（可在版式设置中调整）
+    bundle.project.layout = { ...bundle.project.layout, difficultyDisplay: 'none', questionFields: { review: true, important: true } }
   })
   return { filePath: opened.filePath, title: result.title, questionCount: result.questionCount, warnings: [...imageWarnings, ...result.warnings] }
 }

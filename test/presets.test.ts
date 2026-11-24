@@ -20,19 +20,21 @@ function styleEl(xml: string, name: string): string {
 }
 
 describe('格式预设', () => {
-  it('物理教学案 V1.0：可读取，找不到的 ID 回到默认预设', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0', '物理题型整理 V1.0', '数学教学案 V1.0'])
-    expect(getPreset('不存在').id).toBe('physics-v1')
-    expect(createEmptyProject().presetId).toBe('physics-v1')
+  it('默认预设：教学案与题型整理，找不到的 ID 回到默认预设，旧预设 ID 兼容回退', () => {
+    expect(PRESETS.map((p) => p.name)).toEqual(['教学案', '题型整理'])
+    expect(getPreset('不存在').id).toBe('lesson-v1')
+    expect(getPreset('physics-v1').id).toBe('lesson-v1')
+    expect(getPreset('physics-typesummary-v1').id).toBe('typesummary-v1')
+    expect(createEmptyProject().presetId).toBe('lesson-v1')
   })
 
-  it('物理教学案 V1.0 的标题格式与模板一致：导出时写回样式不改变格式', async () => {
+  it('教学案的标题格式与模板一致：导出时写回样式不改变格式', async () => {
     const zip = await JSZip.loadAsync(TEMPLATE)
     const before = await zip.file('word/styles.xml')!.async('string')
-    const after = applyHeadingStyles(before, presetStyles(getPreset('physics-v1')))
+    const after = applyHeadingStyles(before, presetStyles(getPreset('lesson-v1')))
     for (const key of ['title', 'section', 'topic'] as const) {
-      const el = styleEl(after, presetStyles(getPreset('physics-v1'))[key].wordStyleName)
-      const h = getPreset('physics-v1').headings[key]
+      const el = styleEl(after, presetStyles(getPreset('lesson-v1'))[key].wordStyleName)
+      const h = getPreset('lesson-v1').headings[key]
       expect(el).toContain(`<w:sz w:val="${h.sizeHalfPt}"/>`)
       expect(el).toContain(`w:eastAsia="宋体"`)
       expect(el).toContain('<w:b/>')
@@ -44,7 +46,7 @@ describe('格式预设', () => {
   })
 
   it('换一个预设：预览样式与导出样式都随之变化', async () => {
-    const base = getPreset('physics-v1')
+    const base = getPreset('lesson-v1')
     const custom: FormatPreset = {
       ...base,
       id: 'test',
@@ -127,9 +129,9 @@ describe('星级难度（与等级对应：A=1 星简单、B=2 星、C=3 星难�
 
   it('difficultyOf 给出等级、星级与说明', async () => {
     const { difficultyOf } = await import('@core/presets')
-    expect(difficultyOf({ difficulty: 'A' }, getPreset('physics-v1'))).toEqual({ grade: 'A', stars: 1, label: '简单' })
-    expect(difficultyOf({ stars: 3 }, getPreset('physics-v1'))).toEqual({ grade: 'C', stars: 3, label: '难' })
-    expect(difficultyOf({}, getPreset('physics-v1'))).toEqual({})
+    expect(difficultyOf({ difficulty: 'A' }, getPreset('lesson-v1'))).toEqual({ grade: 'A', stars: 1, label: '简单' })
+    expect(difficultyOf({ stars: 3 }, getPreset('lesson-v1'))).toEqual({ grade: 'C', stars: 3, label: '难' })
+    expect(difficultyOf({}, getPreset('lesson-v1'))).toEqual({})
   })
 })
 
@@ -141,7 +143,7 @@ describe('导入时的星级难度', () => {
       type: 'question' as const,
       question: createQuestion({ ...(difficulty ? { difficulty } : {}), stem: [{ inlines: [{ type: 'text', text: stem }] }] })
     })
-    const [a, b, c, d] = applyPresetRules([mk('★★★如图所示'), mk('如图所示', '★★'), mk('★☆☆题', 'B'), mk('★★★★★题')], getPreset('physics-v1')) as Array<ReturnType<typeof mk>>
+    const [a, b, c, d] = applyPresetRules([mk('★★★如图所示'), mk('如图所示', '★★'), mk('★☆☆题', 'B'), mk('★★★★★题')], getPreset('lesson-v1')) as Array<ReturnType<typeof mk>>
     expect(a!.question).toMatchObject({ difficulty: 'C' })
     expect(a!.question.stars).toBeUndefined()
     expect(a!.question.stem[0]!.inlines).toEqual([{ type: 'text', text: '如图所示' }])

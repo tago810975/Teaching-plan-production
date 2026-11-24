@@ -201,3 +201,38 @@ describe('图片居中与右侧图旁的 2/4 列选项自适应间距', () => {
     expect(opt4.tabStopsTwip![2]!).toBeLessThan(7970)
   })
 })
+
+describe('图片上下间距与多图换行分段', () => {
+  it('单张非环绕插图段落带有与题目一致的 120 twip 上下间距，并在 Word 导出时写入 spacing', async () => {
+    const png = await createAsset(new Uint8Array(readFileSync('resources/templates/physics-default/header/phone-icon.png')), 'image/png')
+    const p = questionProject([{ ...fig('below-all'), assetId: png.id }], false)
+    const ir = buildDocument(p, 'student')
+    const imgPara = ir.paragraphs.find((dp) => dp.runs.some((r) => r.kind === 'image'))!
+    expect(imgPara.spaceBeforeTwip).toBe(120)
+    expect(imgPara.spaceAfterTwip).toBe(120)
+
+    const bytes = await writeDocx({
+      ir,
+      assets: { [png.id]: png },
+      title: 't',
+      template: new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
+    })
+    const doc = await (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
+    expect(doc).toContain('<w:spacing w:before="120" w:after="120"/>')
+  })
+
+  it('两张超宽大图自动拆成两个独立图片段（首段 120/120，次段 0/120）避免上下紧贴；两张窄图仍并排', () => {
+    // 栏宽约 10466 * 635 = 6,645,910 EMU，每张 4,500,000 EMU 两张超宽需拆行
+    const wide = questionProject([fig('below-all', { widthEmu: 4500000 }), { ...fig('below-all', { widthEmu: 4500000 }), assetId: 'img-w2' }], false)
+    const imgParas = buildDocument(wide, 'student').paragraphs.filter((dp) => dp.runs.some((r) => r.kind === 'image'))
+    expect(imgParas).toHaveLength(2)
+    expect([imgParas[0]!.spaceBeforeTwip, imgParas[0]!.spaceAfterTwip]).toEqual([120, 120])
+    expect([imgParas[1]!.spaceBeforeTwip, imgParas[1]!.spaceAfterTwip]).toEqual([0, 120])
+
+    // 窄图（900,000 EMU）仍放在同一段并排
+    const narrow = questionProject([fig('below-all'), { ...fig('below-all'), assetId: 'img-n2' }], false)
+    const narrowParas = buildDocument(narrow, 'student').paragraphs.filter((dp) => dp.runs.some((r) => r.kind === 'image'))
+    expect(narrowParas).toHaveLength(1)
+    expect([narrowParas[0]!.spaceBeforeTwip, narrowParas[0]!.spaceAfterTwip]).toEqual([120, 120])
+  })
+})

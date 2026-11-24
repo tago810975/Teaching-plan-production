@@ -1,41 +1,52 @@
 {
-  "id": "physics-handbook-v1",
-  "name": "物理知识点手册 V1.0",
-  "subject": "物理",
-  "description": "物理知识点手册（知识单）：大标题与“一、二、三……”知识点，没有知识梳理等二级标题；学生版把红色加粗的重点挖空成横线，用于默写。",
+  "id": "typesummary-v1",
+  "name": "题型整理",
+  "subject": "",
+  "description": "通用题型整理模板：一道例题配审题注释框、思维与书写对照表及题后归纳。",
   "templateId": "physics-default",
-  "kind": "handbook",
+  "kind": "typeSummary",
+  "numberQuestions": false,
+  "lineSpacing": {
+    "heading": 1,
+    "question": 1.3,
+    "knowledge": 1.3,
+    "body": 1.3
+  },
   "header": {
-    "variantSuffix": false,
-    "left": "物理知识单"
+    "variantSuffix": false
   },
   "headings": {
     "title": {
-      "font": "song",
-      "sizeHalfPt": 36,
-      "bold": true,
+      "font": "hei",
+      "sizeHalfPt": 35,
+      "bold": false,
       "align": "center",
-      "spaceBeforeTwip": 160,
-      "spaceAfterTwip": 160
+      "spaceBeforeTwip": 0,
+      "spaceAfterTwip": 120
     },
     "section": {
-      "font": "song",
-      "sizeHalfPt": 28,
-      "bold": true,
+      "font": "hei",
+      "sizeHalfPt": 29,
+      "bold": false,
       "align": "left",
-      "spaceBeforeTwip": 160,
-      "spaceAfterTwip": 160
+      "spaceBeforeTwip": 200,
+      "spaceAfterTwip": 150
     },
     "topic": {
-      "font": "song",
+      "font": "hei",
       "sizeHalfPt": 21,
-      "bold": true,
+      "bold": false,
       "align": "left",
       "spaceBeforeTwip": 120,
-      "spaceAfterTwip": 120
+      "spaceAfterTwip": 60
     }
   },
-  "sectionNames": [],
+  "sectionNames": [
+    "例题",
+    "审题",
+    "解题",
+    "题后归纳"
+  ],
   "worksheet": {
     "titlePrefix": "作业单-",
     "fields": [
@@ -60,12 +71,12 @@
     },
     {
       "label": "蓝",
-      "color": "2F5597"
+      "color": "1F4E79"
     }
   ],
   "keyPoint": {
     "label": "重点",
-    "description": "知识梳理中需要记忆的内容（以后做默写单时挖空）：红色加粗下划线",
+    "description": "红色加粗下划线",
     "marks": {
       "bold": true,
       "underline": true,
@@ -73,8 +84,19 @@
     }
   },
   "import": {
-    "renameLabels": {},
-    "analysisColor": "keep"
+    "renameLabels": {
+      "【详解】": "【解析】"
+    },
+    "analysisColor": "black"
+  },
+  "dictation": {
+    "enabled": false,
+    "colors": [
+      "C00000",
+      "FF0000"
+    ],
+    "bold": true,
+    "minChars": 4
   },
   "difficulty": {
     "levels": [
@@ -94,14 +116,5 @@
         "label": "难"
       }
     ]
-  },
-  "dictation": {
-    "enabled": true,
-    "colors": [
-      "C00000",
-      "FF0000"
-    ],
-    "bold": true,
-    "minChars": 4
   }
 }

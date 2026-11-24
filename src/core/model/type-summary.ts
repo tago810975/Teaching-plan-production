@@ -105,7 +105,7 @@ export function createTypeSummarySkeleton(sectionNames: readonly string[]): Bloc
   const name = (i: number, fallback: string): string => sectionNames[i] ?? fallback
   const options = ['A', 'B', 'C', 'D'].map((label) => ({ label, content: { inlines: [] } }))
   return [
-    { id: newId(), type: 'title', text: '题型名称：适用条件（如“放缩圆法：速度方向一定，大小不同”）' },
+    { id: newId(), type: 'title', text: '题型名称：适用条件' },
     { id: newId(), type: 'section', text: name(0, '例题') },
     {
       id: newId(),
@@ -117,7 +117,7 @@ export function createTypeSummarySkeleton(sectionNames: readonly string[]): Bloc
       })
     },
     { id: newId(), type: 'section', text: name(1, '审题'), pageBreakBefore: true },
-    createNoteBox(circledItems(['条件①的含义：它告诉我们什么物理条件。', '条件②的含义……', '条件③的含义……'])),
+    createNoteBox(circledItems(['条件①的含义……', '条件②的含义……', '条件③的含义……'])),
     {
       id: newId(),
       type: 'paragraph',

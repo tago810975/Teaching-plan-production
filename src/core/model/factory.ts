@@ -16,8 +16,8 @@ import type {
   RichText
 } from './types'
 
-/** 默认格式预设：物理教学案 V1.0（与 core/presets 中的 id 一致） */
-export const DEFAULT_PRESET_ID = 'physics-v1'
+/** 默认格式预设：通用教学案（与 core/presets 中的 id 一致） */
+export const DEFAULT_PRESET_ID = 'lesson-v1'
 
 export const DEFAULT_TEMPLATE_ID = 'physics-default'
 

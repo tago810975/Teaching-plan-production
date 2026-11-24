@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import JSZip from 'jszip'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { blankKeyPoints, buildDocument } from '@core/document/build'
 import { writeDocx } from '@core/export/docx-writer'
 import { importDocx } from '@core/import/import-docx'
@@ -10,7 +10,7 @@ import { projectSchema } from '@core/model/schema'
 import { createTable, deleteColumn, deleteRow, hasMerges, insertColumn, insertRow, layoutTable } from '@core/model/table'
 import type { Inline, Project, RichText, TableInline } from '@core/model/types'
 import { decodeBundle, encodeBundle } from '@core/project-file/codec'
-import { getPreset } from '@core/presets'
+import { getPreset, setUserPresets, type FormatPreset } from '@core/presets'
 
 const TEMPLATE = new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
 const cell = (text: string, extra: object = {}) => ({ content: [para(text)], ...extra })
@@ -29,11 +29,22 @@ function sampleTable(): TableInline {
   }
 }
 
-function projectWith(content: RichText, presetId = 'physics-v1'): Project {
+function projectWith(content: RichText, presetId = 'lesson-v1'): Project {
   const p = createEmptyProject()
   p.presetId = presetId
   p.blocks = [createKnowledge({ title: '一、光的衍射', content })]
   return p
+}
+
+const TEST_HANDBOOK: FormatPreset = {
+  ...getPreset('lesson-v1'),
+  id: 'test-handbook',
+  name: '知识点手册（测试）',
+  kind: 'handbook',
+  header: { variantSuffix: false, left: '知识单' },
+  sectionNames: [],
+  import: { renameLabels: {}, analysisColor: 'keep' },
+  dictation: { enabled: true, colors: ['C00000', 'FF0000'], bold: true, minChars: 4 }
 }
 
 describe('表格的网格', () => {
@@ -75,8 +86,11 @@ describe('表格的数据与输入框', () => {
 })
 
 describe('表格的排版与导出', () => {
+  beforeAll(() => setUserPresets([TEST_HANDBOOK]))
+  afterAll(() => setUserPresets([]))
+
   it('预览数据：列宽不超过栏宽；学生版挖空单元格中的重点', () => {
-    const p = projectWith([{ inlines: [sampleTable()] }], 'physics-handbook-v1')
+    const p = projectWith([{ inlines: [sampleTable()] }], 'test-handbook')
     const run = (v: 'teacher' | 'student') => buildDocument(p, v).paragraphs.flatMap((x) => x.runs).find((r) => r.kind === 'table')!
     const t = run('teacher')
     expect(t.kind === 'table' && t.table.colWidthsTwip).toEqual([1500, 3000, 3000])
@@ -87,7 +101,7 @@ describe('表格的排版与导出', () => {
     const t2 = run('teacher')
     expect(t2.kind === 'table' && t2.table.rows[1]!.cells[1]!.paragraphs[0]!.runs[0]).toMatchObject({ src: { path: ['content', 0, 'inlines', 0, 'rows', 1, 'cells', 1, 'content', 0], inline: 0 } })
     // 教学案预设不挖空
-    expect(blankKeyPoints(buildDocument(projectWith([{ inlines: [sampleTable()] }]), 'student').paragraphs[1]!, { ...getPreset('physics-v1').dictation, enabled: false })).toBeDefined()
+    expect(blankKeyPoints(buildDocument(projectWith([{ inlines: [sampleTable()] }]), 'student').paragraphs[1]!, { ...getPreset('lesson-v1').dictation, enabled: false })).toBeDefined()
   })
 
   it('导出为 Word 表格：gridSpan、vMerge（续行单元格）、底纹、列宽；正文不以表格结尾', async () => {
@@ -105,7 +119,7 @@ describe('表格的排版与导出', () => {
 
   it('导出后再导入，表格结构与内容不变', async () => {
     const bytes = await writeDocx({ ir: buildDocument(projectWith([para('前'), { inlines: [sampleTable()] }]), 'teacher'), assets: {}, title: 't', template: TEMPLATE })
-    const r = await importDocx(bytes, { presetId: 'physics-handbook-v1' })
+    const r = await importDocx(bytes, { presetId: 'test-handbook' })
     const tables: TableInline[] = []
     const walk = (v: unknown): void => {
       if (Array.isArray(v)) v.forEach(walk)
@@ -131,7 +145,7 @@ describe('表格的排版与导出', () => {
   })
 
   it('示例知识点手册：三个表格（含合并单元格与图片）', async () => {
-    const r = await importDocx(new Uint8Array(readFileSync('reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx')), { presetId: 'physics-handbook-v1' })
+    const r = await importDocx(new Uint8Array(readFileSync('reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx')), { presetId: 'test-handbook' })
     const tables: TableInline[] = []
     const walk = (v: unknown): void => {
       if (Array.isArray(v)) v.forEach(walk)
@@ -187,7 +201,7 @@ describe('合并与拆分单元格', async () => {
   it('合并后导出再导入，合并关系不变', async () => {
     const m = mergeCells(filled(3, 3), { r0: 0, c0: 1, r1: 2, c1: 1 })
     const bytes = await writeDocx({ ir: buildDocument(projectWith([{ inlines: [m] }]), 'teacher'), assets: {}, title: 't', template: TEMPLATE })
-    const r = await importDocx(bytes, { presetId: 'physics-handbook-v1' })
+    const r = await importDocx(bytes, { presetId: 'test-handbook' })
     const k = r.blocks.find((b) => b.type === 'knowledge')
     const t = k?.type === 'knowledge' ? (k.content.flatMap((p) => p.inlines).find((i) => i.type === 'table') as TableInline) : undefined
     expect(text(t!)).toEqual(text(m))
@@ -229,7 +243,7 @@ describe('在预览中选中文字改格式', async () => {
 
 describe('导入表格时整理单元格中的字体', () => {
   it('与正文相同的字体不记录：示例表格的单元格中不再满是“字体”标记', async () => {
-    const r = await importDocx(new Uint8Array(readFileSync('reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx')), { presetId: 'physics-handbook-v1' })
+    const r = await importDocx(new Uint8Array(readFileSync('reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx')), { presetId: 'test-handbook' })
     const tables: TableInline[] = []
     const walk = (v: unknown): void => {
       if (Array.isArray(v)) v.forEach(walk)

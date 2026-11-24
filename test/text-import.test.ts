@@ -72,7 +72,7 @@ describe('真实题目图片的转写（test/fixtures/image-import，来自用�
   const { readFileSync } = await import('node:fs')
   const png = await createAsset(new Uint8Array([1, 2, 3]), 'image/png')
   const figures = new Map(Array.from({ length: 6 }, (_, i) => [i + 1, { asset: { ...png, id: `${png.id}-${i + 1}` }, widthEmu: 1000000, heightEmu: 600000 }]))
-  const load = (name: string) => importText(readFileSync(`test/fixtures/image-import/${name}`, 'utf8'), { presetId: 'physics-v1', figures })
+  const load = (name: string) => importText(readFileSync(`test/fixtures/image-import/${name}`, 'utf8'), { presetId: 'lesson-v1', figures })
   const questions = (r: ReturnType<typeof importText>) => r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
   const count = (v: unknown, type: string) => JSON.stringify(v).split(`"type":"${type}"`).length - 1
 
@@ -144,7 +144,7 @@ describe('WorkBuddy 实测：按代码块复制的原文（test/fixtures/image-i
   const raw = readFileSync('test/fixtures/image-import/WorkBuddy实测-交流电与回旋加速器.txt', 'utf8')
 
   it('先列小问、再统一解析（解析里用已出现的（1）（2）分段）：小问是 3 个，不把解析的分段当成小问', () => {
-    const r = importText(raw, { presetId: 'physics-v1', figures })
+    const r = importText(raw, { presetId: 'lesson-v1', figures })
     const [q] = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
     expect(q!.subQuestions).toHaveLength(3)
     const analysis = plainText(q!.analysis)
@@ -160,7 +160,7 @@ describe('WorkBuddy 实测：按代码块复制的原文（test/fixtures/image-i
 
   it('续页的半道题前有【接上页】时单独成题，并提示补全；没有时并入前一题的解析（无法区分）', () => {
     const marked = raw.replace('量为 $+q$', '【接上页】\n量为 $+q$')
-    const r = importText(marked, { presetId: 'physics-v1', figures })
+    const r = importText(marked, { presetId: 'lesson-v1', figures })
     const qs = r.blocks.filter((b): b is QuestionBlock => b.type === 'question').map((b) => b.question)
     expect(qs).toHaveLength(2)
     expect(plainText(qs[1]!.stem)).toMatch(/^量为/)

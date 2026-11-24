@@ -1,7 +1,7 @@
 /**
  * 编辑界面：工具栏 + 大纲 / 分页预览 / 属性面板。
  */
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState, type Dispatch } from 'react'
 import { buildDocument } from '@core/document/build'
 import type { FigureListName, OptionImageRef } from '@core/document/ir'
 import { getPreset } from '@core/presets'
@@ -13,7 +13,7 @@ import { usePanelWidths } from './layout/usePanelWidths'
 import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
-import { BlockQuickMenu } from './BlockQuickMenu'
+import { BatchQuestionQuickMenu, BlockQuickMenu } from './BlockQuickMenu'
 import { ImageImportDialog } from './import/ImageImportDialog'
 import { ContextMenu } from './home/ContextMenu'
 import { FigureBatchDialog, figureLabel } from './figures/FigureBatchDialog'
@@ -32,10 +32,25 @@ import type { ImportReport } from '@shared/ipc'
 import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
+import { listOutlineQuestionIds, pruneQuestionSelection, selectQuestionRange, toggleQuestionSelection } from './panels/outline-selection'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
 import { findBlock, HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
+import { clearBlockClipboard, getBlockClipboard, setBlockClipboard, takeBlocksForPaste, useBlockClipboard } from './state/blockClipboard'
+import { collectBlocksByIds } from '@core/model/block-clipboard'
 import { useMathUpright } from './state/mathUpright'
+
+const COPYABLE_BLOCK_TYPES = new Set<Block['type']>(['question', 'composite', 'knowledge'])
+
+function isEditableTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof Element)) return false
+  return el.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !== null
+}
+
+function hasSelectedText(): boolean {
+  const sel = window.getSelection()
+  return sel !== null && !sel.isCollapsed && sel.toString().length > 0
+}
 
 /** 编辑器用到的文件操作（作用于本标签页） */
 export interface EditorFiles {
@@ -193,21 +208,60 @@ function EditorBody({
     [dispatch]
   )
   const headerSelected = state.selectedBlockId === HEADER_SELECTION
-  const select = useCallback(
-    (blockId: string, focus?: ParagraphFocus) => dispatch({ type: 'select', blockId, ...(focus !== undefined ? { focus } : {}) }),
-    [dispatch]
+  const outlineQuestionIds = useMemo(() => listOutlineQuestionIds(project.blocks), [project.blocks])
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([])
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null)
+  const activeSelectedQuestions = useMemo(
+    () => pruneQuestionSelection(selectedQuestionIds, outlineQuestionIds),
+    [selectedQuestionIds, outlineQuestionIds]
   )
-  const selectHeader = useCallback(() => dispatch({ type: 'select', blockId: HEADER_SELECTION }), [dispatch])
+  const clearMultiSelect = useCallback(() => {
+    setSelectedQuestionIds([])
+    setSelectionAnchorId(null)
+  }, [])
+  const select = useCallback(
+    (blockId: string, focus?: ParagraphFocus) => {
+      setSelectedQuestionIds([])
+      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
+      dispatch({ type: 'select', blockId, ...(focus !== undefined ? { focus } : {}) })
+    },
+    [dispatch, outlineQuestionIds]
+  )
+  const selectHeader = useCallback(() => {
+    clearMultiSelect()
+    dispatch({ type: 'select', blockId: HEADER_SELECTION })
+  }, [clearMultiSelect, dispatch])
+
+  const fallbackEditorId = useId()
+  const editorKey = tabId ?? fallbackEditorId
+  const clipboard = useBlockClipboard()
+  const cutBlockIds = useMemo<ReadonlySet<string>>(() => {
+    const set = new Set<string>()
+    if (clipboard?.mode !== 'cut' || clipboard.cutSource?.editorKey !== editorKey) return set
+    for (const id of clipboard.cutSource.blockIds) {
+      set.add(id)
+      const b = project.blocks.find((x) => x.id === id)
+      if (b?.type === 'composite') {
+        for (const it of b.items) set.add(it.id)
+      }
+    }
+    return set
+  }, [clipboard, editorKey, project.blocks])
 
   const inactive = inactiveProp === true
   useEffect(() => {
     if (inactive) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') dispatch({ type: 'select', blockId: null })
+      if (e.key === 'Escape') {
+        const cb = getBlockClipboard()
+        if (cb?.mode === 'cut' && cb.cutSource?.editorKey === editorKey) clearBlockClipboard()
+        clearMultiSelect()
+        dispatch({ type: 'select', blockId: null })
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dispatch, inactive])
+  }, [clearMultiSelect, dispatch, editorKey, inactive])
 
   // 撤销 / 重做：工具栏按钮、Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z、“编辑”菜单
   const travel = useCallback(
@@ -252,27 +306,36 @@ function EditorBody({
   // 快捷窗口：右键内容（预览或大纲）弹出版式窗口，右键图片弹出图片窗口
   const [quickMenu, setQuickMenu] = useState<
     | { kind: 'block'; blockId: string; x: number; y: number; stage?: boolean }
+    | { kind: 'batch-questions'; blockIds: string[]; x: number; y: number }
     | { kind: 'figure'; blockId: string; figureIndex: number; list?: FigureListName; x: number; y: number }
     | { kind: 'option'; blockId: string; ref: OptionImageRef; x: number; y: number }
     | null
   >(null)
   const openQuickMenu = useCallback(
     (blockId: string, x: number, y: number) => {
+      setSelectedQuestionIds([])
+      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
       dispatch({ type: 'select', blockId })
       setQuickMenu({ kind: 'block', blockId, x, y })
     },
-    [dispatch]
+    [dispatch, outlineQuestionIds]
   )
+  const openBatchQuestionMenu = useCallback((blockIds: string[], x: number, y: number) => {
+    setQuickMenu({ kind: 'batch-questions', blockIds, x, y })
+  }, [])
   // 在预览中右键：空间大，风格主题可以用更张扬的样式（stage）；大纲里右键保持紧凑的常规样式
   const openStageMenu = useCallback(
     (blockId: string, x: number, y: number) => {
+      setSelectedQuestionIds([])
+      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
       dispatch({ type: 'select', blockId })
       setQuickMenu({ kind: 'block', blockId, x, y, stage: true })
     },
-    [dispatch]
+    [dispatch, outlineQuestionIds]
   )
   const openImageMenu = useCallback(
     (target: ImageTarget, x: number, y: number) => {
+      clearMultiSelect()
       dispatch({ type: 'select', blockId: target.ref.blockId })
       setQuickMenu(
         target.kind === 'figure'
@@ -280,10 +343,10 @@ function EditorBody({
           : { kind: 'option', blockId: target.ref.blockId, ref: target.ref, x, y }
       )
     },
-    [dispatch]
+    [clearMultiSelect, dispatch]
   )
   const closeQuickMenu = useCallback(() => setQuickMenu(null), [])
-  const quickBlock = quickMenu !== null ? findBlock(project.blocks, quickMenu.blockId) : null
+  const quickBlock = quickMenu !== null && quickMenu.kind !== 'batch-questions' ? findBlock(project.blocks, quickMenu.blockId) : null
   const canUndo = state.history.past.length > 0
   const canRedo = state.history.future.length > 0
 
@@ -316,6 +379,160 @@ function EditorBody({
   const rootRef = useRef<HTMLDivElement>(null)
   // 大纲中点击某项（即使已选中）：预览滚动到它
   const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(null)
+  const selectQuestion = useCallback(
+    (blockId: string, mod: { shift: boolean; toggle: boolean }) => {
+      if (mod.shift) {
+        const anchor =
+          selectionAnchorId !== null && outlineQuestionIds.includes(selectionAnchorId)
+            ? selectionAnchorId
+            : state.selectedBlockId !== null && outlineQuestionIds.includes(state.selectedBlockId)
+              ? state.selectedBlockId
+              : null
+        const next = selectQuestionRange(outlineQuestionIds, anchor, blockId)
+        setSelectedQuestionIds(next)
+        if (anchor === null) setSelectionAnchorId(blockId)
+        dispatch({ type: 'select', blockId })
+        setReveal((r) => ({ id: blockId, nonce: (r?.nonce ?? 0) + 1 }))
+        return
+      }
+      if (mod.toggle) {
+        const next = toggleQuestionSelection(activeSelectedQuestions, state.selectedBlockId, outlineQuestionIds, blockId)
+        setSelectedQuestionIds(next)
+        if (next.length === 0) {
+          setSelectionAnchorId(null)
+          dispatch({ type: 'select', blockId: null })
+        } else {
+          const nextPrimary = next.includes(blockId) ? blockId : next[next.length - 1]!
+          if (selectionAnchorId === null || !next.includes(selectionAnchorId)) {
+            setSelectionAnchorId(nextPrimary)
+          }
+          dispatch({ type: 'select', blockId: nextPrimary })
+          setReveal((r) => ({ id: blockId, nonce: (r?.nonce ?? 0) + 1 }))
+        }
+        return
+      }
+      setSelectedQuestionIds([])
+      setSelectionAnchorId(blockId)
+      dispatch({ type: 'select', blockId })
+      setReveal((r) => ({ id: blockId, nonce: (r?.nonce ?? 0) + 1 }))
+    },
+    [activeSelectedQuestions, dispatch, outlineQuestionIds, selectionAnchorId, state.selectedBlockId]
+  )
+
+  const copyBlocksByIds = useCallback(
+    (blockIds: readonly string[], cut: boolean): boolean => {
+      const picked = collectBlocksByIds(project.blocks, blockIds)
+      if (picked.length === 0) return false
+      const pickedIds = picked.map((b) => b.id)
+      setBlockClipboard(
+        picked,
+        assets,
+        cut ? 'cut' : 'copy',
+        cut
+          ? {
+              editorKey,
+              blockIds: pickedIds,
+              commit: () => dispatch({ type: 'delete-blocks', blockIds: pickedIds })
+            }
+          : undefined
+      )
+      if (cut) clearMultiSelect()
+      setQuickMenu(null)
+      return true
+    },
+    [assets, clearMultiSelect, dispatch, editorKey, project.blocks]
+  )
+  const copySelectedBlocks = useCallback(
+    (cut: boolean): boolean => {
+      if (activeSelectedQuestions.length > 1) return copyBlocksByIds(activeSelectedQuestions, cut)
+      if (selectedBlock !== null && COPYABLE_BLOCK_TYPES.has(selectedBlock.type)) {
+        return copyBlocksByIds([selectedBlock.id], cut)
+      }
+      return false
+    },
+    [activeSelectedQuestions, copyBlocksByIds, selectedBlock]
+  )
+  const pasteBlocks = useCallback(
+    (afterBlockId?: string | null): boolean => {
+      const cb = getBlockClipboard()
+      const payload = takeBlocksForPaste()
+      if (cb === null || payload === null || payload.blocks.length === 0) return false
+      const target =
+        afterBlockId !== undefined
+          ? afterBlockId
+          : activeSelectedQuestions.length > 1
+            ? activeSelectedQuestions[activeSelectedQuestions.length - 1]!
+            : (selectedBlock?.id ?? null)
+      const sameCut = cb.mode === 'cut' && cb.cutSource !== undefined && cb.cutSource.editorKey === editorKey
+      dispatch({
+        type: 'insert-blocks',
+        blocks: payload.blocks,
+        assets: payload.assets,
+        afterBlockId: target,
+        ...(sameCut ? { removeBlockIds: cb.cutSource!.blockIds } : {})
+      })
+      if (cb.mode === 'cut') {
+        if (!sameCut) cb.cutSource?.commit()
+        clearBlockClipboard()
+      }
+      clearMultiSelect()
+      setQuickMenu(null)
+      const firstId = payload.blocks[0]!.id
+      setReveal((r) => ({ id: firstId, nonce: (r?.nonce ?? 0) + 1 }))
+      return true
+    },
+    [activeSelectedQuestions, clearMultiSelect, dispatch, editorKey, selectedBlock]
+  )
+
+  // Ctrl+C / Ctrl+X / Ctrl+V 与“编辑”菜单复制、剪切、粘贴题目（输入区内或选中正文文字时放行）
+  useEffect(() => {
+    if (inactive) return
+    const canHandleShortcut = (target: EventTarget | null): boolean => {
+      if (document.querySelector('dialog[open]') !== null) return false
+      if (isEditableTarget(document.activeElement) || isEditableTarget(target)) return false
+      return true
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      if (!canHandleShortcut(e.target)) return
+      const k = e.key.toLowerCase()
+      if (k === 'c' || k === 'x') {
+        if (hasSelectedText()) return
+        if (copySelectedBlocks(k === 'x')) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      } else if (k === 'v') {
+        if (getBlockClipboard() !== null && pasteBlocks()) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      }
+    }
+    const onClipboard = (e: ClipboardEvent): void => {
+      if (e.defaultPrevented || !canHandleShortcut(e.target)) return
+      if (e.type === 'copy' || e.type === 'cut') {
+        if (hasSelectedText()) return
+        if (copySelectedBlocks(e.type === 'cut')) {
+          e.preventDefault()
+        }
+      } else if (e.type === 'paste') {
+        if (getBlockClipboard() !== null && pasteBlocks()) {
+          e.preventDefault()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    document.addEventListener('copy', onClipboard, true)
+    document.addEventListener('cut', onClipboard, true)
+    document.addEventListener('paste', onClipboard, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('copy', onClipboard, true)
+      document.removeEventListener('cut', onClipboard, true)
+      document.removeEventListener('paste', onClipboard, true)
+    }
+  }, [copySelectedBlocks, inactive, pasteBlocks])
   const stateRef = useRef(state)
   stateRef.current = state
   const figureActions = useMemo<FigureActions>(
@@ -501,15 +718,38 @@ function EditorBody({
           block={quickBlock}
           {...(questionNumbers.get(quickBlock.id) !== undefined ? { number: questionNumbers.get(quickBlock.id)! } : {})}
           questionNumbers={questionNumbers}
-          blocks={project.blocks}
           x={quickMenu.x}
           y={quickMenu.y}
           preset={preset}
           dispatch={dispatch}
           onClose={closeQuickMenu}
+          onCopy={() => void copyBlocksByIds([quickBlock.id], false)}
+          onCut={() => void copyBlocksByIds([quickBlock.id], true)}
+          onPaste={() => void pasteBlocks(quickBlock.id)}
           stage={quickMenu.stage === true}
         />
       )}
+      {quickMenu?.kind === 'batch-questions' &&
+        (() => {
+          const validIds = pruneQuestionSelection(quickMenu.blockIds, outlineQuestionIds)
+          if (validIds.length === 0) return null
+          return (
+            <BatchQuestionQuickMenu
+              key={validIds.join(',')}
+              blockIds={validIds}
+              blocks={project.blocks}
+              x={quickMenu.x}
+              y={quickMenu.y}
+              preset={preset}
+              dispatch={dispatch}
+              onClose={closeQuickMenu}
+              onDeleted={clearMultiSelect}
+              onCopy={() => void copyBlocksByIds(validIds, false)}
+              onCut={() => void copyBlocksByIds(validIds, true)}
+              onPaste={() => void pasteBlocks(validIds[validIds.length - 1] ?? null)}
+            />
+          )
+        })()}
       {exportOpen && (
         <ExportDialog
           bundle={state.bundle}
@@ -531,9 +771,14 @@ function EditorBody({
           blocks={project.blocks}
           questionNumbers={questionNumbers}
           selectedBlockId={state.selectedBlockId}
+          selectedQuestionIds={activeSelectedQuestions}
+          cutBlockIds={cutBlockIds}
           dispatch={dispatch}
           preset={preset}
+          onSelectQuestion={selectQuestion}
+          onClearMultiSelect={clearMultiSelect}
           onBlockMenu={openQuickMenu}
+          onBatchQuestionMenu={openBatchQuestionMenu}
           onOpenFigureBatch={() => setFigureBatch({})}
           onReveal={(id) => setReveal((r) => ({ id, nonce: (r?.nonce ?? 0) + 1 }))}
         />
@@ -541,6 +786,7 @@ function EditorBody({
           ir={ir}
           assetUrls={assetUrls}
           selectedBlockId={state.selectedBlockId}
+          cutBlockIds={cutBlockIds}
           revealRequest={reveal}
           onSelect={select}
           onSelectHeader={selectHeader}

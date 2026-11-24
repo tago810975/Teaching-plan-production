@@ -1,14 +1,10 @@
 {
-  "id": "math-v1",
-  "name": "数学教学案 V1.0",
-  "subject": "数学",
-  "description": "数学教学案：大标题、知识梳理 / 例题精讲 / 课堂总结 / 课后练习等二级标题，例题可带变式题（a. b. c.）。从墨案迁移的教案使用这个预设。",
+  "id": "lesson-v1",
+  "name": "教学案",
+  "subject": "",
+  "description": "通用教学案模板：包含大标题、栏目标题、题型分类、题目与作业单。",
   "templateId": "physics-default",
   "kind": "lesson",
-  "questionFields": {
-    "review": true,
-    "important": true
-  },
   "header": {
     "variantSuffix": true
   },
@@ -42,8 +38,8 @@
     "知识梳理",
     "例题精讲",
     "课堂练习",
-    "课堂总结",
-    "课后练习"
+    "课后练习",
+    "课堂总结"
   ],
   "worksheet": {
     "titlePrefix": "作业单-",
@@ -74,7 +70,7 @@
   ],
   "keyPoint": {
     "label": "重点",
-    "description": "知识梳理中需要记忆的内容（以后做默写单时挖空）：红色加粗下划线",
+    "description": "红色加粗下划线",
     "marks": {
       "bold": true,
       "underline": true,
@@ -85,33 +81,23 @@
     "renameLabels": {
       "【详解】": "【解析】"
     },
-    "analysisColor": "keep"
+    "analysisColor": "black"
   },
   "difficulty": {
     "levels": [
       {
         "grade": "A",
         "stars": 1,
-        "label": "容易"
+        "label": "简单"
       },
       {
         "grade": "B",
         "stars": 2,
-        "label": "较易"
+        "label": "中等"
       },
       {
         "grade": "C",
         "stars": 3,
-        "label": "中等"
-      },
-      {
-        "grade": "D",
-        "stars": 4,
-        "label": "较难"
-      },
-      {
-        "grade": "E",
-        "stars": 5,
         "label": "难"
       }
     ]

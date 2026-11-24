@@ -339,7 +339,18 @@ export interface CompositeBlock {
   figures: QuestionFigure[]
   items: QuestionBlock[]
   answer: RichText
+  /** 答案中的插图（仅教师版，位置同知识点插图） */
+  answerFigures?: QuestionFigure[]
+  knowledgePoints?: string[]
+  keyPoint?: string
+  difficultPoint?: string
+  /** 审题（仅教师版，排在解析之前，标签【审题】） */
+  review?: RichText
+  /** 重点题：教师版题目前显示【重点题】 */
+  important?: boolean
   analysis: RichText
+  /** 解析中的插图（仅教师版，位置同知识点插图） */
+  analysisFigures?: QuestionFigure[]
   layout: BlockLayout
 }
 

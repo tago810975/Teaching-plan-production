@@ -20,7 +20,7 @@ import type { Variant } from '@core/model/types'
 import { createTypeSummarySample } from './fixtures/type-summary-sample'
 
 const template = new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
-const preset = getPreset('physics-typesummary-v1')
+const preset = getPreset('typesummary-v1')
 
 const tables = (ps: DocParagraph[]): DocTable[] => ps.flatMap((p) => p.runs.flatMap((r) => (r.kind === 'table' ? [r.table] : [])))
 
@@ -30,10 +30,10 @@ async function documentXml(variant: Variant): Promise<string> {
   return (await JSZip.loadAsync(bytes)).file('word/document.xml')!.async('string')
 }
 
-describe('物理题型整理 V1.0', () => {
+describe('题型整理', () => {
   it('预设：题型整理类型、不编号、页眉不加(教案)(学案)、四个栏目', () => {
-    expect(PRESETS.map((p) => p.id)).toContain('physics-typesummary-v1')
-    expect(preset.name).toBe('物理题型整理 V1.0')
+    expect(PRESETS.map((p) => p.id)).toContain('typesummary-v1')
+    expect(preset.name).toBe('题型整理')
     expect(preset.kind).toBe('typeSummary')
     expect(preset.numberQuestions).toBe(false)
     expect(preset.header.variantSuffix).toBe(false)
@@ -96,7 +96,7 @@ describe('物理题型整理 V1.0', () => {
       expect(ir.header.right).toBe('选修二　磁场 磁场力　带电粒子圆周运动')
     }
     // 其他预设照旧编号
-    const lesson = buildDocument({ ...project, presetId: 'physics-v1' }, 'teacher')
+    const lesson = buildDocument({ ...project, presetId: 'lesson-v1' }, 'teacher')
     expect(lesson.paragraphs.find((p) => p.style === 'question')!.label).toBe('1.')
   })
 

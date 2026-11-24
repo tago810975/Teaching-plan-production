@@ -121,3 +121,48 @@ describe('导入综合题（期中试卷分析）', async () => {
     expect(labels.slice(4, 7)).toEqual(['5.', '6.', '7.'])
   })
 })
+
+describe('综合题仅教师版属性（重点题、知识点、重点、难点、审题、答案解析插图）', () => {
+  it('教师版输出重点题标记、知识点、重点、难点、审题及答案/解析插图，学生版不显示', () => {
+    const p = createEmptyProject()
+    p.layout.questionFields = { review: true, important: true }
+    const comp = createComposite({
+      id: 'comp-extra',
+      title: '材料特训',
+      background: [para('背景材料')],
+      items: [q('第一问')],
+      important: true,
+      knowledgePoints: ['机械波', '波速公式'],
+      keyPoint: '理解波的传播特性',
+      difficultPoint: '波长与质点振动关系',
+      review: [para('抓住周期和波长的定义')],
+      answer: [para('A')],
+      answerFigures: [{ assetId: 'ans-img', widthEmu: 914400, heightEmu: 457200, placement: 'below' }],
+      analysis: [para('详细解析')],
+      analysisFigures: [{ assetId: 'ana-img', widthEmu: 914400, heightEmu: 457200, placement: 'below' }]
+    })
+    p.blocks = [comp]
+
+    const teacher = buildDocument(p, 'teacher')
+    const stylesAndText = teacher.paragraphs.map((paraItem) => ({
+      style: paraItem.style,
+      label: paraItem.label ?? '',
+      shaded: paraItem.shaded === true,
+      text: paraItem.runs.map((run) => (run.kind === 'text' ? run.text : run.kind === 'image' ? `[img:${run.assetId}]` : '')).join('')
+    }))
+    expect(stylesAndText.some((x) => x.style === 'compositeTitle' && x.text.includes('【重点题】') && x.text.includes('材料特训'))).toBe(true)
+    expect(stylesAndText.some((x) => x.style === 'knowledge' && x.text === '机械波；波速公式' && x.shaded)).toBe(true)
+    expect(stylesAndText.some((x) => x.style === 'keyPoint' && x.text === '理解波的传播特性' && x.shaded)).toBe(true)
+    expect(stylesAndText.some((x) => x.style === 'difficultPoint' && x.text === '波长与质点振动关系' && x.shaded)).toBe(true)
+    expect(stylesAndText.some((x) => x.style === 'analysis' && x.text === '【审题】抓住周期和波长的定义' && x.shaded)).toBe(true)
+    expect(stylesAndText.some((x) => x.text === '[img:ans-img]' && x.shaded)).toBe(true)
+    expect(stylesAndText.some((x) => x.text === '[img:ana-img]' && x.shaded)).toBe(true)
+
+    const student = buildDocument(p, 'student')
+    const studentText = student.paragraphs.map((paraItem) => paraItem.runs.map((run) => (run.kind === 'text' ? run.text : '')).join('')).join('\n')
+    expect(studentText).not.toContain('【重点题】')
+    expect(studentText).not.toContain('理解波的传播特性')
+    expect(studentText).not.toContain('抓住周期和波长的定义')
+    expect(student.paragraphs.every((paraItem) => paraItem.shaded !== true)).toBe(true)
+  })
+})

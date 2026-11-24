@@ -11,9 +11,9 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { CollageText } from './theme/CollageText'
 import { difficultyOf, type FormatPreset } from '@core/presets'
 import { plainText } from '@core/model/factory'
-import type { Block, CompositeBlock, KeepTogether, OptionColumns, QuestionLayout } from '@core/model/types'
-import { answerPlacement } from '@core/model/composite-answers'
+import type { Block, KeepTogether, OptionColumns, QuestionBlock, QuestionLayout } from '@core/model/types'
 import type { EditorAction } from './state/store'
+import { useBlockClipboard } from './state/blockClipboard'
 import { AnswerPlacementControl } from './panels/AnswerPlacementControl'
 
 interface Props {
@@ -22,20 +22,26 @@ interface Props {
   number?: string
   /** 各题在全卷中的题号（综合题答案集中到最后时使用） */
   questionNumbers?: ReadonlyMap<string, string>
-  /** 全部内容（题目可移到哪道综合题） */
-  blocks?: readonly Block[]
   x: number
   y: number
   preset: FormatPreset
   dispatch: Dispatch<EditorAction>
   onClose: () => void
+  /** 复制当前内容（支持跨学案粘贴） */
+  onCopy?: () => void
+  /** 剪切当前内容（支持跨学案粘贴） */
+  onCut?: () => void
+  /** 把剪贴板中的内容粘贴到当前内容下方 */
+  onPaste?: () => void
   /** 从预览中打开（风格主题可用更张扬的样式） */
   stage?: boolean
 }
 
 type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pick<QuestionLayout, 'optionColumns'>>
 
-export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blocks = [], x, y, preset, dispatch, onClose, stage = false }: Props) {
+export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, y, preset, dispatch, onClose, onCopy, onCut, onPaste, stage = false }: Props) {
+  const clipboard = useBlockClipboard()
+  const canCopy = block.type === 'question' || block.type === 'composite' || block.type === 'knowledge'
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -105,7 +111,6 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blo
           </label>
         </>
       )}
-      {block.type === 'question' && <MoveTo block={block} blocks={blocks} questionNumbers={questionNumbers} dispatch={dispatch} />}
       {block.type === 'composite' && block.items.length > 0 && (
         <Row label="答案">
           <AnswerPlacementControl block={block} questionNumbers={questionNumbers} dispatch={dispatch} />
@@ -131,6 +136,18 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blo
         <button type="button" onClick={() => dispatch({ type: 'move-block', blockId: block.id, delta: 1 })} title="下移（可连续点击）">
           ↓ 下移
         </button>
+        {block.type === 'composite' && block.items.length > 0 && (
+          <button
+            type="button"
+            title="拆成独立的单题；拆开前会先把集中答案与解析分到各小题，可按 Ctrl+Z 撤销"
+            onClick={() => {
+              dispatch({ type: 'split-composite', blockId: block.id })
+              onClose()
+            }}
+          >
+            拆成单题
+          </button>
+        )}
         <button
           type="button"
           className="danger"
@@ -143,52 +160,237 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), blo
           删除
         </button>
       </div>
+      {((canCopy && (onCopy !== undefined || onCut !== undefined)) || (clipboard !== null && onPaste !== undefined)) && (
+        <div className="quick-menu-actions quick-menu-actions--clip">
+          {canCopy && onCopy !== undefined && (
+            <button
+              type="button"
+              title="复制（Ctrl+C），可跨学案粘贴"
+              onClick={() => {
+                onCopy()
+                onClose()
+              }}
+            >
+              复制
+            </button>
+          )}
+          {canCopy && onCut !== undefined && (
+            <button
+              type="button"
+              title="剪切（Ctrl+X），粘贴后从原处移除"
+              onClick={() => {
+                onCut()
+                onClose()
+              }}
+            >
+              剪切
+            </button>
+          )}
+          {clipboard !== null && onPaste !== undefined && (
+            <button
+              type="button"
+              title="粘贴到当前内容下方（Ctrl+V）"
+              onClick={() => {
+                onPaste()
+                onClose()
+              }}
+            >
+              粘贴
+            </button>
+          )}
+        </div>
+      )}
     </QuickPopover>
   )
 }
 
-/**
- * “移到”：把题目一步移到某道综合题的最后，或移出综合题。所在综合题的答案还集中在最后时提示先分到各小题
- * （否则共用答案里仍写着这道题的答案）。
- */
-function MoveTo({ block, blocks, questionNumbers, dispatch }: { block: Block; blocks: readonly Block[]; questionNumbers: ReadonlyMap<string, string>; dispatch: Dispatch<EditorAction> }) {
-  const composites = blocks.filter((b): b is CompositeBlock => b.type === 'composite')
-  const parent = composites.find((c) => c.items.some((it) => it.id === block.id))
-  if (composites.length === 0) return null
-  const range = (c: CompositeBlock): string => {
-    const ns = c.items.map((it) => questionNumbers.get(it.id)?.replace(/\.$/, '')).filter((n): n is string => n !== undefined)
-    return ns.length === 0 ? '无小题' : ns.length === 1 ? `第 ${ns[0]} 题` : `第 ${ns[0]}～${ns[ns.length - 1]} 题`
+/** 批量快捷菜单的 Props */
+interface BatchProps {
+  blockIds: readonly string[]
+  blocks: readonly Block[]
+  x: number
+  y: number
+  preset: FormatPreset
+  dispatch: Dispatch<EditorAction>
+  onClose: () => void
+  onDeleted?: () => void
+  onCopy?: () => void
+  onCut?: () => void
+  onPaste?: () => void
+}
+
+function commonValue<T>(values: readonly T[]): T | null {
+  if (values.length === 0) return null
+  const first = values[0]!
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] !== first) return null
   }
-  const name = (c: CompositeBlock): string => {
-    const t = c.title.trim() || plainText(c.background).trim()
-    return `${t.length > 10 ? `${t.slice(0, 10)}…` : t || '综合题'}（${range(c)}）`
-  }
-  const shared = parent !== undefined && answerPlacement(parent) === 'end'
+  return first
+}
+
+/** 支持混合态（indeterminate）的复选框 */
+function TriCheckbox({ checked, label, onChange }: { checked: boolean | null; label: string; onChange: (next: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current !== null) ref.current.indeterminate = checked === null
+  }, [checked])
   return (
-    <>
-      <Row label="移到">
-        <select
-          aria-label="把这道题移到"
-          value=""
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === '') return
-            dispatch({ type: 'move-question-to', blockId: block.id, compositeId: v === '\u0000' ? null : v })
+    <label className="checkbox quick-menu-check">
+      <input ref={ref} type="checkbox" checked={checked === true} onChange={(e) => onChange(e.target.checked)} />
+      {label}
+    </label>
+  )
+}
+
+/**
+ * 大纲多选题目后右键弹出的批量快捷操作窗口：全部修改与删除均可按 Ctrl+Z 一步撤销。
+ */
+export function BatchQuestionQuickMenu({ blockIds, blocks, x, y, preset, dispatch, onClose, onDeleted, onCopy, onCut, onPaste }: BatchProps) {
+  const clipboard = useBlockClipboard()
+  const idSet = new Set(blockIds)
+  const questions: QuestionBlock[] = []
+  for (const b of blocks) {
+    if (b.type === 'question' && idSet.has(b.id)) questions.push(b)
+    else if (b.type === 'composite') {
+      for (const it of b.items) {
+        if (idSet.has(it.id)) questions.push(it)
+      }
+    }
+  }
+  if (questions.length === 0) return null
+
+  const targetIds = questions.map((q) => q.id)
+  const updateQuestions = (fn: (q: QuestionBlock) => QuestionBlock): void =>
+    dispatch({
+      type: 'update-blocks',
+      blockIds: targetIds,
+      update: (b) => (b.type === 'question' ? fn(b) : b)
+    })
+  const setLayout = (patch: Partial<QuestionLayout>): void =>
+    updateQuestions((q) => ({ ...q, question: { ...q.question, layout: { ...q.question.layout, ...patch } } }))
+
+  const commonGrade = commonValue(questions.map((q) => difficultyOf(q.question, preset).grade ?? ''))
+  const withOptions = questions.filter((q) => q.question.options.length > 0)
+  const commonCols = commonValue(withOptions.map((q) => q.question.layout.optionColumns))
+  const commonKeep = commonValue(questions.map((q) => q.question.layout.keepTogether))
+  const commonTeacher = commonValue(questions.map((q) => q.question.layout.teacherSpaceLines))
+  const commonStudent = commonValue(questions.map((q) => q.question.layout.studentSpaceLines))
+  const commonPageBreak = commonValue(questions.map((q) => q.question.layout.pageBreakBefore))
+
+  return (
+    <QuickPopover x={x} y={y} title={`已选 ${questions.length} 道题`} label="批量快捷操作" onClose={onClose}>
+      <Row label="难度">
+        <Choice
+          value={commonGrade}
+          options={[['', '无'], ...preset.difficulty.levels.map((l): [string, string] => [l.grade, `${l.grade} ${'★'.repeat(l.stars)}`])]}
+          onChange={(g) => updateQuestions((q) => ({ ...q, question: { ...q.question, difficulty: g === '' ? undefined : g, stars: undefined } }))}
+        />
+      </Row>
+      {withOptions.length > 0 && (
+        <Row label="选项">
+          <Choice<OptionColumns>
+            value={commonCols}
+            options={[
+              ['auto', '自动'],
+              [1, '每行 1 项'],
+              [2, '2 项'],
+              [4, '4 项']
+            ]}
+            onChange={(optionColumns) =>
+              dispatch({
+                type: 'update-blocks',
+                blockIds: withOptions.map((q) => q.id),
+                update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, layout: { ...b.question.layout, optionColumns } } } : b)
+              })
+            }
+          />
+        </Row>
+      )}
+      <Row label="同页">
+        <Choice<KeepTogether>
+          value={commonKeep}
+          options={[
+            ['auto', '跟随版式设置'],
+            ['always', '整题同页'],
+            ['never', '允许跨页']
+          ]}
+          onChange={(keepTogether) => setLayout({ keepTogether })}
+        />
+      </Row>
+      <Row label="留白">
+        <Stepper label="教案" value={commonTeacher ?? questions[0]!.question.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
+        <Stepper label="学案" value={commonStudent ?? questions[0]!.question.layout.studentSpaceLines} onChange={(studentSpaceLines) => setLayout({ studentSpaceLines })} />
+      </Row>
+      {(commonTeacher === null || commonStudent === null) && <p className="field-hint quick-menu-note">各题留白行数不同，调整将统一所选题目的留白</p>}
+      <TriCheckbox checked={commonPageBreak} label="从新的一页开始" onChange={(pageBreakBefore) => setLayout({ pageBreakBefore })} />
+      <div className="quick-menu-actions">
+        {questions.length >= 2 && (
+          <button
+            type="button"
+            title="按大纲顺序合并成一道综合题；合并后可用 Ctrl+Z 撤销"
+            onClick={() => {
+              dispatch({ type: 'merge-to-composite', blockIds: targetIds })
+              onDeleted?.()
+              onClose()
+            }}
+          >
+            合并成综合题
+          </button>
+        )}
+        <button
+          type="button"
+          className="danger"
+          title="删除后可用 Ctrl+Z 撤销"
+          onClick={() => {
+            dispatch({ type: 'delete-blocks', blockIds: targetIds })
+            onDeleted?.()
+            onClose()
           }}
         >
-          <option value="">{parent !== undefined ? `现在在：${name(parent)}` : '现在是独立的题目'}</option>
-          {parent !== undefined && <option value={'\u0000'}>移出综合题（成为独立的题目）</option>}
-          {composites
-            .filter((c) => c !== parent)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                综合题：{name(c)} 的最后
-              </option>
-            ))}
-        </select>
-      </Row>
-      {shared && <p className="field-hint quick-menu-note">所在综合题的答案与解析集中在最后，移走前建议先在综合题中选“分到各小题”，答案才会跟着这道题走。</p>}
-    </>
+          删除这 {questions.length} 道题
+        </button>
+      </div>
+      {(onCopy !== undefined || onCut !== undefined || (clipboard !== null && onPaste !== undefined)) && (
+        <div className="quick-menu-actions quick-menu-actions--clip">
+          {onCopy !== undefined && (
+            <button
+              type="button"
+              title="复制选中的题目（Ctrl+C），可跨学案粘贴"
+              onClick={() => {
+                onCopy()
+                onClose()
+              }}
+            >
+              复制
+            </button>
+          )}
+          {onCut !== undefined && (
+            <button
+              type="button"
+              title="剪切选中的题目（Ctrl+X），粘贴后从原处移除"
+              onClick={() => {
+                onCut()
+                onClose()
+              }}
+            >
+              剪切
+            </button>
+          )}
+          {clipboard !== null && onPaste !== undefined && (
+            <button
+              type="button"
+              title="粘贴到所选题目的最后一项下方（Ctrl+V）"
+              onClick={() => {
+                onPaste()
+                onClose()
+              }}
+            >
+              粘贴
+            </button>
+          )}
+        </div>
+      )}
+    </QuickPopover>
   )
 }
 
@@ -227,7 +429,7 @@ export function Row({ label, children }: { label: string; children: ReactNode })
   )
 }
 
-export function Choice<T extends string | number>({ value, options, onChange }: { value: T; options: Array<[T, string]>; onChange: (v: T) => void }) {
+export function Choice<T extends string | number>({ value, options, onChange }: { value: T | null; options: Array<[T, string]>; onChange: (v: T) => void }) {
   return (
     <div className="segmented quick-menu-seg" role="radiogroup">
       {options.map(([v, label]) => (

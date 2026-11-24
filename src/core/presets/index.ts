@@ -12,10 +12,8 @@ import { DEFAULT_PRESET_ID } from '../model/factory'
 import { lineSpacing, questionFields } from '../model/schema'
 import type { LineSpacing, ProjectLayout, QuestionFields } from '../model/types'
 import { STYLE_SPECS, type ParagraphStyleSpec, type StyleKey } from '../document/styles'
-import physicsV1 from './physics-v1.json'
-import physicsHandbookV1 from './physics-handbook-v1.json'
-import physicsTypeSummaryV1 from './physics-typesummary-v1.json'
-import mathV1 from './math-v1.json'
+import lessonV1 from './lesson-v1.json'
+import typeSummaryV1 from './typesummary-v1.json'
 
 const heading = z.object({
   font: z.enum(['song', 'hei', 'kai', 'fang']),
@@ -99,7 +97,7 @@ export type HeadingFormat = FormatPreset['headings']['title']
 export type HeadingKey = keyof FormatPreset['headings']
 
 /** 内置预设（随软件发布，只读），按显示顺序 */
-export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(physicsV1), presetSchema.parse(physicsHandbookV1), presetSchema.parse(physicsTypeSummaryV1), presetSchema.parse(mathV1)]
+export const PRESETS: readonly FormatPreset[] = [presetSchema.parse(lessonV1), presetSchema.parse(typeSummaryV1)]
 
 export { DEFAULT_PRESET_ID }
 
@@ -123,9 +121,21 @@ export function isBuiltinPreset(id: string): boolean {
   return PRESETS.some((p) => p.id === id)
 }
 
+const LEGACY_PRESET_IDS: Readonly<Record<string, string>> = {
+  'physics-typesummary-v1': 'typesummary-v1'
+}
+
 /** 按 ID 取预设；找不到（如来自更新版本的工程，或用户模板已删除）时用默认预设 */
 export function getPreset(id: string | undefined): FormatPreset {
-  return allPresets().find((p) => p.id === id) ?? PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)!
+  const all = allPresets()
+  const direct = all.find((p) => p.id === id)
+  if (direct !== undefined) return direct
+  const mappedId = id !== undefined ? LEGACY_PRESET_IDS[id] : undefined
+  if (mappedId !== undefined) {
+    const mapped = all.find((p) => p.id === mappedId)
+    if (mapped !== undefined) return mapped
+  }
+  return PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)!
 }
 
 /** 预设 ID 与用户模板的 Word 模板 ID 只能用小写字母、数字和连字符（用作文件夹名、写进工程文件） */

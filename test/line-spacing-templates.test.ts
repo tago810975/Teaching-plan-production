@@ -11,7 +11,7 @@ import { createEmptyBundle, createKnowledge, createQuestion, newId, para } from 
 import { decodeBundle, encodeBundle } from '@core/project-file/codec'
 import { allPresets, getPreset, parsePreset, PRESETS, resolveLineSpacing, setUserPresets } from '@core/presets'
 import { checkWordTemplate } from '@core/template/check'
-import physicsV1 from '@core/presets/physics-v1.json'
+import lessonV1 from '@core/presets/lesson-v1.json'
 import type { Project } from '@core/model/types'
 
 const template = new Uint8Array(readFileSync('resources/templates/physics-default/template.docx'))
@@ -51,7 +51,7 @@ describe('行距', () => {
 
   it('工程没设的项用格式预设的行距（题型整理默认 1.3 倍，标题单倍）', () => {
     const project = sampleProject()
-    project.presetId = 'physics-typesummary-v1'
+    project.presetId = 'typesummary-v1'
     expect(resolveLineSpacing(project.layout, getPreset(project.presetId))).toEqual({ heading: 1, question: 1.3, knowledge: 1.3, body: 1.3 })
     expect(lineOf(project, 'title')).toEqual([undefined])
     expect(lineOf(project, 'q').every((v) => v === 312)).toBe(true)
@@ -82,11 +82,11 @@ describe('用户模板', () => {
   afterEach(() => setUserPresets([]))
 
   it('preset.json 校验：字段错误、id 格式给出中文说明', () => {
-    expect(parsePreset({ ...physicsV1, id: 'my-preset' }).ok).toBe(true)
-    const bad = parsePreset({ ...physicsV1, kind: 'exam' })
+    expect(parsePreset({ ...lessonV1, id: 'my-preset' }).ok).toBe(true)
+    const bad = parsePreset({ ...lessonV1, kind: 'exam' })
     expect(bad.ok).toBe(false)
     if (!bad.ok) expect(bad.error).toContain('kind')
-    const badId = parsePreset({ ...physicsV1, id: '我的模板' })
+    const badId = parsePreset({ ...lessonV1, id: '我的模板' })
     expect(badId.ok).toBe(false)
     if (!badId.ok) expect(badId.error).toContain('小写字母')
   })
@@ -96,9 +96,9 @@ describe('用户模板', () => {
     setUserPresets([mine, { ...PRESETS[1]!, name: '冒充的' }])
     expect(allPresets().map((p) => p.id)).toEqual([...PRESETS.map((p) => p.id), 'zhang-v1'])
     expect(getPreset('zhang-v1').name).toBe('张老师的教学案')
-    expect(getPreset('physics-handbook-v1').name).toBe('物理知识点手册 V1.0')
+    expect(getPreset('typesummary-v1').name).toBe('题型整理')
     setUserPresets([])
-    expect(getPreset('zhang-v1').id).toBe('physics-v1')
+    expect(getPreset('zhang-v1').id).toBe('lesson-v1')
   })
 
   it('Word 模板检查：内置模板通过；缺少 {{body}} 或样式时说明原因', async () => {

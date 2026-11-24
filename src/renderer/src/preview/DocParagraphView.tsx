@@ -14,6 +14,8 @@ interface Props {
   paragraph: DocParagraph
   assetUrls: ReadonlyMap<string, string>
   selected: boolean
+  /** 处于待剪切状态，虚化提示 */
+  cut?: boolean
   onSelect?: (blockId: string, focus?: ParagraphFocus) => void
   /** 点击公式时调用；不提供则公式不可点击（如测量区） */
   onEditMath?: (run: MathRun) => void
@@ -84,6 +86,7 @@ export const DocParagraphView = memo(function DocParagraphView({
   paragraph: p,
   assetUrls,
   selected,
+  cut = false,
   onSelect,
   onBlockMenu,
   onEditMath,
@@ -100,8 +103,8 @@ export const DocParagraphView = memo(function DocParagraphView({
     textAlign: p.align ?? css.textAlign,
     // 版式设置中的行距（与 previewCss 的换算相同：单倍约为字号的 1.3 倍，对齐网格的样式按网格行距）
     lineHeight: p.lineAuto !== undefined ? lineHeightFor(spec, p.lineAuto) : css.lineHeight,
-    paddingTop: css.marginTop,
-    paddingBottom: css.marginBottom,
+    paddingTop: p.spaceBeforeTwip !== undefined ? `${twipToPt(p.spaceBeforeTwip)}pt` : css.marginTop,
+    paddingBottom: p.spaceAfterTwip !== undefined ? `${twipToPt(p.spaceAfterTwip)}pt` : css.marginBottom,
     paddingLeft: p.indentLeftTwip !== undefined ? `${twipToPt(p.indentLeftTwip)}pt` : css.paddingLeft,
     textIndent: p.firstLineIndentTwip !== undefined ? `${twipToPt(p.firstLineIndentTwip)}pt` : p.indentLeftTwip !== undefined ? '0pt' : css.textIndent
   }
@@ -151,7 +154,8 @@ export const DocParagraphView = memo(function DocParagraphView({
     // 字体：段落自身的字体，否则样式的字体（与导出、模板一致）
     `font-${p.font ?? spec.fontRole}`,
     p.shaded === true ? 'para--shaded' : '',
-    selected ? 'is-selected' : ''
+    selected ? 'is-selected' : '',
+    cut ? 'is-cut' : ''
   ]
     .filter(Boolean)
     .join(' ')

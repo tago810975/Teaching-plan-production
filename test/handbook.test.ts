@@ -1,19 +1,37 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { blankKeyPoints, buildDocument } from '@core/document/build'
 import type { DocParagraph, DocRun } from '@core/document/ir'
 import { importDocx } from '@core/import/import-docx'
 import { createEmptyProject, newId, para } from '@core/model/factory'
-import { getPreset, PRESETS } from '@core/presets'
+import { getPreset, PRESETS, setUserPresets, type FormatPreset } from '@core/presets'
 import type { Inline, Project } from '@core/model/types'
 
 const SAMPLE = 'reference/samples/物理知识点手册_光/教案_T_知识点清单-光.docx'
 
-describe('物理知识点手册 V1.0', async () => {
-  const r = await importDocx(new Uint8Array(readFileSync(SAMPLE)), { presetId: 'physics-handbook-v1' })
+const TEST_HANDBOOK: FormatPreset = {
+  ...getPreset('lesson-v1'),
+  id: 'test-handbook',
+  name: '知识点手册（测试）',
+  kind: 'handbook',
+  header: { variantSuffix: false, left: '知识单' },
+  sectionNames: [],
+  import: { renameLabels: {}, analysisColor: 'keep' },
+  dictation: { enabled: true, colors: ['C00000', 'FF0000'], bold: true, minChars: 4 }
+}
+
+describe('知识点手册（用户自定义 handbook 预设）', () => {
+  let r: Awaited<ReturnType<typeof importDocx>>
+  beforeAll(async () => {
+    setUserPresets([TEST_HANDBOOK])
+    r = await importDocx(new Uint8Array(readFileSync(SAMPLE)), { presetId: 'test-handbook' })
+  })
+  afterAll(() => {
+    setUserPresets([])
+  })
   const project = (): Project => {
     const p = createEmptyProject()
-    p.presetId = 'physics-handbook-v1'
+    p.presetId = 'test-handbook'
     p.header = { ...p.header, right: '选修一-光' }
     p.blocks = r.blocks
     return p
@@ -21,9 +39,9 @@ describe('物理知识点手册 V1.0', async () => {
   const text = (p: DocParagraph): string =>
     p.runs.map((u) => (u.kind === 'text' ? u.text : u.kind === 'blank' ? `[${u.widthChars}]` : u.kind === 'math' ? '〔公式〕' : '')).join('')
 
-  it('预设：物理教学案与物理知识点手册', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['物理教学案 V1.0', '物理知识点手册 V1.0', '物理题型整理 V1.0', '数学教学案 V1.0'])
-    expect(getPreset('physics-handbook-v1')).toMatchObject({ kind: 'handbook', sectionNames: [], header: { variantSuffix: false } })
+  it('预设：内置教学案与题型整理，用户预设支持 handbook', () => {
+    expect(PRESETS.map((p) => p.name)).toEqual(['教学案', '题型整理'])
+    expect(getPreset('test-handbook')).toMatchObject({ kind: 'handbook', sectionNames: [], header: { variantSuffix: false } })
   })
 
   it('导入：只有大标题与知识点，不识别题目，没有“知识梳理”等二级标题', () => {
@@ -81,13 +99,13 @@ describe('物理知识点手册 V1.0', async () => {
 
   it('教学案预设的学生版不挖空', () => {
     const p = project()
-    p.presetId = 'physics-v1'
+    p.presetId = 'lesson-v1'
     expect(buildDocument(p, 'student').paragraphs.some((x) => x.runs.some((u) => u.kind === 'blank'))).toBe(false)
   })
 })
 
 describe('默写挖空规则', () => {
-  const d = getPreset('physics-handbook-v1').dictation
+  const d = TEST_HANDBOOK.dictation
   const P = (runs: DocRun[], style: DocParagraph['style'] = 'body'): DocParagraph => ({ key: 'k', sourceBlockId: 'b', style, runs })
   const red = (t: string): DocRun => ({ kind: 'text', text: t, marks: { bold: true, color: 'C00000' } })
 
@@ -106,10 +124,12 @@ describe('默写挖空规则', () => {
   })
 
   it('“重点”按钮设的红色加粗下划线同样会挖空', () => {
+    setUserPresets([TEST_HANDBOOK])
     const p = createEmptyProject()
-    p.presetId = 'physics-handbook-v1'
+    p.presetId = 'test-handbook'
     p.blocks = [{ id: newId(), type: 'knowledge', title: '一、测试', content: [{ inlines: [{ type: 'text', text: '光路' }, { type: 'text', text: '可逆', marks: { bold: true, underline: true, color: 'C00000' } }] }, para('完')], figures: [], layout: { keepTogether: 'auto', teacherSpaceLines: 0, studentSpaceLines: 0 } } as never]
     const s = buildDocument(p, 'student').paragraphs.find((x) => x.runs.some((u) => u.kind === 'blank'))!
     expect(s.runs.map((r) => (r.kind === 'text' ? { kind: r.kind, text: r.text } : r))).toEqual([{ kind: 'text', text: '光路' }, { kind: 'blank', widthChars: 4 }])
+    setUserPresets([])
   })
 })

@@ -154,9 +154,13 @@ class ExportContext {
     if (p.tabStopsTwip !== undefined) pPr += tabsXml(p.style, p.tabStopsTwip)
     if (p.spacerTwip !== undefined) {
       pPr += `<w:spacing w:before="0" w:after="0" w:line="${p.spacerTwip}" w:lineRule="exact"/>`
-    } else if (p.lineAuto !== undefined) {
-      // 版式设置中的行距：只改行距，段前段后随样式
-      pPr += `<w:spacing w:line="${p.lineAuto}" w:lineRule="auto"/>`
+    } else if (p.lineAuto !== undefined || p.spaceBeforeTwip !== undefined || p.spaceAfterTwip !== undefined) {
+      // 版式设置行距或图片段上下间距：只输出实际设置的项，其余仍随样式
+      const attrs: string[] = []
+      if (p.spaceBeforeTwip !== undefined) attrs.push(`w:before="${p.spaceBeforeTwip}"`)
+      if (p.spaceAfterTwip !== undefined) attrs.push(`w:after="${p.spaceAfterTwip}"`)
+      if (p.lineAuto !== undefined) attrs.push(`w:line="${p.lineAuto}" w:lineRule="auto"`)
+      pPr += `<w:spacing ${attrs.join(' ')}/>`
     }
     if (p.manualLabel === true && p.indentLeftTwip === undefined) {
       // 取消了自动编号：悬挂缩进照样式（题号与题干之间的制表符落在左缩进处）

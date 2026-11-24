@@ -14,7 +14,12 @@ export function figuresOf(b: Block, list?: FigureListName): QuestionFigure[] {
     if (list === 'analysis') return b.question.analysisFigures ?? []
     return b.question.figures
   }
-  if (b.type === 'knowledge' || b.type === 'composite') return list === undefined ? b.figures : []
+  if (b.type === 'composite') {
+    if (list === 'answer') return b.answerFigures ?? []
+    if (list === 'analysis') return b.analysisFigures ?? []
+    return b.figures
+  }
+  if (b.type === 'knowledge') return list === undefined ? b.figures : []
   return []
 }
 
@@ -25,7 +30,12 @@ export function withFigures(b: Block, list: FigureListName | undefined, fn: (fig
     if (list === 'analysis') return { ...b, question: { ...q, analysisFigures: fn(q.analysisFigures ?? []) } }
     return { ...b, question: { ...q, figures: fn(q.figures) } }
   }
-  if ((b.type === 'knowledge' || b.type === 'composite') && list === undefined) return { ...b, figures: fn(b.figures) } as Block
+  if (b.type === 'composite') {
+    if (list === 'answer') return { ...b, answerFigures: fn(b.answerFigures ?? []) }
+    if (list === 'analysis') return { ...b, analysisFigures: fn(b.analysisFigures ?? []) }
+    return { ...b, figures: fn(b.figures) }
+  }
+  if (b.type === 'knowledge' && list === undefined) return { ...b, figures: fn(b.figures) } as Block
   return b
 }
 

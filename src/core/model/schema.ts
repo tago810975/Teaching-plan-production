@@ -217,7 +217,14 @@ const block = z.discriminatedUnion('type', [
     figures: z.array(figure),
     items: z.array(questionBlock),
     answer: richText,
+    answerFigures: z.array(figure).optional(),
+    knowledgePoints: z.array(z.string()).optional(),
+    keyPoint: z.string().optional(),
+    difficultPoint: z.string().optional(),
+    review: richText.optional(),
+    important: z.boolean().optional(),
     analysis: richText,
+    analysisFigures: z.array(figure).optional(),
     layout: blockLayout
   })
 ])

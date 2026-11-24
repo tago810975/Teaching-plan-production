@@ -1,15 +1,15 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { collectMoanImageUrls, convertMoanPlan, extractOptions, headingText, splitPlanName, splitReview, type MoanPlanShow } from '@core/import/moan/convert'
 import { htmlPlainText, htmlToRich, parseColor, splitMath } from '@core/import/moan/html'
 import { readImageInfo } from '@core/import/moan/image-size'
 import { createMoanSession, observeMoanFrame, parseSocketFrame, teachingPlanIdFromUrl } from '@core/import/moan/session'
 import { buildDocument, variantLetters } from '@core/document/build'
 import { createEmptyProject, createQuestion, para, plainText } from '@core/model/factory'
-import { getPreset, resolveQuestionFields } from '@core/presets'
+import { getPreset, resolveQuestionFields, setUserPresets, type FormatPreset } from '@core/presets'
 import type { Block, QuestionBlock } from '@core/model/types'
 
-const SECTIONS = getPreset('math-v1').sectionNames
+const SECTIONS = getPreset('lesson-v1').sectionNames
 const show = (): MoanPlanShow => JSON.parse(readFileSync('test/fixtures/moan/show-3829.json', 'utf8')) as MoanPlanShow
 
 describe('墨案 HTML → 富文本', () => {
@@ -159,7 +159,7 @@ describe('墨案教案 → 教学案', () => {
 
   it('题号：1. a. b. 2. a. …，与墨案一致', () => {
     const r = convertMoanPlan(show(), new Map(), SECTIONS)
-    const project = { ...createEmptyProject(), presetId: 'math-v1', blocks: r.blocks }
+    const project = { ...createEmptyProject(), presetId: 'lesson-v1', blocks: r.blocks }
     const labels = buildDocument(project, 'teacher')
       .paragraphs.filter((p) => p.style === 'question' && p.label !== undefined)
       .map((p) => p.label)
@@ -209,6 +209,15 @@ describe('拆出审题', () => {
 })
 
 describe('题目可选项：审题、重点题', () => {
+  const TEST_REVIEW_PRESET: FormatPreset = {
+    ...getPreset('lesson-v1'),
+    id: 'test-review',
+    name: '含审题预设（测试）',
+    questionFields: { review: true, important: true }
+  }
+  beforeAll(() => setUserPresets([TEST_REVIEW_PRESET]))
+  afterAll(() => setUserPresets([]))
+
   const q = createQuestion({ kind: 'solve', stem: [para('题干')], analysis: [para('【解析】讲解')], review: [para('先求斜率')], important: true })
   const doc = (presetId: string, layout: Partial<ReturnType<typeof createEmptyProject>['layout']> = {}, variant: 'teacher' | 'student' = 'teacher') => {
     const p = createEmptyProject()
@@ -216,28 +225,28 @@ describe('题目可选项：审题、重点题', () => {
   }
   const texts = (ir: ReturnType<typeof buildDocument>): string[] => ir.paragraphs.map((p) => p.runs.map((r) => (r.kind === 'text' ? r.text : '')).join(''))
 
-  it('数学教学案默认打开：审题排在解析之前，教师版题干前有【重点题】', () => {
-    expect(resolveQuestionFields({}, getPreset('math-v1'))).toEqual({ review: true, important: true })
-    const t = texts(doc('math-v1'))
+  it('预设打开 questionFields：审题排在解析之前，教师版题干前有【重点题】', () => {
+    expect(resolveQuestionFields({}, getPreset('test-review'))).toEqual({ review: true, important: true })
+    const t = texts(doc('test-review'))
     expect(t[0]).toBe('【重点题】题干')
     expect(t.indexOf('【审题】先求斜率')).toBeGreaterThan(0)
     expect(t.indexOf('【审题】先求斜率')).toBe(t.indexOf('【解析】讲解') - 1)
     // 学生版两者都不出现
-    const s2 = texts(doc('math-v1', {}, 'student'))
+    const s2 = texts(doc('test-review', {}, 'student'))
     expect(s2[0]).toBe('题干')
     expect(s2.some((x) => x.includes('审题'))).toBe(false)
   })
 
   it('其他预设默认关闭（数据保留）；工程的版式设置可以打开', () => {
-    expect(resolveQuestionFields({}, getPreset('physics-v1'))).toEqual({ review: false, important: false })
-    const off = texts(doc('physics-v1'))
+    expect(resolveQuestionFields({}, getPreset('lesson-v1'))).toEqual({ review: false, important: false })
+    const off = texts(doc('lesson-v1'))
     expect(off[0]).toBe('题干')
     expect(off.some((x) => x.includes('审题'))).toBe(false)
-    const on = texts(doc('physics-v1', { questionFields: { review: true } }))
+    const on = texts(doc('lesson-v1', { questionFields: { review: true } }))
     expect(on[0]).toBe('题干')
     expect(on.includes('【审题】先求斜率')).toBe(true)
-    // 数学预设也可以关掉其中一项
-    expect(texts(doc('math-v1', { questionFields: { important: false } }))[0]).toBe('题干')
+    // 打开了的预设也可以关掉其中一项
+    expect(texts(doc('test-review', { questionFields: { important: false } }))[0]).toBe('题干')
   })
 })
 

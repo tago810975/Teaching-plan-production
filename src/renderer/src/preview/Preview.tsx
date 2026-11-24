@@ -54,10 +54,13 @@ interface Props {
   keyPoint?: FormatPreset['keyPoint']
   /** 大纲中点击了某项（即使已选中）：滚动到它；nonce 每次点击都变 */
   revealRequest?: { id: string; nonce: number } | null
+  /** 待剪切虚化展示的块 ID 集合 */
+  cutBlockIds?: ReadonlySet<string>
 }
 
 export function Preview({
   revealRequest,
+  cutBlockIds,
   ir,
   assetUrls,
   selectedBlockId,
@@ -254,6 +257,7 @@ export function Preview({
                     paragraph={p}
                     assetUrls={assetUrls}
                     selected={p.sourceBlockId === selectedBlockId}
+                    cut={cutBlockIds?.has(p.sourceBlockId) === true}
                     onSelect={selectFromPreview}
                     {...(onBlockMenu !== undefined ? { onBlockMenu } : {})}
                     {...(onEditMath !== undefined ? { onEditMath } : {})}

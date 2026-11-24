@@ -14,21 +14,52 @@ interface Props {
   /** 题目块 ID → 题号，取自 DocIR，保证与预览一致 */
   questionNumbers: ReadonlyMap<string, string>
   selectedBlockId: string | null
+  /** 多选状态下已选中的题目 ID 列表 */
+  selectedQuestionIds?: readonly string[]
+  /** 待剪切虚化展示的块 ID 集合 */
+  cutBlockIds?: ReadonlySet<string>
   dispatch: Dispatch<EditorAction>
   /** 格式预设：等级与星级的对应 */
   preset: FormatPreset
+  /** 多选题目点击（支持 Shift 区间与 Ctrl/Cmd 切换） */
+  onSelectQuestion?: (blockId: string, mod: { shift: boolean; toggle: boolean }) => void
+  /** 清空大纲题目多选 */
+  onClearMultiSelect?: () => void
   /** 右键内容：弹出快捷版式窗口 */
   onBlockMenu?: (blockId: string, x: number, y: number) => void
+  /** 右键已多选的题目：弹出批量操作窗口 */
+  onBatchQuestionMenu?: (blockIds: string[], x: number, y: number) => void
   /** 打开“批量处理插图” */
   onOpenFigureBatch?: () => void
   /** 点击了某项（已选中时再点也会请求）：预览滚动到它（老师手动翻页后再点能翻回去） */
   onReveal?: (blockId: string) => void
 }
 
-export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, preset, onBlockMenu, onOpenFigureBatch, onReveal }: Props) {
-  const menu = (id: string) => (e: ReactMouseEvent): void => {
+export function Outline({
+  blocks,
+  questionNumbers,
+  selectedBlockId,
+  selectedQuestionIds = [],
+  cutBlockIds,
+  dispatch,
+  preset,
+  onSelectQuestion,
+  onClearMultiSelect,
+  onBlockMenu,
+  onBatchQuestionMenu,
+  onOpenFigureBatch,
+  onReveal
+}: Props) {
+  const multiSet = selectedQuestionIds.length > 1 ? new Set(selectedQuestionIds) : null
+  const menu = (id: string, isQuestion: boolean) => (e: ReactMouseEvent): void => {
+    if (isQuestion && multiSet !== null && multiSet.has(id) && onBatchQuestionMenu !== undefined) {
+      e.preventDefault()
+      onBatchQuestionMenu([...selectedQuestionIds], e.clientX, e.clientY)
+      return
+    }
     if (onBlockMenu === undefined) return
     e.preventDefault()
+    onClearMultiSelect?.()
     dispatch({ type: 'select', blockId: id })
     onBlockMenu(id, e.clientX, e.clientY)
   }
@@ -37,9 +68,12 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
   const siblings: Array<{ id: string }> = parent?.type === 'composite' ? parent.items : blocks
   const selectedIndex = siblings.findIndex((b) => b.id === selectedBlockId)
   const listRef = useRef<HTMLOListElement>(null)
-  const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(listRef, (blockId, target, isQuestion) =>
-    // 题目可进出综合题；其他内容只在顶层移动
-    isQuestion ? dispatch({ type: 'move-question-at', blockId, drop: target }) : target.kind === 'top' && dispatch({ type: 'move-block-to', blockId, toIndex: target.index })
+  const { drag, onItemPointerDown, consumeClick } = useOutlineDrag(
+    listRef,
+    (blockId, target, isQuestion) =>
+      // 题目可进出综合题；其他内容只在顶层移动
+      isQuestion ? dispatch({ type: 'move-question-at', blockId, drop: target }) : target.kind === 'top' && dispatch({ type: 'move-block-to', blockId, toIndex: target.index }),
+    onClearMultiSelect
   )
 
   return (
@@ -49,14 +83,20 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
         <button
           type="button"
           className={`outline-item outline-item--header${selectedBlockId === HEADER_SELECTION ? ' is-selected' : ''}`}
-          onClick={() => dispatch({ type: 'select', blockId: HEADER_SELECTION })}
+          onClick={() => {
+            onClearMultiSelect?.()
+            dispatch({ type: 'select', blockId: HEADER_SELECTION })
+          }}
         >
           <span className="outline-text">页眉与水印</span>
         </button>
         <button
           type="button"
           className={`outline-item outline-item--header${selectedBlockId === LAYOUT_SELECTION ? ' is-selected' : ''}`}
-          onClick={() => dispatch({ type: 'select', blockId: LAYOUT_SELECTION })}
+          onClick={() => {
+            onClearMultiSelect?.()
+            dispatch({ type: 'select', blockId: LAYOUT_SELECTION })
+          }}
         >
           <span className="outline-text">版式设置</span>
         </button>
@@ -73,54 +113,88 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
           {blocks.flatMap((block, topIndex) => [
             <li
               key={block.id}
+              data-drag-id={block.id}
               data-top-index={topIndex}
               {...(block.type === 'composite' ? { 'data-composite-id': block.id, 'data-item-count': block.items.length } : {})}
-              className={drag?.blockId === block.id ? 'is-dragging' : undefined}
+              className={[drag?.blockId === block.id ? 'is-dragging' : '', cutBlockIds?.has(block.id) ? 'is-cut' : ''].filter(Boolean).join(' ') || undefined}
             >
-              <button
-                type="button"
-                className={`outline-item outline-item--${block.type}${block.id === selectedBlockId ? ' is-selected' : ''}`}
-                title="点击选中；按住拖动可调整顺序；右键快捷设置"
-                onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block), block.type === 'question')}
-                onContextMenu={menu(block.id)}
-                onClick={() => {
-                  if (consumeClick()) return
-                  dispatch({ type: 'select', blockId: block.id })
-                  onReveal?.(block.id)
-                }}
-              >
-                {block.type === 'question' && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
-                <span className="outline-text">{describe(block)}</span>
-                {block.type === 'question' && <Difficulty {...difficultyOf(block.question, preset)} />}
-              </button>
+              {(() => {
+                const isQ = block.type === 'question'
+                const isMultiItem = isQ && (multiSet?.has(block.id) ?? false)
+                const isSel = block.id === selectedBlockId || isMultiItem
+                return (
+                  <button
+                    type="button"
+                    className={`outline-item outline-item--${block.type}${isSel ? ' is-selected' : ''}${isMultiItem ? ' is-multi-selected' : ''}`}
+                    title={isQ ? '点击选中（支持 Shift 连选、Ctrl 多选）；长按拖动排序；右键快捷或批量操作' : '点击选中；长按拖动可调整顺序；右键快捷设置'}
+                    onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block), isQ)}
+                    onMouseDown={(e) => {
+                      if (isQ && e.shiftKey) e.preventDefault()
+                    }}
+                    onContextMenu={menu(block.id, isQ)}
+                    onClick={(e) => {
+                      if (consumeClick()) return
+                      if (isQ && onSelectQuestion !== undefined) {
+                        onSelectQuestion(block.id, { shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey })
+                      } else {
+                        onClearMultiSelect?.()
+                        dispatch({ type: 'select', blockId: block.id })
+                        onReveal?.(block.id)
+                      }
+                    }}
+                  >
+                    {isQ && <span className="outline-no">{questionNumbers.get(block.id) ?? ''}</span>}
+                    <span className="outline-text">{describe(block)}</span>
+                    {isQ && <Difficulty {...difficultyOf(block.question, preset)} />}
+                  </button>
+                )
+              })()}
             </li>,
             // 综合题的小题：缩进列在综合题之下；拖综合题时一起移动，也可单独拖进拖出
             ...(block.type === 'composite'
-              ? block.items.map((item, itemIndex) => (
-                  <li
-                    key={item.id}
-                    data-parent-id={block.id}
-                    data-item-index={itemIndex}
-                    className={drag?.blockId === block.id || drag?.blockId === item.id ? 'outline-nested is-dragging' : 'outline-nested'}
-                  >
-                    <button
-                      type="button"
-                      className={`outline-item outline-item--question outline-item--nested${item.id === selectedBlockId ? ' is-selected' : ''}`}
-                      title="点击选中；按住拖动可移到别处（可拖出或拖进综合题）；右键快捷设置"
-                      onPointerDown={(e) => onItemPointerDown(e, item.id, describe(item), true)}
-                      onContextMenu={menu(item.id)}
-                      onClick={() => {
-                        if (consumeClick()) return
-                        dispatch({ type: 'select', blockId: item.id })
-                        onReveal?.(item.id)
-                      }}
+              ? block.items.map((item, itemIndex) => {
+                  const isMultiItem = multiSet?.has(item.id) ?? false
+                  const isSel = item.id === selectedBlockId || isMultiItem
+                  return (
+                    <li
+                      key={item.id}
+                      data-drag-id={item.id}
+                      data-parent-id={block.id}
+                      data-item-index={itemIndex}
+                      className={[
+                        'outline-nested',
+                        drag?.blockId === block.id || drag?.blockId === item.id ? 'is-dragging' : '',
+                        cutBlockIds?.has(item.id) || cutBlockIds?.has(block.id) ? 'is-cut' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                     >
-                      <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>
-                      <span className="outline-text">{describe(item)}</span>
-                      <Difficulty {...difficultyOf(item.question, preset)} />
-                    </button>
-                  </li>
-                ))
+                      <button
+                        type="button"
+                        className={`outline-item outline-item--question outline-item--nested${isSel ? ' is-selected' : ''}${isMultiItem ? ' is-multi-selected' : ''}`}
+                        title="点击选中（支持 Shift 连选、Ctrl 多选）；长按拖动可移出或移进综合题；右键快捷或批量操作"
+                        onPointerDown={(e) => onItemPointerDown(e, item.id, describe(item), true)}
+                        onMouseDown={(e) => {
+                          if (e.shiftKey) e.preventDefault()
+                        }}
+                        onContextMenu={menu(item.id, true)}
+                        onClick={(e) => {
+                          if (consumeClick()) return
+                          if (onSelectQuestion !== undefined) {
+                            onSelectQuestion(item.id, { shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey })
+                          } else {
+                            dispatch({ type: 'select', blockId: item.id })
+                            onReveal?.(item.id)
+                          }
+                        }}
+                      >
+                        <span className="outline-no">{questionNumbers.get(item.id) ?? ''}</span>
+                        <span className="outline-text">{describe(item)}</span>
+                        <Difficulty {...difficultyOf(item.question, preset)} />
+                      </button>
+                    </li>
+                  )
+                })
               : [])
           ])}
           {drag !== null && <div className={drag.nested ? 'outline-drop-line is-nested' : 'outline-drop-line'} style={{ top: `${drag.lineTop}px` }} aria-hidden="true" />}
@@ -139,25 +213,44 @@ export function Outline({ blocks, questionNumbers, selectedBlockId, dispatch, pr
       </p>
 
       <div className="outline-actions">
+        {multiSet !== null && <span className="outline-multi-hint">已选 {selectedQuestionIds.length} 题</span>}
         <button
           type="button"
-          disabled={selectedIndex <= 0}
+          disabled={multiSet !== null || selectedIndex <= 0}
           onClick={() => selectedBlockId && dispatch({ type: 'move-block', blockId: selectedBlockId, delta: -1 })}
         >
           上移
         </button>
         <button
           type="button"
-          disabled={selectedIndex === -1 || selectedIndex >= siblings.length - 1}
+          disabled={multiSet !== null || selectedIndex === -1 || selectedIndex >= siblings.length - 1}
           onClick={() => selectedBlockId && dispatch({ type: 'move-block', blockId: selectedBlockId, delta: 1 })}
         >
           下移
         </button>
+        {multiSet !== null && onBatchQuestionMenu !== undefined && (
+          <button
+            type="button"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              onBatchQuestionMenu([...selectedQuestionIds], r.left, r.top)
+            }}
+          >
+            批量操作
+          </button>
+        )}
         <button
           type="button"
           className="danger"
-          disabled={selectedIndex === -1}
-          onClick={() => selectedBlockId && dispatch({ type: 'delete-block', blockId: selectedBlockId })}
+          disabled={multiSet === null && selectedIndex === -1}
+          onClick={() => {
+            if (multiSet !== null) {
+              dispatch({ type: 'delete-blocks', blockIds: [...selectedQuestionIds] })
+              onClearMultiSelect?.()
+            } else if (selectedBlockId) {
+              dispatch({ type: 'delete-block', blockId: selectedBlockId })
+            }
+          }}
         >
           删除
         </button>
