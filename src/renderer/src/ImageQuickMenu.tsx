@@ -183,6 +183,18 @@ export function FigureQuickMenu(props: {
         <button type="button" disabled={figureIndex === figures.length - 1} onClick={() => move(1)} title="与后一张图交换顺序">
           ↓ 后移
         </button>
+        {actions !== null && (
+          <button
+            type="button"
+            title="把这张图转移到其他题目、知识点或答案/解析"
+            onClick={() => {
+              actions.openTransfer(ref)
+              onClose()
+            }}
+          >
+            转移到…
+          </button>
+        )}
         <button
           type="button"
           className="danger"

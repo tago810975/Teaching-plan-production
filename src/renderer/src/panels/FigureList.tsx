@@ -240,6 +240,15 @@ export function FigureList({
               <button
                 type="button"
                 className="figure-btn"
+                disabled={actions === null || blockId === undefined}
+                onClick={() => actions?.openTransfer(refOf(i))}
+                title="把这张图转移到其他题目、知识点或答案/解析"
+              >
+                转移…
+              </button>
+              <button
+                type="button"
+                className="figure-btn"
                 disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
                 onClick={() => actions?.openBatch({ refs: [refOf(i)], redraw: true })}
                 title="交给 WorkBuddy 或 Antigravity（反重力）重绘为 SVG；收到后与原图对照，选用哪一个"

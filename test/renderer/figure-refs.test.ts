@@ -16,7 +16,7 @@ function sample(): Block[] {
   return [
     { id: 'k', type: 'knowledge', title: '加速电场', paragraphs: [], figures: [fig('k-0')] } as unknown as Block,
     { id: 'q', type: 'question', question: q } as Block,
-    { id: 'c', type: 'composite', title: '综合题', background: [], figures: [fig('c-0')], items: [{ id: 'ci', question: item }] } as unknown as Block
+    { id: 'c', type: 'composite', title: '综合题', background: [], figures: [fig('c-0')], items: [{ id: 'ci', type: 'question', question: item }] } as unknown as Block
   ]
 }
 
@@ -58,5 +58,32 @@ describe('工程中的插图', () => {
     s = reduceAt(s, { type: 'undo' }, 5000)
     expect(listFigures(s.bundle.project.blocks).slice(0, 2).map((e) => e.figure.assetId)).toEqual(['k-0', 'q-0'])
     void newId
+  })
+
+  it('转移插图（move-figure）：切换到目标块与插图组并一步撤销', () => {
+    const bundle = createEmptyBundle()
+    bundle.project.blocks = sample()
+    let s = initEditorState(bundle)
+    s = { ...s, selectedBlockId: 'q' }
+
+    // 把第 1 道题的题图 q-0 移到综合题小题 ci 的解析插图组
+    s = reduceAt(s, { type: 'move-figure', from: { blockId: 'q', figureIndex: 0 }, to: { blockId: 'ci', list: 'analysis' } }, 1000)
+    expect(s.selectedBlockId).toBe('ci')
+    expect(s.focusRequest).toEqual({
+      blockId: 'ci',
+      field: 'figure:analysis:0',
+      paragraph: 0,
+      before: '',
+      after: '',
+      nonce: s.revision
+    })
+    const movedList = listFigures(s.bundle.project.blocks)
+    expect(movedList.find((e) => e.figure.assetId === 'q-0')?.ref).toEqual({ blockId: 'ci', figureIndex: 0, list: 'analysis' })
+    expect(movedList.filter((e) => e.ref.blockId === 'q' && e.list === 'figures')).toHaveLength(0)
+
+    // 一步撤销：插图回到原题原组，selectedBlockId 恢复为 q
+    s = reduceAt(s, { type: 'undo' }, 5000)
+    expect(s.selectedBlockId).toBe('q')
+    expect(listFigures(s.bundle.project.blocks).find((e) => e.figure.assetId === 'q-0')?.ref).toEqual({ blockId: 'q', figureIndex: 0 })
   })
 })

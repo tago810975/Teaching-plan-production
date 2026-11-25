@@ -507,15 +507,15 @@ function buildQuestion(
   }
 
   // 防跨页。整题同页：除最后一段外都“与下段同页”，所有段“段中不分页”。
-  // 允许跨页：只把题目主体连在一起（不会出现题干在页底、选项在下一页），答案与详解可以跨页。
-  // 作答留白无论哪种设置都与前一段同页。
+  // 允许跨页：题干（及题干下方配图）与第一个选项行保持同页，避免题干孤零零留在页底；
+  // 多个选项行之间，以及答案与详解均可跨页。作答留白无论哪种设置都与前一段同页。
   const keepAll = q.layout.keepTogether === 'always' || (q.layout.keepTogether === 'auto' && keepTogetherByDefault)
   const keptCount = keepAll ? paras.length : bodyCount
   paras.forEach((p, i) => {
     const nextIsSpacer = paras[i + 1]?.spacerTwip !== undefined
     if (i < keptCount) {
       p.keepLines = true
-      if (i < keptCount - 1) p.keepNext = true
+      if (i < keptCount - 1 && (keepAll || p.style !== 'option')) p.keepNext = true
     }
     if (nextIsSpacer) p.keepNext = true
   })

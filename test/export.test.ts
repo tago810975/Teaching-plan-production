@@ -217,3 +217,29 @@ describe('答案、解析插图导出', () => {
     expect(s.doc).not.toContain('<w:drawing>')
   })
 })
+
+describe('允许跨页导出：选择题多行选项不强行同页', () => {
+  it('题干保留 keepNext，多行选项段落不写 keepNext 但保留 keepLines', async () => {
+    const bundle = createEmptyBundle()
+    bundle.project.blocks = [{
+      id: newId(),
+      type: 'question',
+      question: createQuestion({
+        stem: [para('跨页选择题题干')],
+        options: ['A', 'B', 'C', 'D'].map((label, i) => ({ label, content: para(`选项第${i + 1}行`) })),
+        layout: { optionColumns: 1, keepTogether: 'never' }
+      })
+    }]
+    const { doc } = await exportParts(bundle, 'student')
+    const paras = doc.match(/<w:p>.*?<\/w:p>/gs) ?? []
+    const stem = paras.find((p) => p.includes('跨页选择题题干'))!
+    const optA = paras.find((p) => p.includes('选项第1行'))!
+    const optB = paras.find((p) => p.includes('选项第2行'))!
+    expect(stem).toContain('<w:keepNext/>')
+    expect(stem).toContain('<w:keepLines/>')
+    expect(optA).not.toContain('<w:keepNext/>')
+    expect(optA).toContain('<w:keepLines/>')
+    expect(optB).not.toContain('<w:keepNext/>')
+    expect(optB).toContain('<w:keepLines/>')
+  })
+})

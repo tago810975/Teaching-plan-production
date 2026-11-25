@@ -8,12 +8,12 @@
 import { createEmptyBundle } from '@core/model/factory'
 import type { FigureRef, InlineRef } from '@core/document/ir'
 import type { Asset, Block, Inline, PageHeader, ProjectBundle, ProjectLayout, QuestionBlock, QuestionFigure, RichParagraph, Variant } from '@core/model/types'
-import { withFigures } from '@core/model/figure-lists'
+import { moveFigure, withFigures, type MoveFigureTarget } from '@core/model/figure-lists'
 import { formatParagraphRange, type FormatOp, type InlinePos } from '@core/model/markup'
 import { setColumnWidths } from '@core/model/table'
 import { moveQuestion, moveQuestionAt, moveQuestionTo, type QuestionDrop } from '@core/model/move-question'
 import { mergeQuestionsToComposite, splitComposite } from '@core/model/composite-ops'
-import { replaceFigureAssets, type FigureAssetChange } from '@core/model/figure-refs'
+import { figureFieldId, listKeyOf, replaceFigureAssets, type FigureAssetChange } from '@core/model/figure-refs'
 
 /** 选中页眉时 selectedBlockId 的取值 */
 export const HEADER_SELECTION = '#header'
@@ -135,6 +135,8 @@ export type EditorAction =
   | { type: 'set-link-option-images'; value: boolean }
   /** 修改某张题图 / 插图（在预览中缩放、拖动后） */
   | { type: 'update-figure'; ref: FigureRef; patch: Partial<QuestionFigure> }
+  /** 把一张插图转移到另一道题 / 另一个内容块或插图组（一步撤销） */
+  | { type: 'move-figure'; from: FigureRef; to: MoveFigureTarget }
   /** 替换（inline 为 null 时删除）某个行内内容，如在预览中编辑的公式 */
   | { type: 'replace-inline'; ref: InlineRef; inline: Inline | null }
   /** 添加图片资源（题图等），不改变内容 */
@@ -538,6 +540,24 @@ function baseReducer(state: EditorState, action: Exclude<EditorAction, { type: '
       )
       // 属性面板中的宽度等数值随之更新
       return { ...next, revision: state.revision + 1 }
+    }
+    case 'move-figure': {
+      const { blocks, movedRef } = moveFigure(state.bundle.project.blocks, action.from, action.to)
+      if (movedRef === null) return state
+      const next = withBlocks(state, () => blocks)
+      return {
+        ...next,
+        selectedBlockId: movedRef.blockId,
+        revision: state.revision + 1,
+        focusRequest: {
+          blockId: movedRef.blockId,
+          field: figureFieldId(listKeyOf(movedRef), movedRef.figureIndex),
+          paragraph: 0,
+          before: '',
+          after: '',
+          nonce: state.revision + 1
+        }
+      }
     }
     case 'replace-inline': {
       const { ref, inline } = action

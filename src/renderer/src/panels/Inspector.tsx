@@ -287,8 +287,8 @@ function LayoutForm({ layout, dispatch, preset }: { layout: ProjectLayout; dispa
       <fieldset className="group">
         <legend>题目</legend>
         <p className="field-hint">
-          整题同页时，排不下的题目会整道移到下一页，前一页可能留下空白；允许跨页时，题干、题图与选项仍保持在同一页，
-          只有答案和详解可以接到下一页。
+          整题同页时，排不下的题目会整道移到下一页，前一页可能留下空白；允许跨页时，题干与首个选项行保持同页，
+          其余选项及答案、详解均可跨页。
         </p>
         {row('keepQuestionTogether', 'teacher', '教案', '整题同页')}
         {row('keepQuestionTogether', 'student', '学案', '整题同页')}

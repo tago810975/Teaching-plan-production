@@ -18,6 +18,8 @@ export interface FigureActions {
   sharpen: (refs: FigureRef[], mode?: EnhanceMode, options?: EnhanceOptions) => Promise<{ done: number; skipped: number }>
   /** 打开“手动调色”（亮度、对比度、饱和度） */
   openAdjust: (ref: FigureRef) => void
+  /** 打开“转移插图”，把当前插图移到其他题目 / 内容块 / 插图组 */
+  openTransfer: (ref: FigureRef) => void
   /** 预览滚动到这张图（属性栏中单击插图时），并短暂高亮 */
   reveal: (ref: FigureRef) => void
   /** 打开“批量处理插图”；给出 refs 时只勾选这些，redraw 为真时立即交给 WorkBuddy 重绘 */

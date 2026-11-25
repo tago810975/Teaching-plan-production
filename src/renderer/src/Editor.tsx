@@ -17,6 +17,7 @@ import { BatchQuestionQuickMenu, BlockQuickMenu } from './BlockQuickMenu'
 import { ContextMenu } from './home/ContextMenu'
 import { figureLabel } from './figures/FigureBatchDialog'
 import { FigureAdjustDialog } from './figures/FigureAdjustDialog'
+import { FigureTransferDialog } from './figures/FigureTransferDialog'
 import { FigureActionsContext, sharpenAsset, type FigureActions } from './figures/figure-actions'
 import { FigureClickContext } from './preview/image-menu'
 import { figureFieldId, figureRefKey, listFigures, listKeyOf } from '@core/model/figure-refs'
@@ -376,6 +377,8 @@ function EditorBody({
   onOpenFigureBatchRef.current = onOpenFigureBatch
   // 调整图片（亮度、对比度、灰度）
   const [adjustRef, setAdjustRef] = useState<FigureRef | null>(null)
+  // 转移插图（换到其他题目、知识点或答案/解析）
+  const [transferRef, setTransferRef] = useState<FigureRef | null>(null)
   // 公式字母正体 / 斜体：这份教学案的版式设置优先，没有设置时用本机设置（预览与导出一致）
   const machineUpright = useMathUpright()
   const mathUpright = project.layout.mathUpright ?? machineUpright
@@ -562,6 +565,7 @@ function EditorBody({
       },
       openBatch: (options) => onOpenFigureBatchRef.current(options ?? {}),
       openAdjust: (ref) => setAdjustRef(ref),
+      openTransfer: (ref) => setTransferRef(ref),
       reveal: (ref) => {
         const root = rootRef.current
         const fig = root?.querySelector<HTMLElement>(`.page [data-figure="${CSS.escape(figureRefKey(ref))}"]`)
@@ -839,6 +843,28 @@ function EditorBody({
               onApply={(next) => {
                 dispatch({ type: 'replace-figure-assets', assets: [next], changes: [{ ref: entry.ref, assetId: next.id }] })
                 setAdjustRef(null)
+              }}
+            />
+          )
+        })()}
+      {transferRef !== null &&
+        (() => {
+          const entry = listFigures(project.blocks).find(
+            (e) => e.ref.blockId === transferRef.blockId && e.ref.figureIndex === transferRef.figureIndex && (e.ref.list ?? '') === (transferRef.list ?? '')
+          )
+          if (entry === undefined) return null
+          return (
+            <FigureTransferDialog
+              blocks={project.blocks}
+              assets={state.bundle.assets}
+              questionNumbers={questionNumbers}
+              from={entry.ref}
+              assetId={entry.figure.assetId}
+              sourceLabel={figureLabel(entry, questionNumbers)}
+              onClose={() => setTransferRef(null)}
+              onConfirm={(to) => {
+                dispatch({ type: 'move-figure', from: entry.ref, to })
+                setTransferRef(null)
               }}
             />
           )

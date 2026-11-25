@@ -5971,6 +5971,86 @@ canvas.checker {
 .figure-adjust {
   width: min(900px, 94vw);
 }
+/* ---------- 转移插图 ---------- */
+.figure-transfer {
+  width: min(480px, 94vw);
+}
+.figure-transfer-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--panel-raised);
+}
+.figure-transfer-thumb {
+  width: 72px;
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.figure-transfer-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.figure-transfer-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.figure-transfer-current-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.figure-transfer-current {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  word-break: break-word;
+}
+.figure-transfer-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.figure-transfer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.figure-transfer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.figure-transfer-field select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+}
+.figure-transfer-field select:focus {
+  outline: none;
+  border-color: var(--focus);
+}
 .figure-adjust-compare {
   display: grid;
   grid-template-columns: 1fr 1fr;

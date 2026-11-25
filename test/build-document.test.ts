@@ -180,6 +180,80 @@ describe('版式参数', () => {
     expect(buildDocument(p, 'teacher').paragraphs[2]?.keepLines).toBe(true)
   })
 
+  it('允许跨页时选择题的多行选项可以跨页，题干仍与首个选项行同页', () => {
+    const baseOpts = ['A', 'B', 'C', 'D'].map((label) => ({ label, content: para('选项内容') }))
+    const oneCol = createQuestion({
+      stem: [para('题干')],
+      options: baseOpts,
+      layout: { optionColumns: 1, keepTogether: 'never' }
+    })
+    const proj = projectWith(oneCol)
+    proj.layout.keepQuestionTogether.student = false
+    const ir = buildDocument(proj, 'student')
+    expect(ir.paragraphs.map((p) => [p.style, p.keepNext ?? false, p.keepLines ?? false])).toEqual([
+      ['question', true, true],
+      ['option', false, true],
+      ['option', false, true],
+      ['option', false, true],
+      ['option', false, true]
+    ])
+    // 5 段各高 30，页面高 100 时应拆成 [0, 1, 2] 和 [3, 4] 两页，而不是整题推到第 2 页
+    const pages = paginate(
+      ir.paragraphs.map((p) => ({ height: 30, keepNext: p.keepNext, keepLines: p.keepLines })),
+      100
+    )
+    expect(pages.map((pg) => pg.map((s) => s.index))).toEqual([
+      [0, 1, 2],
+      [3, 4]
+    ])
+
+    // 两列排布时（2 行选项）同样不在选项行之间强行同页
+    const twoCol = createQuestion({
+      stem: [para('题干')],
+      options: baseOpts,
+      layout: { optionColumns: 2, keepTogether: 'never' }
+    })
+    const ir2 = buildDocument(projectWith(twoCol), 'student')
+    expect(ir2.paragraphs.map((p) => [p.style, p.keepNext ?? false])).toEqual([
+      ['question', true],
+      ['option', false],
+      ['option', false]
+    ])
+  })
+
+  it('整题同页时多行选项保持为一个整体，不拆到两页', () => {
+    const q = createQuestion({
+      stem: [para('题干')],
+      options: ['A', 'B', 'C', 'D'].map((label) => ({ label, content: para('选项内容') })),
+      layout: { optionColumns: 1, keepTogether: 'always' }
+    })
+    const ir = buildDocument(projectWith(q), 'student')
+    expect(ir.paragraphs.map((p) => p.keepNext ?? false)).toEqual([true, true, true, true, false])
+    const pages = paginate(
+      [{ height: 40 }, ...ir.paragraphs.map((p) => ({ height: 30, keepNext: p.keepNext, keepLines: p.keepLines }))],
+      160
+    )
+    // 前面已有 40，整题 150 放不下，整道题（1..5）整体推到下一页
+    expect(pages.map((pg) => pg.map((s) => s.index))).toEqual([[0], [1, 2, 3, 4, 5]])
+  })
+
+  it('允许跨页且有作答留白时，最后一项仍与留白同页，前面选项之间可跨页', () => {
+    const q = createQuestion({
+      stem: [para('题干')],
+      options: ['A', 'B', 'C', 'D'].map((label) => ({ label, content: para('选项内容') })),
+      layout: { optionColumns: 1, keepTogether: 'never', studentSpaceLines: 3 }
+    })
+    const ir = buildDocument(projectWith(q), 'student')
+    expect(ir.paragraphs.map((p) => [p.style, p.keepNext ?? false])).toEqual([
+      ['question', true],
+      ['option', false],
+      ['option', false],
+      ['option', false],
+      ['option', true],
+      ['body', false]
+    ])
+  })
+
   it('右侧题图挂在题干段落上', async () => {
     const { project } = await createDemoBundle()
     const ir = buildDocument(project, 'student')
