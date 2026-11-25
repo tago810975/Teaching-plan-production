@@ -165,13 +165,13 @@ export function FigureQuickMenu(props: {
           <button
             type="button"
             disabled={vector}
-            title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
+            title="交给 WorkBuddy 或 Antigravity（反重力）重绘为 SVG；收到后与原图对照，选用哪一个"
             onClick={() => {
               actions.openBatch({ refs: [ref], redraw: true })
               onClose()
             }}
           >
-            WorkBuddy 重绘
+            AI 重绘
           </button>
         </div>
       )}

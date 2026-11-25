@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cloneBlocksWithNewIds, collectBlocksByIds, extractBlockAssets } from '@core/model/block-clipboard'
 import { createComposite, createEmptyBundle, createKnowledge, createQuestion, para } from '@core/model/factory'
-import type { Asset, QuestionBlock } from '@core/model/types'
+import type { Asset, Block, QuestionBlock } from '@core/model/types'
 import { clearBlockClipboard, getBlockClipboard, setBlockClipboard, takeBlocksForPaste } from '../../src/renderer/src/state/blockClipboard'
 import { initEditorState, reduceAt } from '../../src/renderer/src/state/store'
 
@@ -227,5 +227,81 @@ describe('跨学案剪贴板与下方粘贴', () => {
     expect(stateB.bundle.assets['img-fig']).toBeDefined()
     expect(stateA.bundle.project.blocks).toHaveLength(0)
     expect(getBlockClipboard()).toBeNull()
+  })
+
+  it('标题、知识梳理栏目、带图知识点、正文段落与作业单均支持复制、剪切与跨学案粘贴', () => {
+    clearBlockClipboard()
+    const title: Block = { id: 't1', type: 'title', text: '第 1 讲 磁场' }
+    const section: Block = { id: 'sec-know', type: 'section', text: '知识梳理' }
+    const topic: Block = { id: 'top1', type: 'topic', text: '考点一、洛伦兹力' }
+    const knowledge: Block = {
+      ...createKnowledge({ id: 'k-fig', title: '左手定则', content: [para('四指指向正电荷运动方向')] }),
+      figures: [{ assetId: 'img-know', widthEmu: 200, heightEmu: 150, placement: 'below' }]
+    }
+    const paragraph: Block = {
+      id: 'p-tbl',
+      type: 'paragraph',
+      shaded: true,
+      content: [
+        {
+          inlines: [
+            {
+              type: 'table',
+              rows: [{ cells: [{ content: [{ inlines: [{ type: 'image', assetId: 'img-para-tbl', widthEmu: 90, heightEmu: 90 }] }] }] }]
+            }
+          ]
+        }
+      ]
+    }
+    const worksheet: Block = { id: 'ws1', type: 'worksheet', title: '课后作业', fields: ['姓名', '正确率'] }
+    const allAssets: Record<string, Asset> = {
+      'img-know': fakeAsset('img-know'),
+      'img-para-tbl': fakeAsset('img-para-tbl')
+    }
+
+    const bundleA = createEmptyBundle()
+    bundleA.project.blocks = [title, section, topic, knowledge, paragraph, worksheet]
+    bundleA.assets = allAssets
+    let stateA = reduceAt(initEditorState(bundleA), { type: 'load', bundle: bundleA, filePath: '/a.tplan' }, 0)
+
+    // 多选“知识梳理栏目 + 知识点”复制并跨学案粘贴
+    const pickedForCopy = collectBlocksByIds(stateA.bundle.project.blocks, ['sec-know', 'k-fig'])
+    setBlockClipboard(pickedForCopy, stateA.bundle.assets, 'copy')
+    const bundleB = createEmptyBundle()
+    const existing: Block = { id: 'b-title', type: 'title', text: '新学案' }
+    bundleB.project.blocks = [existing]
+    let stateB = reduceAt(initEditorState(bundleB), { type: 'load', bundle: bundleB, filePath: '/b.tplan' }, 0)
+    const copyPayload = takeBlocksForPaste()!
+    stateB = reduceAt(stateB, { type: 'insert-blocks', blocks: copyPayload.blocks, assets: copyPayload.assets, afterBlockId: 'b-title' }, 1000)
+
+    expect(stateB.bundle.project.blocks.map((b) => b.type)).toEqual(['title', 'section', 'knowledge'])
+    expect(stateB.bundle.project.blocks[1]!.id).not.toBe('sec-know')
+    expect(stateB.bundle.project.blocks[2]!.id).not.toBe('k-fig')
+    expect(stateB.bundle.assets['img-know']).toBeDefined()
+    expect(stateB.bundle.assets['img-para-tbl']).toBeUndefined()
+
+    // 同文档内剪切标题/正文段落/作业单到末尾并支持一步撤销
+    const pickedForCut = collectBlocksByIds(stateA.bundle.project.blocks, ['t1', 'p-tbl', 'ws1'])
+    setBlockClipboard(pickedForCut, stateA.bundle.assets, 'cut', {
+      editorKey: 'tab-a',
+      blockIds: ['t1', 'p-tbl', 'ws1'],
+      commit: () => {}
+    })
+    const cutPayload = takeBlocksForPaste()!
+    stateA = reduceAt(
+      stateA,
+      {
+        type: 'insert-blocks',
+        blocks: cutPayload.blocks,
+        assets: cutPayload.assets,
+        afterBlockId: 'ws1',
+        removeBlockIds: ['t1', 'p-tbl', 'ws1']
+      },
+      2000
+    )
+    expect(stateA.bundle.project.blocks.map((b) => b.type)).toEqual(['section', 'topic', 'knowledge', 'title', 'paragraph', 'worksheet'])
+
+    stateA = reduceAt(stateA, { type: 'undo' }, 3000)
+    expect(stateA.bundle.project.blocks.map((b) => b.id)).toEqual(['t1', 'sec-know', 'top1', 'k-fig', 'p-tbl', 'ws1'])
   })
 })

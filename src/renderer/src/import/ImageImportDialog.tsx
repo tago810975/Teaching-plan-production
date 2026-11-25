@@ -11,7 +11,13 @@ import { FORMAT_GUIDE, importText, KNOWLEDGE_GUIDE, type TextFigure } from '@cor
 import { redrawSizes } from '@core/import/svg-redraw'
 import { createAsset } from '@core/project-file/codec'
 import type { Asset, Block } from '@core/model/types'
-import type { ImportReport } from '@shared/ipc'
+import type { ImportReport, McpClientId, McpClientStatus } from '@shared/ipc'
+import type {
+  ImageImportRedrawProgress,
+  ImageImportSessionPatch,
+  ImageImportSummary,
+  ImageImportWbState
+} from '../state/imageImportSession'
 import { enhance, readPixels, toObjectUrl, toPng } from './enhance-client'
 
 interface SourceImage {
@@ -52,6 +58,16 @@ interface Props {
   /** 添加插图时：插图的名称（如“题图”“答案插图”） */
   figureTitle?: string
   presetId: string | undefined
+  /** 收起到后台等待 AI 返回时为 true：关闭模态层但保留窗口内所有图片、框选与监听 */
+  minimized?: boolean
+  onMinimize?: () => void
+  /** 当前导入目标教学案名；null 表示已无打开的教学案 */
+  targetTitle?: string | null
+  /** 原标签页关闭后，目标是否回退到了其他标签页 */
+  targetFellBack?: boolean
+  /** 已有进行中任务时从别处重新触发导入的提示 */
+  reopenHint?: string | null
+  onSessionUpdate?: (patch: ImageImportSessionPatch) => void
   onCancel: () => void
   onImport?: (blocks: Block[], assets: Record<string, Asset>, report: ImportReport) => void
   onAddFigures?: (figures: AddedFigure[]) => void
@@ -88,7 +104,42 @@ async function loadPixels(url: string, width: number, height: number): Promise<{
 
 const scaleRect = (r: Rect, k: number): Rect => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k })
 
-export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', presetId, onCancel, onImport, onAddFigures }: Props) {
+function summarizeText(
+  raw: string,
+  nums: ReadonlyMap<string, number>,
+  textOpts: { presetId?: string; asKnowledge?: boolean }
+): ImageImportSummary | null {
+  if (raw.trim() === '') return null
+  const figures = new Map<number, TextFigure>(
+    [...nums.values()].map((n) => [n, { asset: { id: `box-${n}`, mime: 'image/png', data: new Uint8Array() }, widthEmu: 1, heightEmu: 1 }])
+  )
+  try {
+    const res = importText(raw, { ...textOpts, figures })
+    return {
+      questionCount: res.questionCount,
+      ...(res.knowledgeCount !== undefined ? { knowledgeCount: res.knowledgeCount } : {}),
+      blockCount: res.blocks.length,
+      issueCount: res.issues.length
+    }
+  } catch {
+    return { questionCount: 0, blockCount: 0, issueCount: 1 }
+  }
+}
+
+export function ImageImportDialog({
+  kind = 'questions',
+  figureTitle = '插图',
+  presetId,
+  minimized = false,
+  onMinimize,
+  targetTitle,
+  targetFellBack = false,
+  reopenHint = null,
+  onSessionUpdate,
+  onCancel,
+  onImport,
+  onAddFigures
+}: Props) {
   const figuresOnly = kind === 'figures'
   const asKnowledge = kind === 'knowledge'
   const guide = asKnowledge ? KNOWLEDGE_GUIDE : FORMAT_GUIDE
@@ -111,18 +162,31 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
   // 让 WorkBuddy 重绘为 SVG：交出时的图号 → 框；收到的 SVG；选用 SVG 的框
   const [redraw, setRedraw] = useState<{ taskId: string; byNumber: Map<number, string>; total: number; note?: string } | null>(null)
   const [svgs, setSvgs] = useState<Map<string, string>>(new Map())
+  const svgsRef = useRef<Map<string, string>>(svgs)
+  svgsRef.current = svgs
   const [useSvg, setUseSvg] = useState<Set<string>>(new Set())
   // 要交给 WorkBuddy 重绘的框（在框上点“重绘”勾选；本来就清晰的图不用重绘）
   const [redrawPick, setRedrawPick] = useState<Set<string>>(new Set())
   const redrawRef = useRef<typeof redraw>(null)
   redrawRef.current = redraw
-  // 交给 WorkBuddy 识别：等待中的任务、状态提示
-  const [wb, setWb] = useState<{ state: 'idle' | 'need-connect' | 'waiting' | 'received'; taskId?: string; note?: string }>({ state: 'idle' })
+  // 交给 WorkBuddy / Antigravity 识别：等待中的任务、状态提示
+  const [wb, setWb] = useState<{ state: ImageImportWbState; taskId?: string; note?: string; clients?: McpClientStatus[] }>({ state: 'idle' })
   const wbTask = useRef<string | null>(null)
+  const onSessionUpdateRef = useRef(onSessionUpdate)
+  onSessionUpdateRef.current = onSessionUpdate
+  const optsRef = useRef(opts)
+  optsRef.current = opts
+  const numbersRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
+    const el = dialogRef.current
+    if (el === null) return
+    if (minimized) {
+      if (el.open) el.close()
+    } else if (!el.open) {
+      el.showModal()
+    }
+  }, [minimized])
   // 关闭时回收图片地址
   const urlsRef = useRef<string[]>([])
   useEffect(() => () => urlsRef.current.forEach((u) => URL.revokeObjectURL(u)), [])
@@ -173,6 +237,8 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
         if (r.taskId !== wbTask.current) return
         setText(r.text)
         setWb({ state: 'received', taskId: r.taskId })
+        const receivedSummary = summarizeText(r.text, numbersRef.current, optsRef.current)
+        onSessionUpdateRef.current?.({ wbState: 'received', receivedSummary, arrived: 'recognition' })
       }),
     []
   )
@@ -192,8 +258,15 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
         if (cur === null || r.taskId !== cur.taskId) return
         const boxId = cur.byNumber.get(r.figure)
         if (boxId === undefined) return
-        setSvgs((m) => new Map(m).set(boxId, r.svg))
+        const nextSvgs = new Map(svgsRef.current).set(boxId, r.svg)
+        svgsRef.current = nextSvgs
+        setSvgs(nextSvgs)
         setUseSvg((s) => new Set(s).add(boxId))
+        const received = [...cur.byNumber.values()].filter((id) => nextSvgs.has(id)).length
+        onSessionUpdateRef.current?.({
+          redrawProgress: { received, total: cur.total },
+          ...(received >= cur.total ? { arrived: 'redraw' as const } : {})
+        })
       }),
     []
   )
@@ -202,12 +275,16 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
     setError(null)
     const status = await window.api.workbuddyStatus()
     if (!status.connected) {
-      setWb({ state: 'need-connect', note: status.found ? undefined : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）。' })
+      setWb({
+        state: 'need-connect',
+        clients: status.clients,
+        ...(status.found ? {} : { note: '没有找到 WorkBuddy 或 Antigravity（反重力），请先安装并打开一次其中任意一个。' })
+      })
       return
     }
     try {
       const byNumber = new Map<number, string>()
-      const figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number }> = []
+      const figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number; arrowWidth: number; arrowHeight: number }> = []
       for (const b of boxes.filter((x) => redrawPick.has(x.id))) {
         const n = numbers.get(b.id)
         const src = images.find((i) => i.key === b.image)
@@ -223,10 +300,10 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
       const taskId = await window.api.workbuddyRedrawStart(figures)
       setRedraw({ taskId, byNumber, total: figures.length })
     } catch (e) {
-      setError(`交给 WorkBuddy 失败：${e instanceof Error ? e.message : String(e)}`)
+      setError(`交给 AI 重绘失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }
-  // 等待期间增删了插图框：告诉 WorkBuddy 插图数
+  // 等待期间增删了插图框：告诉 MCP 客户端插图数
   useEffect(() => {
     if (wbTask.current !== null) void window.api.workbuddyUpdate(wbTask.current, boxes.length)
   }, [boxes.length])
@@ -235,7 +312,11 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
     setError(null)
     const status = await window.api.workbuddyStatus()
     if (!status.connected) {
-      setWb({ state: 'need-connect', note: status.found ? undefined : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）。' })
+      setWb({
+        state: 'need-connect',
+        clients: status.clients,
+        ...(status.found ? {} : { note: '没有找到 WorkBuddy 或 Antigravity（反重力），请先安装并打开一次其中任意一个。' })
+      })
       return
     }
     try {
@@ -245,21 +326,28 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
       wbTask.current = taskId
       setWb({ state: 'waiting', taskId })
     } catch (e) {
-      setError(`交给 WorkBuddy 失败：${e instanceof Error ? e.message : String(e)}`)
+      setError(`交给 AI 识别失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  const connectWorkBuddy = async (): Promise<void> => {
-    const r = await window.api.workbuddyConnect()
+  const connectWorkBuddy = async (client: McpClientId = 'workbuddy'): Promise<void> => {
+    const r = await window.api.workbuddyConnect(client)
     if (!r.ok) {
-      setWb({ state: 'need-connect', note: r.error })
+      setWb((prev) => ({ state: 'need-connect', note: r.error, ...(prev.clients !== undefined ? { clients: prev.clients } : {}) }))
       return
     }
-    setWb({ state: 'idle', note: '已连接。如果 WorkBuddy 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用（或重启 WorkBuddy），然后再点“交给 WorkBuddy 识别”。' })
+    setWb({
+      state: 'idle',
+      note:
+        client === 'antigravity'
+          ? '已连接 Antigravity（反重力）。请在 Antigravity 的“… → MCP Servers”刷新或新开会话确认 teaching-plan 已启用，然后再点“交给 AI 识别”。'
+          : '已连接 WorkBuddy。如果 WorkBuddy 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用（或重启 WorkBuddy），然后再点“交给 AI 识别”。'
+    })
   }
 
-  // Ctrl+V 粘贴截图
+  // Ctrl+V 粘贴截图（收起到后台时不拦截编辑器里的粘贴）
   useEffect(() => {
+    if (minimized) return
     const onPaste = (e: ClipboardEvent): void => {
       const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'))
       if (files.length === 0) return
@@ -268,7 +356,7 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
     }
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
-  }, [])
+  }, [minimized])
 
   /** 框的编号：按图片顺序，同一张图按阅读顺序 */
   const numbers = useMemo(() => {
@@ -280,6 +368,7 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
     }
     return out
   }, [images, boxes])
+  numbersRef.current = numbers
 
   // 识别结果即时检查（插图用占位资源，只看编号是否对应）
   const check = useMemo(() => {
@@ -292,7 +381,37 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
     } catch (e) {
       return { blocks: [], assets: {}, questionCount: 0, issues: [`识别出错：${e instanceof Error ? e.message : String(e)}`] }
     }
-  }, [text, numbers, presetId])
+  }, [text, numbers, presetId, asKnowledge])
+
+  const checkSummary = useMemo<ImageImportSummary | null>(() => {
+    if (check === null) return null
+    return {
+      questionCount: check.questionCount,
+      ...(check.knowledgeCount !== undefined ? { knowledgeCount: check.knowledgeCount } : {}),
+      blockCount: check.blocks.length,
+      issueCount: check.issues.length
+    }
+  }, [check])
+
+  const redrawProgress = useMemo<ImageImportRedrawProgress | null>(
+    () =>
+      redraw === null
+        ? null
+        : {
+            received: [...redraw.byNumber.values()].filter((id) => svgs.has(id)).length,
+            total: redraw.total
+          },
+    [redraw, svgs]
+  )
+
+  useEffect(() => {
+    onSessionUpdateRef.current?.({
+      wbState: wb.state,
+      imageCount: images.length,
+      receivedSummary: checkSummary,
+      redrawProgress
+    })
+  }, [wb.state, images.length, checkSummary, redrawProgress])
 
   /** 截取一块并按选项处理，返回图片与显示尺寸 */
   const cutFigure = async (src: SourceImage, rect: Rect): Promise<AddedFigure> => {
@@ -376,6 +495,7 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
 
   const img = images.find((i) => i.key === current) ?? null
   const figureCount = boxes.length
+  const noTargetTab = !figuresOnly && onMinimize !== undefined && targetTitle === null
 
   return (
     <dialog
@@ -386,10 +506,44 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
         // 文件选择框点“取消”也会发出 cancel 事件并冒泡到这里：只响应窗口自己的（Esc），否则整个窗口连同识别结果被关掉
         if (e.target !== e.currentTarget) return
         e.preventDefault()
-        onCancel()
+        if (onMinimize !== undefined && (wb.state === 'waiting' || wb.state === 'received' || redraw !== null)) {
+          onMinimize()
+        } else {
+          onCancel()
+        }
       }}
     >
-      <h2 id="image-import-title">{figuresOnly ? `添加${figureTitle}` : asKnowledge ? '从图片导入知识点' : '从图片导入题目'}</h2>
+      <div className="image-import-head">
+        <div className="image-import-head-title">
+          <h2 id="image-import-title">{figuresOnly ? `添加${figureTitle}` : asKnowledge ? '从图片导入知识点' : '从图片导入题目'}</h2>
+          {!figuresOnly && targetTitle !== undefined && (
+            <span className="field-hint">
+              {targetTitle !== null ? `目标教学案：《${targetTitle}》` : '当前没有打开的教学案'}
+            </span>
+          )}
+        </div>
+        {!figuresOnly && onMinimize !== undefined && (
+          <button
+            type="button"
+            onClick={onMinimize}
+            title="先收起到后台，等待期间可以继续编辑教学案、切换标签页；收到结果会自动提示"
+          >
+            收起到后台
+          </button>
+        )}
+      </div>
+      {reopenHint !== null && (
+        <p className="image-import-wb" role="status">
+          {reopenHint}
+        </p>
+      )}
+      {!figuresOnly && targetFellBack && (
+        <p className="image-import-wb" role="status">
+          {targetTitle !== null
+            ? `原教学案已关闭，确认导入时将插入到《${targetTitle}》。`
+            : '当前没有打开的教学案，请先收起到后台并打开一个教学案后再导入。'}
+        </p>
+      )}
       <div className={figuresOnly ? 'image-import-body is-figures' : 'image-import-body'}>
         <section
           className="image-import-left"
@@ -424,9 +578,9 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
                 type="button"
                 disabled={boxes.every((b) => !redrawPick.has(b.id))}
                 onClick={() => void sendRedraw()}
-                title={boxes.some((b) => redrawPick.has(b.id)) ? '把勾选的插图交给 WorkBuddy 重绘为 SVG；收到后与原图逐张对照，选用哪一个' : '先在框上点“重绘”勾选要重绘的插图（本来就清晰的图不用重绘）'}
+                title={boxes.some((b) => redrawPick.has(b.id)) ? '把勾选的插图交给 WorkBuddy / Antigravity（反重力）重绘为 SVG；收到后与原图逐张对照，选用哪一个' : '先在框上点“重绘”勾选要重绘的插图（本来就清晰的图不用重绘）'}
               >
-                让 WorkBuddy 重绘（{boxes.filter((b) => redrawPick.has(b.id)).length}）
+                让 AI 重绘（{boxes.filter((b) => redrawPick.has(b.id)).length}）
               </button>
             )}
             <label className="checkbox" title="导入时去掉插图的灰底与杂点、放大 3 倍（不改变内容），打印更清楚">
@@ -497,8 +651,13 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
           {redraw !== null && (
             <div className="image-import-wb is-waiting" role="status">
               <span>
-                已交给 WorkBuddy 重绘 {redraw.total} 张插图，请到 WorkBuddy 里说：<strong>重绘插图</strong>（已收到 {[...redraw.byNumber.values()].filter((id) => svgs.has(id)).length}/{redraw.total}）
+                已交给 AI 重绘 {redraw.total} 张插图，请到 WorkBuddy 或 Antigravity（反重力）中说：<strong>重绘插图</strong>（已收到 {[...redraw.byNumber.values()].filter((id) => svgs.has(id)).length}/{redraw.total}）
               </span>
+              {onMinimize !== undefined && (
+                <button type="button" onClick={onMinimize} title="收起到后台继续编辑，收齐后自动提醒">
+                  后台等待
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -561,14 +720,15 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
             >
               {copied ? '已复制 ✓' : '复制给 AI 的指令'}
             </button>
-            <button type="button" disabled={images.length === 0} onClick={() => void sendToWorkBuddy()} title="把图片交给 WorkBuddy 识别，结果自动回到这里">
-              交给 WorkBuddy 识别
+            <button type="button" disabled={images.length === 0} onClick={() => void sendToWorkBuddy()} title="把图片交给 WorkBuddy 或 Antigravity（反重力）识别，结果自动回到这里">
+              交给 AI 识别
             </button>
           </div>
           <WorkBuddyNotice
             wb={wb}
             phrase={asKnowledge ? '导入知识点' : '导入题目'}
-            onConnect={() => void connectWorkBuddy()}
+            onConnect={(client) => void connectWorkBuddy(client)}
+            {...(onMinimize !== undefined ? { onMinimize } : {})}
             onCancel={() => {
               if (wbTask.current !== null) void window.api.workbuddyCancel(wbTask.current)
               wbTask.current = null
@@ -619,7 +779,7 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
             {busy ? '正在添加…' : boxes.length > 0 ? `添加 ${boxes.length} 张${figureTitle}` : `整张添加为${figureTitle}`}
           </button>
         ) : (
-          <button type="button" className="primary" disabled={busy || check === null || check.blocks.length === 0} onClick={() => void doImport()}>
+          <button type="button" className="primary" disabled={busy || noTargetTab || check === null || check.blocks.length === 0} onClick={() => void doImport()}>
             {busy
               ? '正在导入…'
               : `导入${check?.knowledgeCount !== undefined && check.knowledgeCount > 0 ? ` ${check.knowledgeCount} 个知识点` : check !== null && check.questionCount > 0 ? ` ${check.questionCount} 道题` : ''}`}
@@ -630,17 +790,34 @@ export function ImageImportDialog({ kind = 'questions', figureTitle = '插图', 
   )
 }
 
-/** WorkBuddy 状态提示 */
-function WorkBuddyNotice({ wb, phrase, onConnect, onCancel }: { wb: { state: string; note?: string }; phrase: string; onConnect: () => void; onCancel: () => void }) {
+/** MCP 客户端（WorkBuddy / Antigravity）状态提示 */
+function WorkBuddyNotice({
+  wb,
+  phrase,
+  onConnect,
+  onMinimize,
+  onCancel
+}: {
+  wb: { state: string; note?: string; clients?: McpClientStatus[] }
+  phrase: string
+  onConnect: (client: McpClientId) => void
+  onMinimize?: () => void
+  onCancel: () => void
+}) {
   const [copied, setCopied] = useState(false)
   if (wb.state === 'idle') return wb.note !== undefined ? <p className="image-import-wb">{wb.note}</p> : null
   if (wb.state === 'need-connect') {
+    const connectTargets = (wb.clients ?? []).filter((c) => c.found && !c.connected)
     return (
       <div className="image-import-wb" role="status">
-        {wb.note ?? '还没有连接 WorkBuddy。连接一次后，就可以把图片直接交给 WorkBuddy 识别，结果自动回到这里。'}
-        <button type="button" onClick={onConnect}>
-          连接 WorkBuddy
-        </button>
+        <span>
+          {wb.note ?? '还没有连接 WorkBuddy 或 Antigravity（反重力）。连接一次后，就可以直接把图片交给 AI 识别，结果自动回到这里。'}
+        </span>
+        {connectTargets.map((c) => (
+          <button key={c.id} type="button" onClick={() => onConnect(c.id)}>
+            连接 {c.name}
+          </button>
+        ))}
       </div>
     )
   }
@@ -648,7 +825,8 @@ function WorkBuddyNotice({ wb, phrase, onConnect, onCancel }: { wb: { state: str
     return (
       <div className="image-import-wb is-waiting" role="status">
         <span>
-          已交给 WorkBuddy。请到 WorkBuddy 里说：<strong>{phrase}</strong>
+          已交给 AI 识别。请到 WorkBuddy 或 Antigravity（反重力）中说：<strong>{phrase}</strong>
+          {onMinimize !== undefined ? '（可点“后台等待”继续编辑，收到结果后会自动提示）' : ''}
         </span>
         <button
           type="button"
@@ -661,6 +839,11 @@ function WorkBuddyNotice({ wb, phrase, onConnect, onCancel }: { wb: { state: str
         >
           {copied ? '已复制 ✓' : '复制这句话'}
         </button>
+        {onMinimize !== undefined && (
+          <button type="button" className="primary" onClick={onMinimize}>
+            后台等待
+          </button>
+        )}
         <button type="button" onClick={onCancel}>
           取消
         </button>
@@ -669,7 +852,7 @@ function WorkBuddyNotice({ wb, phrase, onConnect, onCancel }: { wb: { state: str
   }
   return (
     <div className="image-import-wb is-received" role="status">
-      已收到 WorkBuddy 的识别结果，请对照原图检查文字和插图，然后导入。
+      已收到 AI 返回的识别结果，请对照原图检查文字和插图，然后导入。
     </div>
   )
 }
@@ -725,7 +908,7 @@ function SvgChoice({ url, box, n, svg, use, onUse }: { url: string; box: Rect; n
       <figure className={use ? 'is-chosen' : undefined}>
         <figcaption>
           <label>
-            <input type="radio" checked={use} onChange={() => onUse(true)} /> WorkBuddy 重绘的 SVG（请核对是否与原图一致）
+            <input type="radio" checked={use} onChange={() => onUse(true)} /> AI 重绘的 SVG（请核对是否与原图一致）
           </label>
         </figcaption>
         <img src={svgUrl} alt="" />

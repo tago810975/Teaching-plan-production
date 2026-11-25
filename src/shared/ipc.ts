@@ -97,13 +97,26 @@ export interface SaveRequest {
 }
 
 /** 导入 Word 的结果说明 */
-/** WorkBuddy 连接的状态 */
-export interface WorkBuddyStatus {
-  /** 找到了 WorkBuddy（用户目录下有 .workbuddy） */
+/** 支持自动连接写入 MCP 配置的客户端 */
+export type McpClientId = 'workbuddy' | 'antigravity'
+
+export interface McpClientStatus {
+  id: McpClientId
+  name: string
   found: boolean
-  /** WorkBuddy 的 mcp.json 中已有教学案制作的连接 */
   connected: boolean
   configPath: string
+}
+
+/** WorkBuddy / Antigravity（反重力）连接状态 */
+export interface WorkBuddyStatus {
+  /** 至少找到了一个支持的客户端 */
+  found: boolean
+  /** 至少有一个支持的客户端已写入 teaching-plan MCP 连接 */
+  connected: boolean
+  configPath: string
+  /** 各个客户端的独立检测与连接状态 */
+  clients: McpClientStatus[]
 }
 
 /** 交给 WorkBuddy 识别的一批图片 */
@@ -270,17 +283,17 @@ export interface RendererApi {
   setExportPointsDefault(on: boolean): Promise<void>
   /** 设置：公式中的字母用正体（不倾斜），预览与导出都按它；默认是 */
   getMathUpright(): Promise<boolean>
-  /** WorkBuddy 自动识别：连接状态、写入 / 移除连接配置 */
+  /** AI 自动识别（WorkBuddy / Antigravity MCP）：连接状态、写入 / 移除连接配置 */
   workbuddyStatus(): Promise<WorkBuddyStatus>
-  workbuddyConnect(): Promise<Result<WorkBuddyStatus>>
-  workbuddyDisconnect(): Promise<WorkBuddyStatus>
+  workbuddyConnect(client?: McpClientId): Promise<Result<WorkBuddyStatus>>
+  workbuddyDisconnect(client?: McpClientId): Promise<WorkBuddyStatus>
   /** 登记待识别的图片（同一时间一批），返回任务 ID；结果由 onWorkbuddyResult 送回 */
   workbuddyStart(input: WorkBuddyTaskInput): Promise<string>
   workbuddyUpdate(taskId: string, figureCount: number): Promise<void>
   workbuddyCancel(taskId: string): Promise<void>
   onWorkbuddyResult(handler: (result: { taskId: string; text: string }) => void): () => void
   /** 让 WorkBuddy 把插图重绘为 SVG：登记插图（图号、图片），每收到一张由 onWorkbuddyRedrawResult 送回（已检查、净化） */
-  workbuddyRedrawStart(figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize?: number; stroke?: number; thin?: number }>): Promise<string>
+  workbuddyRedrawStart(figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize?: number; stroke?: number; thin?: number; arrowWidth?: number; arrowHeight?: number }>): Promise<string>
   workbuddyRedrawCancel(taskId: string): Promise<void>
   onWorkbuddyRedrawResult(handler: (result: { taskId: string; figure: number; svg: string }) => void): () => void
   setMathUpright(on: boolean): Promise<void>

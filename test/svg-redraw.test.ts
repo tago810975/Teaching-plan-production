@@ -34,16 +34,16 @@ describe('AI 重绘的 SVG：检查与净化', () => {
     expect(validateSvg('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><line x1="0" y1="0" x2="1" y2="1"/></svg>').aspect).toBe(1.5)
   })
 
-  it('提示词：忠实还原放在第一位，配色与示例一致', () => {
+  it('提示词：忠实还原放在第一位，配色与最新字号/线宽/箭头规范一致', () => {
     expect(REDRAW_GUIDE).toMatch(/第一要求是忠实还原/)
-    for (const c of ['#000000', '#E95283', '#0599D9']) expect(REDRAW_GUIDE).toContain(c)
+    for (const c of ['#000000', '#E95283', '#0599D9', 'markerUnits="userSpaceOnUse"', '24×16']) expect(REDRAW_GUIDE).toContain(c)
   })
 })
 
-describe('重绘的字号与线宽按原图换算', () => {
-  it('小图（177 像素宽、字高 16）：字号 54，线宽约为字高的 1/8；大图字号小', () => {
-    expect(redrawSizes(177, 16)).toEqual({ fontSize: 54, stroke: 7, thin: 4.5 })
-    expect(redrawSizes(600, 16).fontSize).toBe(20)
+describe('重绘的字号、线宽与箭头按原图换算', () => {
+  it('小图（177 像素宽、字高 16）字号 54 并按比例加粗；大图保底字号 38、线宽 3.5/2.5、箭头 22×15', () => {
+    expect(redrawSizes(177, 16)).toEqual({ fontSize: 54, stroke: 5, thin: 3.5, arrowWidth: 31, arrowHeight: 21 })
+    expect(redrawSizes(600, 16)).toEqual({ fontSize: 38, stroke: 3.5, thin: 2.5, arrowWidth: 22, arrowHeight: 15 })
     expect(redrawSizes(40, 16).fontSize).toBe(90)
   })
 })

@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { allPresets } from '@core/presets'
+import type { McpClientId, WorkBuddyStatus } from '@shared/ipc'
 import { ThemePicker } from './ThemePicker'
 import { themeInfo } from '@shared/themes'
 import { effectOn, setEffect, useEffectsVersion, useTheme } from '../theme/theme'
@@ -144,60 +145,61 @@ export function SettingsDialog({ libraryDir, onLibraryChanged, onClose }: Props)
   )
 }
 
-/** WorkBuddy 自动识别：连接后，在“从图片导入”中可以把图片交给 WorkBuddy 识别，结果自动回到软件 */
+/** AI 自动识别（MCP 连接）：支持 WorkBuddy 与 Antigravity（反重力），连接后在“从图片导入”中可直接交给 AI 识别并自动回传 */
 function WorkBuddySetting() {
-  const [status, setStatus] = useState<{ found: boolean; connected: boolean; configPath: string } | null>(null)
+  const [status, setStatus] = useState<WorkBuddyStatus | null>(null)
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
     void window.api.workbuddyStatus().then(setStatus)
   }, [])
+  const connect = (id: McpClientId, name: string): void => {
+    void window.api.workbuddyConnect(id).then((r) => {
+      if (r.ok) {
+        setStatus(r.value)
+        setNote(
+          id === 'antigravity'
+            ? '已连接 Antigravity（反重力）。请在 Antigravity 中通过右上角“… → MCP Servers”刷新或新开会话确认 teaching-plan 已启用，之后即可直接说“导入题目”或“导入知识点”。'
+            : `已连接 ${name}。如果 ${name} 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用（或重启 ${name}）。`
+        )
+      } else setNote(r.error)
+    })
+  }
+  const disconnect = (id: McpClientId, name: string): void => {
+    void window.api.workbuddyDisconnect(id).then((s) => {
+      setStatus(s)
+      setNote(`已断开 ${name}。`)
+    })
+  }
   return (
     <fieldset className="group">
-      <legend>WorkBuddy 自动识别</legend>
+      <legend>AI 自动识别（MCP 连接）</legend>
       <p className="field-hint">
-        连接后，在“导入题目 → 图片”中点“交给 WorkBuddy 识别”，再到 WorkBuddy 里说“导入题目”，识别结果会自动回到软件。
-        连接会在 WorkBuddy 的配置中加入“teaching-plan”一项（其他连接器不受影响）。
+        连接后，在“导入题目 → 图片”中点“交给 AI 识别”，再到已连接的客户端里说“导入题目”，识别结果会自动回到软件。
+        连接会在对应客户端的 MCP 配置中加入“teaching-plan”一项（其他配置不受影响）。
       </p>
-      <div className="settings-row">
-        <span>
-          {status === null
-            ? '正在检查…'
-            : status.connected
-              ? '已连接'
-              : status.found
-                ? '未连接'
-                : '没有找到 WorkBuddy（请先安装并打开一次 WorkBuddy）'}
-        </span>
-        {status !== null && !status.connected && (
-          <button
-            type="button"
-            disabled={!status.found}
-            onClick={() => {
-              void window.api.workbuddyConnect().then((r) => {
-                if (r.ok) {
-                  setStatus(r.value)
-                  setNote('已连接。如果 WorkBuddy 正开着，请在它的“连接器 → MCP”中确认 teaching-plan 已启用，或重启 WorkBuddy。')
-                } else setNote(r.error)
-              })
-            }}
-          >
-            连接 WorkBuddy
-          </button>
-        )}
-        {status?.connected === true && (
-          <button
-            type="button"
-            onClick={() => {
-              void window.api.workbuddyDisconnect().then((s) => {
-                setStatus(s)
-                setNote('已断开。')
-              })
-            }}
-          >
-            断开
-          </button>
-        )}
-      </div>
+      {status === null ? (
+        <div className="settings-row">
+          <span>正在检查…</span>
+        </div>
+      ) : (
+        status.clients.map((c) => (
+          <div key={c.id} className="settings-row">
+            <span>
+              <strong>{c.name}</strong>：
+              {c.connected ? '已连接' : c.found ? '未连接' : '未检测到（请先安装并打开一次）'}
+            </span>
+            {!c.connected ? (
+              <button type="button" disabled={!c.found} onClick={() => connect(c.id, c.name)}>
+                连接
+              </button>
+            ) : (
+              <button type="button" onClick={() => disconnect(c.id, c.name)}>
+                断开
+              </button>
+            )}
+          </div>
+        ))
+      )}
       {note !== null && <p className="field-hint">{note}</p>}
     </fieldset>
   )

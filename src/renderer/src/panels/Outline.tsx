@@ -3,6 +3,7 @@
  */
 import { useRef, type Dispatch, type MouseEvent as ReactMouseEvent } from 'react'
 import { useOutlineDrag } from './useOutlineDrag'
+import { collectBlocksByIds } from '@core/model/block-clipboard'
 import { plainText } from '@core/model/factory'
 import type { Block } from '@core/model/types'
 import { difficultyOf, type FormatPreset } from '@core/presets'
@@ -14,20 +15,20 @@ interface Props {
   /** 题目块 ID → 题号，取自 DocIR，保证与预览一致 */
   questionNumbers: ReadonlyMap<string, string>
   selectedBlockId: string | null
-  /** 多选状态下已选中的题目 ID 列表 */
+  /** 多选状态下已选中的内容块 ID 列表 */
   selectedQuestionIds?: readonly string[]
   /** 待剪切虚化展示的块 ID 集合 */
   cutBlockIds?: ReadonlySet<string>
   dispatch: Dispatch<EditorAction>
   /** 格式预设：等级与星级的对应 */
   preset: FormatPreset
-  /** 多选题目点击（支持 Shift 区间与 Ctrl/Cmd 切换） */
+  /** 多选点击（支持 Shift 区间与 Ctrl/Cmd 切换） */
   onSelectQuestion?: (blockId: string, mod: { shift: boolean; toggle: boolean }) => void
-  /** 清空大纲题目多选 */
+  /** 清空大纲多选 */
   onClearMultiSelect?: () => void
   /** 右键内容：弹出快捷版式窗口 */
   onBlockMenu?: (blockId: string, x: number, y: number) => void
-  /** 右键已多选的题目：弹出批量操作窗口 */
+  /** 右键已多选的内容：弹出批量操作窗口 */
   onBatchQuestionMenu?: (blockIds: string[], x: number, y: number) => void
   /** 打开“批量处理插图” */
   onOpenFigureBatch?: () => void
@@ -51,8 +52,9 @@ export function Outline({
   onReveal
 }: Props) {
   const multiSet = selectedQuestionIds.length > 1 ? new Set(selectedQuestionIds) : null
-  const menu = (id: string, isQuestion: boolean) => (e: ReactMouseEvent): void => {
-    if (isQuestion && multiSet !== null && multiSet.has(id) && onBatchQuestionMenu !== undefined) {
+  const effectiveMulti = multiSet !== null ? collectBlocksByIds(blocks, selectedQuestionIds) : []
+  const menu = (id: string) => (e: ReactMouseEvent): void => {
+    if (multiSet !== null && multiSet.has(id) && onBatchQuestionMenu !== undefined) {
       e.preventDefault()
       onBatchQuestionMenu([...selectedQuestionIds], e.clientX, e.clientY)
       return
@@ -101,7 +103,7 @@ export function Outline({
           <span className="outline-text">版式设置</span>
         </button>
         {onOpenFigureBatch !== undefined && (
-          <button type="button" className="outline-item outline-item--header" onClick={onOpenFigureBatch} title="勾选多张插图，一起变清晰或交给 WorkBuddy 重绘">
+          <button type="button" className="outline-item outline-item--header" onClick={onOpenFigureBatch} title="勾选多张插图，一起变清晰或交给 AI 重绘">
             <span className="outline-text">批量处理插图…</span>
           </button>
         )}
@@ -120,21 +122,21 @@ export function Outline({
             >
               {(() => {
                 const isQ = block.type === 'question'
-                const isMultiItem = isQ && (multiSet?.has(block.id) ?? false)
+                const isMultiItem = multiSet?.has(block.id) ?? false
                 const isSel = block.id === selectedBlockId || isMultiItem
                 return (
                   <button
                     type="button"
                     className={`outline-item outline-item--${block.type}${isSel ? ' is-selected' : ''}${isMultiItem ? ' is-multi-selected' : ''}`}
-                    title={isQ ? '点击选中（支持 Shift 连选、Ctrl 多选）；长按拖动排序；右键快捷或批量操作' : '点击选中；长按拖动可调整顺序；右键快捷设置'}
+                    title="点击选中（支持 Shift 连选、Ctrl 多选）；长按拖动调整顺序；右键快捷或批量操作"
                     onPointerDown={(e) => onItemPointerDown(e, block.id, describe(block), isQ)}
                     onMouseDown={(e) => {
-                      if (isQ && e.shiftKey) e.preventDefault()
+                      if (e.shiftKey) e.preventDefault()
                     }}
-                    onContextMenu={menu(block.id, isQ)}
+                    onContextMenu={menu(block.id)}
                     onClick={(e) => {
                       if (consumeClick()) return
-                      if (isQ && onSelectQuestion !== undefined) {
+                      if (onSelectQuestion !== undefined) {
                         onSelectQuestion(block.id, { shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey })
                       } else {
                         onClearMultiSelect?.()
@@ -177,7 +179,7 @@ export function Outline({
                         onMouseDown={(e) => {
                           if (e.shiftKey) e.preventDefault()
                         }}
-                        onContextMenu={menu(item.id, true)}
+                        onContextMenu={menu(item.id)}
                         onClick={(e) => {
                           if (consumeClick()) return
                           if (onSelectQuestion !== undefined) {
@@ -213,7 +215,11 @@ export function Outline({
       </p>
 
       <div className="outline-actions">
-        {multiSet !== null && <span className="outline-multi-hint">已选 {selectedQuestionIds.length} 题</span>}
+        {multiSet !== null && (
+          <span className="outline-multi-hint">
+            已选 {effectiveMulti.length} {effectiveMulti.every((b) => b.type === 'question') ? '题' : '项'}
+          </span>
+        )}
         <button
           type="button"
           disabled={multiSet !== null || selectedIndex <= 0}
@@ -245,7 +251,7 @@ export function Outline({
           disabled={multiSet === null && selectedIndex === -1}
           onClick={() => {
             if (multiSet !== null) {
-              dispatch({ type: 'delete-blocks', blockIds: [...selectedQuestionIds] })
+              dispatch({ type: 'delete-blocks', blockIds: effectiveMulti.map((b) => b.id) })
               onClearMultiSelect?.()
             } else if (selectedBlockId) {
               dispatch({ type: 'delete-block', blockId: selectedBlockId })

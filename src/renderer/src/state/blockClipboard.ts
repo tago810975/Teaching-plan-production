@@ -1,6 +1,6 @@
 /**
- * 应用内共享的题块剪贴板（跨标签页 / 跨不同学案通用）：
- * 复制或剪切题目、综合题、知识点时连同引用的图片资源一起保存，粘贴时生成全新 ID。
+ * 应用内共享的内容块剪贴板（跨标签页 / 跨不同学案通用）：
+ * 复制或剪切题目、综合题、知识点、标题、正文等任意内容块时连同引用的图片资源一起保存，粘贴时生成全新 ID。
  */
 import { useSyncExternalStore } from 'react'
 import { cloneBlocksWithNewIds, extractBlockAssets } from '@core/model/block-clipboard'

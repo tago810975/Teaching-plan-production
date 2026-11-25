@@ -32,7 +32,7 @@ export interface BridgeTask {
 /** 待重绘为 SVG 的插图（来自“从图片导入”窗口的“让 WorkBuddy 重绘插图”） */
 export interface RedrawTask {
   id: string
-  figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize?: number; stroke?: number; thin?: number }>
+  figures: Array<{ n: number; mime: string; data: string; width: number; height: number; fontSize?: number; stroke?: number; thin?: number; arrowWidth?: number; arrowHeight?: number }>
   /** 已收到的图号 */
   received: number[]
 }
@@ -58,7 +58,7 @@ export interface BridgeHandlers {
   guide: (task: BridgeTask | null) => string
   check: (text: string, task: BridgeTask | null) => BridgeCheck
   /** 把识别结果交回窗口；任务已不在（窗口关了、取消了）时返回 false */
-  submit: (taskId: string, text: string) => boolean
+  submit: (taskId: string, text: string, check?: BridgeCheck) => boolean
   /** 重绘插图：当前任务、重绘说明、提交一张（检查后交回窗口） */
   redrawPending?: () => RedrawTask | null
   redrawGuide?: () => string
@@ -119,7 +119,7 @@ export async function startBridge(handlers: BridgeHandlers, infoPath: string): P
             const taskId = typeof body['taskId'] === 'string' ? body['taskId'] : (task?.id ?? '')
             if (task === null || task.id !== taskId) return send(200, { ok: false, reason: 'no-task' })
             const check = handlers.check(text, task)
-            const ok = handlers.submit(taskId, text)
+            const ok = handlers.submit(taskId, text, check)
             return send(200, { ok, ...check })
           }
           case '/redraw/pending':

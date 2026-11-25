@@ -242,9 +242,9 @@ export function FigureList({
                 className="figure-btn"
                 disabled={actions === null || blockId === undefined || (assetMime(f.assetId) ?? '').includes('svg')}
                 onClick={() => actions?.openBatch({ refs: [refOf(i)], redraw: true })}
-                title="交给 WorkBuddy 重绘为 SVG；收到后与原图对照，选用哪一个"
+                title="交给 WorkBuddy 或 Antigravity（反重力）重绘为 SVG；收到后与原图对照，选用哪一个"
               >
-                WorkBuddy 重绘
+                AI 重绘
               </button>
               <button type="button" className="figure-btn danger" onClick={() => onChange(figures.filter((_, j) => j !== i))}>
                 删除

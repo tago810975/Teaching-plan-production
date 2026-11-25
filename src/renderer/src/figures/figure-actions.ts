@@ -86,7 +86,7 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /** 交给 WorkBuddy 重绘的一张图：PNG（长边不超过 2000）、尺寸与按原图换算的字号线宽 */
-export async function figureForRedraw(asset: Asset, n: number): Promise<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number }> {
+export async function figureForRedraw(asset: Asset, n: number): Promise<{ n: number; mime: string; data: string; width: number; height: number; fontSize: number; stroke: number; thin: number; arrowWidth: number; arrowHeight: number }> {
   const px = await pixelsOfAsset(asset, 2000)
   const { textHeight } = detectFigures(px)
   return { n, mime: 'image/png', data: toBase64(await toPng(px)), width: px.width, height: px.height, ...redrawSizes(px.width, textHeight) }

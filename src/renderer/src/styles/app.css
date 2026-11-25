@@ -2077,6 +2077,90 @@ body.is-dragging-outline * {
   background: color-mix(in srgb, var(--panel-raised) 60%, transparent);
   color: var(--ink);
 }
+.tabbar-wb-pills {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tabbar-wb-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--panel-raised);
+  color: var(--ink);
+  font-size: var(--fs-small);
+  overflow: hidden;
+}
+.tabbar-wb-pill.is-waiting {
+  border-color: #2f6fb5;
+  background: color-mix(in srgb, #2f6fb5 12%, var(--panel-raised));
+}
+.tabbar-wb-pill.is-ready {
+  border-color: #2e8b57;
+  background: color-mix(in srgb, #2e8b57 14%, var(--panel-raised));
+}
+.tabbar-wb-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 10px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+}
+.tabbar-wb-main:hover {
+  background: var(--hover);
+}
+.tabbar-wb-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+.tabbar-wb-pill.is-waiting .tabbar-wb-dot {
+  background: #2f6fb5;
+  animation: wb-dot-pulse 1.4s ease-in-out infinite;
+}
+.tabbar-wb-pill.is-ready .tabbar-wb-dot {
+  background: #2e8b57;
+}
+@keyframes wb-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
+}
+.tabbar-wb-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-left: var(--hairline) solid var(--rule);
+  border-radius: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1;
+}
+.tabbar-wb-close:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
 
 /* 表格编辑 */
 .table-edit-button {
@@ -2777,6 +2861,28 @@ body.is-dragging-outline * {
 :root[data-theme='noir'] .tab:focus-visible {
   outline-offset: -4px;
 }
+:root[data-theme='noir'] .tabbar-wb-pill {
+  border-radius: 0;
+  border: 2px solid var(--ink);
+  background: var(--desk);
+  color: #fff;
+}
+:root[data-theme='noir'] .tabbar-wb-pill.is-ready {
+  border-color: #2e8b57;
+}
+:root[data-theme='noir'] .tabbar-wb-close {
+  border-left-color: var(--rule);
+  color: #fff;
+}
+:root[data-theme='tide'] .tabbar-wb-pill {
+  border-color: rgba(33, 200, 255, 0.55);
+  background: rgba(6, 20, 48, 0.85);
+  color: var(--ink);
+}
+:root[data-theme='tide'] .tabbar-wb-pill.is-ready {
+  border-color: #2e8b57;
+  box-shadow: 0 0 10px rgba(46, 139, 87, 0.35);
+}
 
 /* ---- 选中：整条红色斜切块 ---- */
 :root[data-theme='noir'] .outline-item.is-selected {
@@ -3307,7 +3413,41 @@ input[type='checkbox']:disabled {
 .export-toast-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 8px;
+}
+.wb-toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.wb-toast-stack > .wb-toast {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  pointer-events: auto;
+}
+.wb-toast {
+  z-index: 65;
+}
+.wb-toast-body {
+  margin: 8px 0 2px;
+  font-size: var(--fs-body);
+  line-height: 1.45;
+}
+.wb-toast-target {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--ink-soft);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* 自动关闭的倒计时：底边一条细线慢慢缩短 */
 @keyframes toast-countdown {
@@ -5356,6 +5496,26 @@ input[type='checkbox']:disabled {
 .image-import {
   width: min(1200px, 95vw);
   max-height: 92vh;
+}
+.image-import-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.image-import-head-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.image-import-head .image-import-head-title h2 {
+  margin-bottom: 0;
+}
+.image-import-head > button {
+  flex: none;
 }
 .image-import-body {
   display: grid;

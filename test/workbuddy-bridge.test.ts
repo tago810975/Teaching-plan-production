@@ -39,7 +39,7 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
   const dir = mkdtempSync(join(tmpdir(), 'tp-bridge-'))
   const infoPath = join(dir, 'workbuddy-bridge.json')
   let task: BridgeTask | null = null
-  const submitted: Array<{ taskId: string; text: string }> = []
+  const submitted: Array<{ taskId: string; text: string; questionCount?: number }> = []
   let redraw: RedrawTask | null = null
   const svgs: Array<{ figure: number; svg: string }> = []
   let bridge: Awaited<ReturnType<typeof startBridge>>
@@ -54,8 +54,8 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
           const r = importText(text, { figures })
           return { questionCount: r.questionCount, issues: r.issues }
         },
-        submit: (taskId, text) => {
-          submitted.push({ taskId, text })
+        submit: (taskId, text, check) => {
+          submitted.push({ taskId, text, ...(check !== undefined ? { questionCount: check.questionCount } : {}) })
           return true
         },
         redrawPending: () => redraw,
@@ -111,7 +111,7 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
   it('提交：结果交给软件；任务不在时提示', async () => {
     const [r] = await mcp(infoPath, [callTool('submit_questions', { text: '1．题目\nA．甲　　B．乙' })])
     expect(toolText(r!)).toContain('已交给教学案制作：识别到 1 道题')
-    expect(submitted).toEqual([{ taskId: 't1', text: '1．题目\nA．甲　　B．乙' }])
+    expect(submitted).toEqual([{ taskId: 't1', text: '1．题目\nA．甲　　B．乙', questionCount: 1 }])
     task = null
     const [again] = await mcp(infoPath, [callTool('submit_questions', { text: 'x' })])
     expect(toolText(again!)).toContain('没有等待识别的图片')
@@ -131,7 +131,14 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
     redraw = null
     const [none] = await mcp(infoPath, [callTool('get_figures_to_redraw')])
     expect(toolText(none!)).toContain('没有等待重绘的插图')
-    redraw = { id: 'r1', figures: [{ n: 1, mime: 'image/png', data: PNG, width: 300, height: 200 }, { n: 2, mime: 'image/png', data: PNG, width: 100, height: 100 }], received: [] }
+    redraw = {
+      id: 'r1',
+      figures: [
+        { n: 1, mime: 'image/png', data: PNG, width: 300, height: 200 },
+        { n: 2, mime: 'image/png', data: PNG, width: 100, height: 100, fontSize: 42, stroke: 4, thin: 2.5, arrowWidth: 24, arrowHeight: 16 }
+      ],
+      received: []
+    }
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400"><rect x="1" y="1" width="9" height="9" stroke="#000"/></svg>'
     const [got, bad, wrongNo, ok1, ok2] = await mcp(infoPath, [
       callTool('get_figures_to_redraw'),
@@ -144,6 +151,7 @@ describe('与 WorkBuddy 的连接：MCP 脚本 + 本机服务（模拟 WorkBuddy
     expect(content[0]!.text).toMatch(/第一要求是忠实还原[\s\S]*共 2 张插图：图1、图2/)
     expect(content.filter((c) => c.type === 'image')).toHaveLength(2)
     expect(content.some((c) => c.text === '图1（原图 300×200 像素，宽高比 1.50）：')).toBe(true)
+    expect(content.some((c) => c.text === '图2（原图 100×100 像素，宽高比 1.00；viewBox 宽 600 时字号 42、主线宽 4、细线宽 2.5、箭头 24×16）：')).toBe(true)
     expect(toolText(bad!)).toMatch(/图1 没有收下[\s\S]*不是合法的 XML/)
     expect(toolText(wrongNo!)).toContain('没有图5')
     expect(toolText(ok1!)).toBe('图1 已收到。还差：图2。')

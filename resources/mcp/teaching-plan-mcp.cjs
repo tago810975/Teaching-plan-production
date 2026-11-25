@@ -49,11 +49,11 @@ function call(path, body) {
   })
 }
 
-const NOT_RUNNING = '教学案制作没有在运行。请让用户先打开“教学案制作”，在“导入题目 → 图片”窗口中放入图片并点“交给 WorkBuddy 识别”，再说“导入题目”。'
-const NO_TASK = '教学案制作里现在没有等待识别的图片。请让用户在教学案制作的“导入题目 → 图片”窗口中放入图片，点“交给 WorkBuddy 识别”，然后再说“导入题目”。'
+const NOT_RUNNING = '教学案制作没有在运行。请让用户先打开“教学案制作”，在“导入题目 → 图片”窗口中放入图片并点“交给 AI 识别”（或在批量处理插图/属性栏点“AI 重绘”），再说“导入题目”或“重绘插图”。'
+const NO_TASK = '教学案制作里现在没有等待识别的图片。请让用户在教学案制作的“导入题目 → 图片”窗口中放入图片，点“交给 AI 识别”，然后再说“导入题目”。'
 
 const textContent = (text) => ({ content: [{ type: 'text', text }] })
-const NO_REDRAW = '教学案制作里现在没有等待重绘的插图。请让用户在教学案制作的“导入题目 → 图片”窗口中框好插图，点“让 WorkBuddy 重绘插图”，然后再说“重绘插图”。'
+const NO_REDRAW = '教学案制作里现在没有等待重绘的插图。请让用户在“从图片导入”或“批量处理插图”中选好插图并点“让 AI 重绘”，然后再说“重绘插图”。'
 
 function describeCheck(r) {
   const head =
@@ -130,7 +130,8 @@ async function runTool(name, args) {
         '全部交完后简短告诉用户：已重绘几张，请回到教学案制作与原图逐张核对后再导入。SVG 全文不必在对话中显示。'
       const content = [{ type: 'text', text: head }]
       for (const f of t.figures) {
-        const sizes = f.fontSize ? `；viewBox 宽 600 时字号 ${f.fontSize}、主线宽 ${f.stroke}、细线宽 ${f.thin}` : ''
+        const arrow = f.arrowWidth && f.arrowHeight ? `、箭头 ${f.arrowWidth}×${f.arrowHeight}` : ''
+        const sizes = f.fontSize ? `；viewBox 宽 600 时字号 ${f.fontSize}、主线宽 ${f.stroke}、细线宽 ${f.thin}${arrow}` : ''
         content.push({ type: 'text', text: `图${f.n}（原图 ${f.width}×${f.height} 像素，宽高比 ${(f.width / f.height).toFixed(2)}${sizes}）：` })
         content.push({ type: 'image', data: f.data, mimeType: f.mime })
       }

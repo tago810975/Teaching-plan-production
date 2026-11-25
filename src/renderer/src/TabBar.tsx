@@ -6,6 +6,16 @@
 import { useRef, useState } from 'react'
 import type { Tab } from './state/workspace'
 
+export interface BackgroundTaskPill {
+  id: string
+  label: string
+  tone: 'waiting' | 'ready' | 'idle'
+  title: string
+  cancelLabel: string
+  onRestore: () => void
+  onCancel: () => void
+}
+
 interface Props {
   tabs: Tab[]
   active: string | null
@@ -13,9 +23,11 @@ interface Props {
   onClose: (id: string) => void
   onMove: (id: string, toIndex: number) => void
   onNew: () => void
+  /** 收起到后台的 AI 任务胶囊（图片导入、插图重绘） */
+  backgroundTasks?: BackgroundTaskPill[]
 }
 
-export function TabBar({ tabs, active, onActivate, onClose, onMove, onNew }: Props) {
+export function TabBar({ tabs, active, onActivate, onClose, onMove, onNew, backgroundTasks = [] }: Props) {
   const dragging = useRef<string | null>(null)
   const [dropAt, setDropAt] = useState<number | null>(null)
 
@@ -119,6 +131,30 @@ export function TabBar({ tabs, active, onActivate, onClose, onMove, onNew }: Pro
       <button type="button" className="tab-new" onClick={onNew} title="新建教学案（Ctrl+N）" aria-label="新建教学案">
         ＋
       </button>
+      {backgroundTasks.length > 0 && (
+        <div className="tabbar-wb-pills">
+          {backgroundTasks.map((task) => (
+            <div key={task.id} className={`tabbar-wb-pill is-${task.tone}`} title={task.title}>
+              <button type="button" className="tabbar-wb-main" onClick={task.onRestore}>
+                <span className="tabbar-wb-dot" aria-hidden="true" />
+                <span>{task.label}</span>
+              </button>
+              <button
+                type="button"
+                className="tabbar-wb-close"
+                aria-label={task.cancelLabel}
+                title={task.cancelLabel}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  task.onCancel()
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

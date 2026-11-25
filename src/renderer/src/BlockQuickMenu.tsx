@@ -11,7 +11,8 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { CollageText } from './theme/CollageText'
 import { difficultyOf, type FormatPreset } from '@core/presets'
 import { plainText } from '@core/model/factory'
-import type { Block, KeepTogether, OptionColumns, QuestionBlock, QuestionLayout } from '@core/model/types'
+import { collectBlocksByIds } from '@core/model/block-clipboard'
+import type { Block, KeepTogether, KnowledgeBlock, OptionColumns, QuestionBlock, QuestionLayout } from '@core/model/types'
 import type { EditorAction } from './state/store'
 import { useBlockClipboard } from './state/blockClipboard'
 import { AnswerPlacementControl } from './panels/AnswerPlacementControl'
@@ -41,7 +42,6 @@ type Layout = Omit<QuestionLayout, 'optionColumns' | 'optionStops'> & Partial<Pi
 
 export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, y, preset, dispatch, onClose, onCopy, onCut, onPaste, stage = false }: Props) {
   const clipboard = useBlockClipboard()
-  const canCopy = block.type === 'question' || block.type === 'composite' || block.type === 'knowledge'
   const update = (fn: (b: Block) => Block): void => dispatch({ type: 'update-block', blockId: block.id, update: fn })
   const setLayout = (patch: Partial<QuestionLayout>): void =>
     update((b) =>
@@ -160,9 +160,9 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, 
           删除
         </button>
       </div>
-      {((canCopy && (onCopy !== undefined || onCut !== undefined)) || (clipboard !== null && onPaste !== undefined)) && (
+      {(onCopy !== undefined || onCut !== undefined || (clipboard !== null && onPaste !== undefined)) && (
         <div className="quick-menu-actions quick-menu-actions--clip">
-          {canCopy && onCopy !== undefined && (
+          {onCopy !== undefined && (
             <button
               type="button"
               title="复制（Ctrl+C），可跨学案粘贴"
@@ -174,7 +174,7 @@ export function BlockQuickMenu({ block, number, questionNumbers = new Map(), x, 
               复制
             </button>
           )}
-          {canCopy && onCut !== undefined && (
+          {onCut !== undefined && (
             <button
               type="button"
               title="剪切（Ctrl+X），粘贴后从原处移除"
@@ -243,100 +243,171 @@ function TriCheckbox({ checked, label, onChange }: { checked: boolean | null; la
 }
 
 /**
- * 大纲多选题目后右键弹出的批量快捷操作窗口：全部修改与删除均可按 Ctrl+Z 一步撤销。
+ * 大纲多选后右键弹出的批量快捷操作窗口：全部修改与删除均可按 Ctrl+Z 一步撤销。
+ * - 全为题目时提供题目完整批量版式、合并综合题、删除与复制/剪切/粘贴；
+ * - 全为知识点时提供知识点批量版式、删除与复制/剪切/粘贴；
+ * - 其他或混合类型（如知识梳理标题 + 知识点 + 题目）提供批量删除与复制/剪切/粘贴。
  */
 export function BatchQuestionQuickMenu({ blockIds, blocks, x, y, preset, dispatch, onClose, onDeleted, onCopy, onCut, onPaste }: BatchProps) {
   const clipboard = useBlockClipboard()
-  const idSet = new Set(blockIds)
-  const questions: QuestionBlock[] = []
-  for (const b of blocks) {
-    if (b.type === 'question' && idSet.has(b.id)) questions.push(b)
-    else if (b.type === 'composite') {
-      for (const it of b.items) {
-        if (idSet.has(it.id)) questions.push(it)
-      }
-    }
-  }
-  if (questions.length === 0) return null
+  const picked = collectBlocksByIds(blocks, blockIds)
+  if (picked.length === 0) return null
 
-  const targetIds = questions.map((q) => q.id)
-  const updateQuestions = (fn: (q: QuestionBlock) => QuestionBlock): void =>
-    dispatch({
-      type: 'update-blocks',
-      blockIds: targetIds,
-      update: (b) => (b.type === 'question' ? fn(b) : b)
-    })
-  const setLayout = (patch: Partial<QuestionLayout>): void =>
-    updateQuestions((q) => ({ ...q, question: { ...q.question, layout: { ...q.question.layout, ...patch } } }))
+  const targetIds = picked.map((b) => b.id)
+  const allQuestions = picked.every((b): b is QuestionBlock => b.type === 'question')
+  const allKnowledge = picked.every((b): b is KnowledgeBlock => b.type === 'knowledge')
 
-  const commonGrade = commonValue(questions.map((q) => difficultyOf(q.question, preset).grade ?? ''))
-  const withOptions = questions.filter((q) => q.question.options.length > 0)
-  const commonCols = commonValue(withOptions.map((q) => q.question.layout.optionColumns))
-  const commonKeep = commonValue(questions.map((q) => q.question.layout.keepTogether))
-  const commonTeacher = commonValue(questions.map((q) => q.question.layout.teacherSpaceLines))
-  const commonStudent = commonValue(questions.map((q) => q.question.layout.studentSpaceLines))
-  const commonPageBreak = commonValue(questions.map((q) => q.question.layout.pageBreakBefore))
+  if (allQuestions) {
+    const questions = picked
+    const updateQuestions = (fn: (q: QuestionBlock) => QuestionBlock): void =>
+      dispatch({
+        type: 'update-blocks',
+        blockIds: targetIds,
+        update: (b) => (b.type === 'question' ? fn(b) : b)
+      })
+    const setLayout = (patch: Partial<QuestionLayout>): void =>
+      updateQuestions((q) => ({ ...q, question: { ...q.question, layout: { ...q.question.layout, ...patch } } }))
 
-  return (
-    <QuickPopover x={x} y={y} title={`已选 ${questions.length} 道题`} label="批量快捷操作" onClose={onClose}>
-      <Row label="难度">
-        <Choice
-          value={commonGrade}
-          options={[['', '无'], ...preset.difficulty.levels.map((l): [string, string] => [l.grade, `${l.grade} ${'★'.repeat(l.stars)}`])]}
-          onChange={(g) => updateQuestions((q) => ({ ...q, question: { ...q.question, difficulty: g === '' ? undefined : g, stars: undefined } }))}
-        />
-      </Row>
-      {withOptions.length > 0 && (
-        <Row label="选项">
-          <Choice<OptionColumns>
-            value={commonCols}
-            options={[
-              ['auto', '自动'],
-              [1, '每行 1 项'],
-              [2, '2 项'],
-              [4, '4 项']
-            ]}
-            onChange={(optionColumns) =>
-              dispatch({
-                type: 'update-blocks',
-                blockIds: withOptions.map((q) => q.id),
-                update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, layout: { ...b.question.layout, optionColumns } } } : b)
-              })
-            }
+    const commonGrade = commonValue(questions.map((q) => difficultyOf(q.question, preset).grade ?? ''))
+    const withOptions = questions.filter((q) => q.question.options.length > 0)
+    const commonCols = commonValue(withOptions.map((q) => q.question.layout.optionColumns))
+    const commonKeep = commonValue(questions.map((q) => q.question.layout.keepTogether))
+    const commonTeacher = commonValue(questions.map((q) => q.question.layout.teacherSpaceLines))
+    const commonStudent = commonValue(questions.map((q) => q.question.layout.studentSpaceLines))
+    const commonPageBreak = commonValue(questions.map((q) => q.question.layout.pageBreakBefore))
+
+    return (
+      <QuickPopover x={x} y={y} title={`已选 ${questions.length} 道题`} label="批量快捷操作" onClose={onClose}>
+        <Row label="难度">
+          <Choice
+            value={commonGrade}
+            options={[['', '无'], ...preset.difficulty.levels.map((l): [string, string] => [l.grade, `${l.grade} ${'★'.repeat(l.stars)}`])]}
+            onChange={(g) => updateQuestions((q) => ({ ...q, question: { ...q.question, difficulty: g === '' ? undefined : g, stars: undefined } }))}
           />
         </Row>
-      )}
-      <Row label="同页">
-        <Choice<KeepTogether>
-          value={commonKeep}
-          options={[
-            ['auto', '跟随版式设置'],
-            ['always', '整题同页'],
-            ['never', '允许跨页']
-          ]}
-          onChange={(keepTogether) => setLayout({ keepTogether })}
-        />
-      </Row>
-      <Row label="留白">
-        <Stepper label="教案" value={commonTeacher ?? questions[0]!.question.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
-        <Stepper label="学案" value={commonStudent ?? questions[0]!.question.layout.studentSpaceLines} onChange={(studentSpaceLines) => setLayout({ studentSpaceLines })} />
-      </Row>
-      {(commonTeacher === null || commonStudent === null) && <p className="field-hint quick-menu-note">各题留白行数不同，调整将统一所选题目的留白</p>}
-      <TriCheckbox checked={commonPageBreak} label="从新的一页开始" onChange={(pageBreakBefore) => setLayout({ pageBreakBefore })} />
-      <div className="quick-menu-actions">
-        {questions.length >= 2 && (
+        {withOptions.length > 0 && (
+          <Row label="选项">
+            <Choice<OptionColumns>
+              value={commonCols}
+              options={[
+                ['auto', '自动'],
+                [1, '每行 1 项'],
+                [2, '2 项'],
+                [4, '4 项']
+              ]}
+              onChange={(optionColumns) =>
+                dispatch({
+                  type: 'update-blocks',
+                  blockIds: withOptions.map((q) => q.id),
+                  update: (b) => (b.type === 'question' ? { ...b, question: { ...b.question, layout: { ...b.question.layout, optionColumns } } } : b)
+                })
+              }
+            />
+          </Row>
+        )}
+        <Row label="同页">
+          <Choice<KeepTogether>
+            value={commonKeep}
+            options={[
+              ['auto', '跟随版式设置'],
+              ['always', '整题同页'],
+              ['never', '允许跨页']
+            ]}
+            onChange={(keepTogether) => setLayout({ keepTogether })}
+          />
+        </Row>
+        <Row label="留白">
+          <Stepper label="教案" value={commonTeacher ?? questions[0]!.question.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
+          <Stepper label="学案" value={commonStudent ?? questions[0]!.question.layout.studentSpaceLines} onChange={(studentSpaceLines) => setLayout({ studentSpaceLines })} />
+        </Row>
+        {(commonTeacher === null || commonStudent === null) && <p className="field-hint quick-menu-note">各题留白行数不同，调整将统一所选题目的留白</p>}
+        <TriCheckbox checked={commonPageBreak} label="从新的一页开始" onChange={(pageBreakBefore) => setLayout({ pageBreakBefore })} />
+        <div className="quick-menu-actions">
+          {questions.length >= 2 && (
+            <button
+              type="button"
+              title="按大纲顺序合并成一道综合题；合并后可用 Ctrl+Z 撤销"
+              onClick={() => {
+                dispatch({ type: 'merge-to-composite', blockIds: targetIds })
+                onDeleted?.()
+                onClose()
+              }}
+            >
+              合并成综合题
+            </button>
+          )}
           <button
             type="button"
-            title="按大纲顺序合并成一道综合题；合并后可用 Ctrl+Z 撤销"
+            className="danger"
+            title="删除后可用 Ctrl+Z 撤销"
             onClick={() => {
-              dispatch({ type: 'merge-to-composite', blockIds: targetIds })
+              dispatch({ type: 'delete-blocks', blockIds: targetIds })
               onDeleted?.()
               onClose()
             }}
           >
-            合并成综合题
+            删除这 {questions.length} 道题
           </button>
-        )}
+        </div>
+        <BatchClipActions clipboardHas={clipboard !== null} onClose={onClose} onCopy={onCopy} onCut={onCut} onPaste={onPaste} />
+      </QuickPopover>
+    )
+  }
+
+  if (allKnowledge) {
+    const knowledges = picked
+    const setLayout = (patch: Partial<QuestionLayout>): void =>
+      dispatch({
+        type: 'update-blocks',
+        blockIds: targetIds,
+        update: (b) => (b.type === 'knowledge' ? { ...b, layout: { ...b.layout, ...patch } } : b)
+      })
+    const commonKeep = commonValue(knowledges.map((k) => k.layout.keepTogether))
+    const commonTeacher = commonValue(knowledges.map((k) => k.layout.teacherSpaceLines))
+    const commonStudent = commonValue(knowledges.map((k) => k.layout.studentSpaceLines))
+    const commonPageBreak = commonValue(knowledges.map((k) => k.layout.pageBreakBefore))
+
+    return (
+      <QuickPopover x={x} y={y} title={`已选 ${knowledges.length} 个知识点`} label="批量快捷操作" onClose={onClose}>
+        <Row label="同页">
+          <Choice<KeepTogether>
+            value={commonKeep}
+            options={[
+              ['auto', '跟随版式设置'],
+              ['always', '整块同页'],
+              ['never', '允许跨页']
+            ]}
+            onChange={(keepTogether) => setLayout({ keepTogether })}
+          />
+        </Row>
+        <Row label="留白">
+          <Stepper label="教案" value={commonTeacher ?? knowledges[0]!.layout.teacherSpaceLines} onChange={(teacherSpaceLines) => setLayout({ teacherSpaceLines })} />
+          <Stepper label="学案" value={commonStudent ?? knowledges[0]!.layout.studentSpaceLines} onChange={(studentSpaceLines) => setLayout({ studentSpaceLines })} />
+        </Row>
+        {(commonTeacher === null || commonStudent === null) && <p className="field-hint quick-menu-note">各块留白行数不同，调整将统一所选知识点的留白</p>}
+        <TriCheckbox checked={commonPageBreak} label="从新的一页开始" onChange={(pageBreakBefore) => setLayout({ pageBreakBefore })} />
+        <div className="quick-menu-actions">
+          <button
+            type="button"
+            className="danger"
+            title="删除后可用 Ctrl+Z 撤销"
+            onClick={() => {
+              dispatch({ type: 'delete-blocks', blockIds: targetIds })
+              onDeleted?.()
+              onClose()
+            }}
+          >
+            删除这 {knowledges.length} 个知识点
+          </button>
+        </div>
+        <BatchClipActions clipboardHas={clipboard !== null} onClose={onClose} onCopy={onCopy} onCut={onCut} onPaste={onPaste} />
+      </QuickPopover>
+    )
+  }
+
+  return (
+    <QuickPopover x={x} y={y} title={`已选 ${picked.length} 项内容`} label="批量快捷操作" onClose={onClose}>
+      <div className="quick-menu-actions">
         <button
           type="button"
           className="danger"
@@ -347,50 +418,67 @@ export function BatchQuestionQuickMenu({ blockIds, blocks, x, y, preset, dispatc
             onClose()
           }}
         >
-          删除这 {questions.length} 道题
+          删除这 {picked.length} 项
         </button>
       </div>
-      {(onCopy !== undefined || onCut !== undefined || (clipboard !== null && onPaste !== undefined)) && (
-        <div className="quick-menu-actions quick-menu-actions--clip">
-          {onCopy !== undefined && (
-            <button
-              type="button"
-              title="复制选中的题目（Ctrl+C），可跨学案粘贴"
-              onClick={() => {
-                onCopy()
-                onClose()
-              }}
-            >
-              复制
-            </button>
-          )}
-          {onCut !== undefined && (
-            <button
-              type="button"
-              title="剪切选中的题目（Ctrl+X），粘贴后从原处移除"
-              onClick={() => {
-                onCut()
-                onClose()
-              }}
-            >
-              剪切
-            </button>
-          )}
-          {clipboard !== null && onPaste !== undefined && (
-            <button
-              type="button"
-              title="粘贴到所选题目的最后一项下方（Ctrl+V）"
-              onClick={() => {
-                onPaste()
-                onClose()
-              }}
-            >
-              粘贴
-            </button>
-          )}
-        </div>
-      )}
+      <BatchClipActions clipboardHas={clipboard !== null} onClose={onClose} onCopy={onCopy} onCut={onCut} onPaste={onPaste} />
     </QuickPopover>
+  )
+}
+
+function BatchClipActions({
+  clipboardHas,
+  onClose,
+  onCopy,
+  onCut,
+  onPaste
+}: {
+  clipboardHas: boolean
+  onClose: () => void
+  onCopy?: () => void
+  onCut?: () => void
+  onPaste?: () => void
+}) {
+  if (onCopy === undefined && onCut === undefined && (!clipboardHas || onPaste === undefined)) return null
+  return (
+    <div className="quick-menu-actions quick-menu-actions--clip">
+      {onCopy !== undefined && (
+        <button
+          type="button"
+          title="复制选中内容（Ctrl+C），可跨学案粘贴"
+          onClick={() => {
+            onCopy()
+            onClose()
+          }}
+        >
+          复制
+        </button>
+      )}
+      {onCut !== undefined && (
+        <button
+          type="button"
+          title="剪切选中内容（Ctrl+X），粘贴后从原处移除"
+          onClick={() => {
+            onCut()
+            onClose()
+          }}
+        >
+          剪切
+        </button>
+      )}
+      {clipboardHas && onPaste !== undefined && (
+        <button
+          type="button"
+          title="粘贴到所选内容最后一项下方（Ctrl+V）"
+          onClick={() => {
+            onPaste()
+            onClose()
+          }}
+        >
+          粘贴
+        </button>
+      )}
+    </div>
   )
 }
 

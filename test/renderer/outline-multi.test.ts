@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { createComposite, createEmptyBundle, createKnowledge, createQuestion, para, plainText } from '@core/model/factory'
 import type { Block, QuestionBlock } from '@core/model/types'
-import { listOutlineQuestionIds, pruneQuestionSelection, selectQuestionRange, toggleQuestionSelection } from '../../src/renderer/src/panels/outline-selection'
+import {
+  effectiveSelectedBlocks,
+  listOutlineBlockIds,
+  listOutlineQuestionIds,
+  pruneQuestionSelection,
+  selectBlockRange,
+  selectQuestionRange,
+  toggleBlockSelection,
+  toggleQuestionSelection
+} from '../../src/renderer/src/panels/outline-selection'
 import { findBlock, initEditorState, reduceAt, type EditorState } from '../../src/renderer/src/state/store'
 
 function qBlock(id: string, stem: string): QuestionBlock {
@@ -51,6 +60,27 @@ describe('大纲多选辅助函数', () => {
     const all = ['q2', 'c1q1', 'q1']
     expect(pruneQuestionSelection(['q1', 'deleted', 'q2'], all)).toEqual(['q2', 'q1'])
     expect(pruneQuestionSelection(['deleted'], all)).toEqual([])
+  })
+
+  it('全块多选支持知识梳理、标题、知识点与综合题区间选择，并对综合题及其小题去重', () => {
+    const s = makeState()
+    const allBlocks = listOutlineBlockIds(s.bundle.project.blocks)
+    expect(allBlocks).toEqual(['sec1', 'q1', 'k1', 'c1', 'c1q1', 'c1q2', 'c2', 'q2'])
+
+    // 从“课堂练习”栏目标题 Shift 连选到知识点 k1
+    const secToKnow = selectBlockRange(allBlocks, 'sec1', 'k1')
+    expect(secToKnow).toEqual(['sec1', 'q1', 'k1'])
+
+    // Ctrl 点选追加综合题 c1，移除 q1
+    const toggled = toggleBlockSelection(secToKnow, 'k1', allBlocks, 'q1')
+    expect(toggled).toEqual(['sec1', 'k1'])
+    const withComp = toggleBlockSelection(toggled, 'k1', allBlocks, 'c1')
+    expect(withComp).toEqual(['sec1', 'k1', 'c1'])
+
+    // 若区间同时包含 c1 和其小题 c1q1、c1q2，effectiveSelectedBlocks 自动去重只保留父综合题 c1
+    const rangeWithSub = selectBlockRange(allBlocks, 'k1', 'c1q2')
+    expect(rangeWithSub).toEqual(['k1', 'c1', 'c1q1', 'c1q2'])
+    expect(effectiveSelectedBlocks(s.bundle.project.blocks, rangeWithSub).map((b) => b.id)).toEqual(['k1', 'c1'])
   })
 })
 

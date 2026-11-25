@@ -14,9 +14,8 @@ import { ErrorBanner } from './ErrorBanner'
 import { ImportNotice } from './ImportNotice'
 import { ExportDialog, ExportDoneNotice } from './export/ExportDialog'
 import { BatchQuestionQuickMenu, BlockQuickMenu } from './BlockQuickMenu'
-import { ImageImportDialog } from './import/ImageImportDialog'
 import { ContextMenu } from './home/ContextMenu'
-import { FigureBatchDialog, figureLabel } from './figures/FigureBatchDialog'
+import { figureLabel } from './figures/FigureBatchDialog'
 import { FigureAdjustDialog } from './figures/FigureAdjustDialog'
 import { FigureActionsContext, sharpenAsset, type FigureActions } from './figures/figure-actions'
 import { FigureClickContext } from './preview/image-menu'
@@ -32,15 +31,18 @@ import type { ImportReport } from '@shared/ipc'
 import type { Block } from '@core/model/types'
 import { Inspector } from './panels/Inspector'
 import { Outline } from './panels/Outline'
-import { listOutlineQuestionIds, pruneQuestionSelection, selectQuestionRange, toggleQuestionSelection } from './panels/outline-selection'
+import {
+  listOutlineBlockIds,
+  pruneBlockSelection,
+  selectBlockRange,
+  toggleBlockSelection
+} from './panels/outline-selection'
 import { useAssetUrls } from './preview/assets'
 import { Preview } from './preview/Preview'
 import { findBlock, HEADER_SELECTION, LAYOUT_SELECTION, type EditorAction, type EditorState } from './state/store'
 import { clearBlockClipboard, getBlockClipboard, setBlockClipboard, takeBlocksForPaste, useBlockClipboard } from './state/blockClipboard'
 import { collectBlocksByIds } from '@core/model/block-clipboard'
 import { useMathUpright } from './state/mathUpright'
-
-const COPYABLE_BLOCK_TYPES = new Set<Block['type']>(['question', 'composite', 'knowledge'])
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof Element)) return false
@@ -78,6 +80,8 @@ interface Props {
   onError: (message: string) => void
   exportOpen: boolean
   onExportOpenChange: (open: boolean) => void
+  onOpenImageImport: (kind: 'questions' | 'knowledge') => void
+  onOpenFigureBatch: (initial?: { refs?: FigureRef[]; redraw?: boolean }) => void
 }
 
 const VARIANTS: ReadonlyArray<readonly [Variant, string]> = [
@@ -104,6 +108,8 @@ function EditorBody({
   onError,
   exportOpen,
   onExportOpenChange,
+  onOpenImageImport,
+  onOpenFigureBatch,
   inactive: inactiveProp,
   tabId
 }: Props) {
@@ -208,24 +214,24 @@ function EditorBody({
     [dispatch]
   )
   const headerSelected = state.selectedBlockId === HEADER_SELECTION
-  const outlineQuestionIds = useMemo(() => listOutlineQuestionIds(project.blocks), [project.blocks])
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([])
+  const outlineBlockIds = useMemo(() => listOutlineBlockIds(project.blocks), [project.blocks])
+  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([])
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null)
-  const activeSelectedQuestions = useMemo(
-    () => pruneQuestionSelection(selectedQuestionIds, outlineQuestionIds),
-    [selectedQuestionIds, outlineQuestionIds]
+  const activeSelectedBlocks = useMemo(
+    () => pruneBlockSelection(selectedBlockIds, outlineBlockIds),
+    [selectedBlockIds, outlineBlockIds]
   )
   const clearMultiSelect = useCallback(() => {
-    setSelectedQuestionIds([])
+    setSelectedBlockIds([])
     setSelectionAnchorId(null)
   }, [])
   const select = useCallback(
     (blockId: string, focus?: ParagraphFocus) => {
-      setSelectedQuestionIds([])
-      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
+      setSelectedBlockIds([])
+      setSelectionAnchorId(outlineBlockIds.includes(blockId) ? blockId : null)
       dispatch({ type: 'select', blockId, ...(focus !== undefined ? { focus } : {}) })
     },
-    [dispatch, outlineQuestionIds]
+    [dispatch, outlineBlockIds]
   )
   const selectHeader = useCallback(() => {
     clearMultiSelect()
@@ -313,12 +319,12 @@ function EditorBody({
   >(null)
   const openQuickMenu = useCallback(
     (blockId: string, x: number, y: number) => {
-      setSelectedQuestionIds([])
-      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
+      setSelectedBlockIds([])
+      setSelectionAnchorId(outlineBlockIds.includes(blockId) ? blockId : null)
       dispatch({ type: 'select', blockId })
       setQuickMenu({ kind: 'block', blockId, x, y })
     },
-    [dispatch, outlineQuestionIds]
+    [dispatch, outlineBlockIds]
   )
   const openBatchQuestionMenu = useCallback((blockIds: string[], x: number, y: number) => {
     setQuickMenu({ kind: 'batch-questions', blockIds, x, y })
@@ -326,12 +332,12 @@ function EditorBody({
   // 在预览中右键：空间大，风格主题可以用更张扬的样式（stage）；大纲里右键保持紧凑的常规样式
   const openStageMenu = useCallback(
     (blockId: string, x: number, y: number) => {
-      setSelectedQuestionIds([])
-      setSelectionAnchorId(outlineQuestionIds.includes(blockId) ? blockId : null)
+      setSelectedBlockIds([])
+      setSelectionAnchorId(outlineBlockIds.includes(blockId) ? blockId : null)
       dispatch({ type: 'select', blockId })
       setQuickMenu({ kind: 'block', blockId, x, y, stage: true })
     },
-    [dispatch, outlineQuestionIds]
+    [dispatch, outlineBlockIds]
   )
   const openImageMenu = useCallback(
     (target: ImageTarget, x: number, y: number) => {
@@ -364,13 +370,10 @@ function EditorBody({
     }
   }
 
-  // 从图片导入题目（识别结果由 AI 给出，见 import/ImageImportDialog.tsx）
-  // 从图片导入：题目或知识点
-  const [imageImportOpen, setImageImportOpen] = useState<'questions' | 'knowledge' | null>(null)
+  // 从图片导入菜单位置（弹窗由工作区统一保活管理，收起到后台时可继续编辑）
   const [importMenu, setImportMenu] = useState<{ x: number; y: number; kind: 'questions' | 'knowledge' } | null>(null)
-
-  // 插图：批量处理窗口、变清晰（属性栏、右键快捷栏共用）、点击预览中的插图定位到属性栏
-  const [figureBatch, setFigureBatch] = useState<{ refs?: FigureRef[]; redraw?: boolean } | null>(null)
+  const onOpenFigureBatchRef = useRef(onOpenFigureBatch)
+  onOpenFigureBatchRef.current = onOpenFigureBatch
   // 调整图片（亮度、对比度、灰度）
   const [adjustRef, setAdjustRef] = useState<FigureRef | null>(null)
   // 公式字母正体 / 斜体：这份教学案的版式设置优先，没有设置时用本机设置（预览与导出一致）
@@ -383,21 +386,21 @@ function EditorBody({
     (blockId: string, mod: { shift: boolean; toggle: boolean }) => {
       if (mod.shift) {
         const anchor =
-          selectionAnchorId !== null && outlineQuestionIds.includes(selectionAnchorId)
+          selectionAnchorId !== null && outlineBlockIds.includes(selectionAnchorId)
             ? selectionAnchorId
-            : state.selectedBlockId !== null && outlineQuestionIds.includes(state.selectedBlockId)
+            : state.selectedBlockId !== null && outlineBlockIds.includes(state.selectedBlockId)
               ? state.selectedBlockId
               : null
-        const next = selectQuestionRange(outlineQuestionIds, anchor, blockId)
-        setSelectedQuestionIds(next)
+        const next = selectBlockRange(outlineBlockIds, anchor, blockId)
+        setSelectedBlockIds(next)
         if (anchor === null) setSelectionAnchorId(blockId)
         dispatch({ type: 'select', blockId })
         setReveal((r) => ({ id: blockId, nonce: (r?.nonce ?? 0) + 1 }))
         return
       }
       if (mod.toggle) {
-        const next = toggleQuestionSelection(activeSelectedQuestions, state.selectedBlockId, outlineQuestionIds, blockId)
-        setSelectedQuestionIds(next)
+        const next = toggleBlockSelection(activeSelectedBlocks, state.selectedBlockId, outlineBlockIds, blockId)
+        setSelectedBlockIds(next)
         if (next.length === 0) {
           setSelectionAnchorId(null)
           dispatch({ type: 'select', blockId: null })
@@ -411,12 +414,12 @@ function EditorBody({
         }
         return
       }
-      setSelectedQuestionIds([])
+      setSelectedBlockIds([])
       setSelectionAnchorId(blockId)
       dispatch({ type: 'select', blockId })
       setReveal((r) => ({ id: blockId, nonce: (r?.nonce ?? 0) + 1 }))
     },
-    [activeSelectedQuestions, dispatch, outlineQuestionIds, selectionAnchorId, state.selectedBlockId]
+    [activeSelectedBlocks, dispatch, outlineBlockIds, selectionAnchorId, state.selectedBlockId]
   )
 
   const copyBlocksByIds = useCallback(
@@ -444,13 +447,13 @@ function EditorBody({
   )
   const copySelectedBlocks = useCallback(
     (cut: boolean): boolean => {
-      if (activeSelectedQuestions.length > 1) return copyBlocksByIds(activeSelectedQuestions, cut)
-      if (selectedBlock !== null && COPYABLE_BLOCK_TYPES.has(selectedBlock.type)) {
+      if (activeSelectedBlocks.length > 1) return copyBlocksByIds(activeSelectedBlocks, cut)
+      if (selectedBlock !== null) {
         return copyBlocksByIds([selectedBlock.id], cut)
       }
       return false
     },
-    [activeSelectedQuestions, copyBlocksByIds, selectedBlock]
+    [activeSelectedBlocks, copyBlocksByIds, selectedBlock]
   )
   const pasteBlocks = useCallback(
     (afterBlockId?: string | null): boolean => {
@@ -460,8 +463,8 @@ function EditorBody({
       const target =
         afterBlockId !== undefined
           ? afterBlockId
-          : activeSelectedQuestions.length > 1
-            ? activeSelectedQuestions[activeSelectedQuestions.length - 1]!
+          : activeSelectedBlocks.length > 1
+            ? activeSelectedBlocks[activeSelectedBlocks.length - 1]!
             : (selectedBlock?.id ?? null)
       const sameCut = cb.mode === 'cut' && cb.cutSource !== undefined && cb.cutSource.editorKey === editorKey
       dispatch({
@@ -481,7 +484,7 @@ function EditorBody({
       setReveal((r) => ({ id: firstId, nonce: (r?.nonce ?? 0) + 1 }))
       return true
     },
-    [activeSelectedQuestions, clearMultiSelect, dispatch, editorKey, selectedBlock]
+    [activeSelectedBlocks, clearMultiSelect, dispatch, editorKey, selectedBlock]
   )
 
   // Ctrl+C / Ctrl+X / Ctrl+V 与“编辑”菜单复制、剪切、粘贴题目（输入区内或选中正文文字时放行）
@@ -557,7 +560,7 @@ function EditorBody({
         dispatch({ type: 'replace-figure-assets', assets: newAssets, changes })
         return { done: changes.length, skipped }
       },
-      openBatch: (options) => setFigureBatch(options ?? {}),
+      openBatch: (options) => onOpenFigureBatchRef.current(options ?? {}),
       openAdjust: (ref) => setAdjustRef(ref),
       reveal: (ref) => {
         const root = rootRef.current
@@ -667,7 +670,7 @@ function EditorBody({
               onClose={() => setImportMenu(null)}
               items={[
                 { label: 'Word 文档…', onSelect: () => void importWord(importMenu.kind === 'knowledge') },
-                { label: '图片（交给 AI 识别）…', onSelect: () => setImageImportOpen(importMenu.kind) }
+                { label: '图片（交给 AI 识别）…', onSelect: () => onOpenImageImport(importMenu.kind) }
               ]}
             />
           )}
@@ -684,18 +687,6 @@ function EditorBody({
       {error !== null && <ErrorBanner message={error} onDismiss={onDismissError} />}
       {importReport !== null && <ImportNotice report={importReport} onDismiss={() => onImportReport(null)} />}
       {exportedFiles !== null && <ExportDoneNotice files={exportedFiles} onDismiss={() => setExportedFiles(null)} />}
-      {imageImportOpen !== null && (
-        <ImageImportDialog
-          kind={imageImportOpen}
-          presetId={project.presetId}
-          onCancel={() => setImageImportOpen(null)}
-          onImport={(blocks, assets, report) => {
-            dispatch({ type: 'insert-blocks', blocks, assets, afterBlockId: insertAfter })
-            onImportReport(report)
-            setImageImportOpen(null)
-          }}
-        />
-      )}
       {quickMenu?.kind === 'figure' && quickBlock !== null && (
         <FigureQuickMenu
           block={quickBlock}
@@ -731,7 +722,7 @@ function EditorBody({
       )}
       {quickMenu?.kind === 'batch-questions' &&
         (() => {
-          const validIds = pruneQuestionSelection(quickMenu.blockIds, outlineQuestionIds)
+          const validIds = pruneBlockSelection(quickMenu.blockIds, outlineBlockIds)
           if (validIds.length === 0) return null
           return (
             <BatchQuestionQuickMenu
@@ -771,7 +762,7 @@ function EditorBody({
           blocks={project.blocks}
           questionNumbers={questionNumbers}
           selectedBlockId={state.selectedBlockId}
-          selectedQuestionIds={activeSelectedQuestions}
+          selectedQuestionIds={activeSelectedBlocks}
           cutBlockIds={cutBlockIds}
           dispatch={dispatch}
           preset={preset}
@@ -779,7 +770,7 @@ function EditorBody({
           onClearMultiSelect={clearMultiSelect}
           onBlockMenu={openQuickMenu}
           onBatchQuestionMenu={openBatchQuestionMenu}
-          onOpenFigureBatch={() => setFigureBatch({})}
+          onOpenFigureBatch={() => onOpenFigureBatchRef.current({})}
           onReveal={(id) => setReveal((r) => ({ id, nonce: (r?.nonce ?? 0) + 1 }))}
         />
         <Preview
@@ -852,16 +843,6 @@ function EditorBody({
             />
           )
         })()}
-      {figureBatch !== null && (
-        <FigureBatchDialog
-          blocks={project.blocks}
-          assets={state.bundle.assets}
-          questionNumbers={questionNumbers}
-          dispatch={dispatch}
-          initial={figureBatch}
-          onClose={() => setFigureBatch(null)}
-        />
-      )}
       </FigureClickContext.Provider>
       </FigureActionsContext.Provider>
     </div>

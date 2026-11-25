@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from 'react'
+import { buildDocument } from '@core/document/build'
 import { DEFAULT_TEMPLATE_ID } from '@core/model/factory'
 import { createDemoBundle } from '@core/sample/demo-project'
 import { Editor, type EditorFiles } from './Editor'
@@ -6,13 +7,37 @@ import { ErrorBanner } from './ErrorBanner'
 import { HomeScreen } from './home/HomeScreen'
 import { NewProjectDialog } from './home/NewProjectDialog'
 import type { ImportReport } from '@shared/ipc'
-import type { EditorAction } from './state/store'
+import { findBlock, type EditorAction } from './state/store'
 import { useWorkspaceFiles } from './state/useWorkspaceFiles'
 import { activeTab, EMPTY_WORKSPACE, workspaceReducer, type Tab, type WorkspaceAction } from './state/workspace'
+import {
+  describeSessionPill,
+  dismissImageImportNotice,
+  minimizeImageImportSession,
+  openImageImportSession,
+  resolveImportTargetTab,
+  restoreImageImportSession,
+  updateImageImportSession,
+  type ImageImportKind,
+  type ImageImportSession
+} from './state/imageImportSession'
+import {
+  describeFigureRedrawPill,
+  dismissFigureRedrawNotice,
+  minimizeFigureRedrawSession,
+  openFigureRedrawSession,
+  restoreFigureRedrawSession,
+  updateFigureRedrawSession,
+  type FigureBatchInitial,
+  type FigureRedrawSession
+} from './state/figureRedrawSession'
 import { getPreset } from '@core/presets'
 import { CreateFromDocxDialog } from './home/CreateFromDocxDialog'
+import { FigureBatchDialog } from './figures/FigureBatchDialog'
+import { ImageImportDialog } from './import/ImageImportDialog'
+import { WorkBuddyReadyNotice } from './import/WorkBuddyReadyNotice'
 import { TabTransition } from './TabTransition'
-import { TabBar } from './TabBar'
+import { TabBar, type BackgroundTaskPill } from './TabBar'
 import { useMathUpright } from './state/mathUpright'
 
 export function App() {
@@ -27,6 +52,9 @@ export function App() {
   // 导入报告只在对应的标签页中显示
   const [importReport, setImportReport] = useState<{ tabId: string; report: ImportReport } | null>(null)
   const [exportTab, setExportTab] = useState<string | null>(null)
+  // 从图片导入 / 批量插图重绘会话：提升到工作区，收起到后台时可继续在任意标签页或首页操作
+  const [imageImport, setImageImport] = useState<ImageImportSession | null>(null)
+  const [figureBatch, setFigureBatch] = useState<FigureRedrawSession | null>(null)
 
   const files = useWorkspaceFiles(ws, dispatch, {
     onRequestNew: () => setNewDialogOpen(true),
@@ -90,6 +118,69 @@ export function App() {
   const alive = aliveRef.current
   const openPaths = ws.tabs.flatMap((t) => (t.state.filePath !== null ? [t.state.filePath] : []))
 
+  const importTarget =
+    imageImport === null
+      ? { tab: null as Tab | null, fellBack: false }
+      : (() => {
+          const resolved = resolveImportTargetTab(
+            imageImport.tabId,
+            ws.tabs.map((t) => t.id),
+            ws.active
+          )
+          return {
+            tab: resolved.tabId !== null ? (ws.tabs.find((t) => t.id === resolved.tabId) ?? null) : null,
+            fellBack: resolved.fellBack
+          }
+        })()
+  const importTargetTitle = importTarget.tab !== null ? (importTarget.tab.state.bundle.project.meta.title || '未命名教学案') : null
+  const batchTab = figureBatch !== null ? (ws.tabs.find((t) => t.id === figureBatch.tabId) ?? null) : null
+  const batchTargetTitle = batchTab !== null ? (batchTab.state.bundle.project.meta.title || '未命名教学案') : null
+  const batchQuestionNumbers = useMemo(() => {
+    const map = new Map<string, string>()
+    if (figureBatch === null || batchTab === null) return map
+    const ir = buildDocument(batchTab.state.bundle.project, batchTab.state.variant)
+    for (const p of ir.paragraphs) {
+      if (p.style === 'question' && p.label !== undefined && !map.has(p.sourceBlockId)) {
+        map.set(p.sourceBlockId, p.label)
+      }
+    }
+    return map
+  }, [figureBatch !== null, batchTab?.state.bundle.project, batchTab?.state.variant])
+  const dispatchBatch = useCallback(
+    (action: EditorAction) => {
+      if (figureBatch === null) return
+      dispatch({ type: 'doc', id: figureBatch.tabId, action })
+      if (action.type === 'replace-figure-assets') dispatch({ type: 'activate', id: figureBatch.tabId })
+    },
+    [figureBatch?.tabId]
+  )
+
+  const backgroundTasks: BackgroundTaskPill[] = []
+  if (imageImport !== null && imageImport.minimized) {
+    const pill = describeSessionPill(imageImport)
+    backgroundTasks.push({
+      id: 'image-import',
+      label: pill.label,
+      tone: pill.tone,
+      title: importTargetTitle !== null ? `点击还原图片导入窗口（目标：《${importTargetTitle}》）` : '点击还原图片导入窗口',
+      cancelLabel: '取消图片导入',
+      onRestore: () => setImageImport((s) => (s === null ? null : restoreImageImportSession(s))),
+      onCancel: () => setImageImport(null)
+    })
+  }
+  if (figureBatch !== null && figureBatch.minimized) {
+    const pill = describeFigureRedrawPill(figureBatch)
+    backgroundTasks.push({
+      id: 'figure-redraw',
+      label: pill.label,
+      tone: pill.tone,
+      title: batchTargetTitle !== null ? `点击还原插图重绘窗口（目标：《${batchTargetTitle}》）` : '点击还原插图重绘窗口',
+      cancelLabel: '取消插图重绘',
+      onRestore: () => setFigureBatch((s) => (s === null ? null : restoreFigureRedrawSession(s))),
+      onCancel: () => setFigureBatch(null)
+    })
+  }
+
   return (
     <div className="app-shell">
       <TabBar
@@ -99,6 +190,7 @@ export function App() {
         onClose={(id) => void files.closeTab(id)}
         onMove={(id, toIndex) => dispatch({ type: 'move-tab', id, toIndex })}
         onNew={files.newProject}
+        backgroundTasks={backgroundTasks}
       />
       {/* 必须排在内容区之前：它要在旧页面被移除之前拍下快照 */}
       <TabTransition activeKey={ws.active ?? 'home'} />
@@ -134,6 +226,39 @@ export function App() {
               onError={setDemoError}
               exportOpen={exportTab === t.id}
               onExportOpenChange={(open) => setExportTab(open ? t.id : null)}
+              onOpenImageImport={(kind: ImageImportKind) => {
+                setImageImport((cur) => {
+                  const curTarget =
+                    cur === null
+                      ? null
+                      : (() => {
+                          const r = resolveImportTargetTab(
+                            cur.tabId,
+                            wsRef.current.tabs.map((x) => x.id),
+                            wsRef.current.active
+                          )
+                          const target = r.tabId !== null ? wsRef.current.tabs.find((x) => x.id === r.tabId) : undefined
+                          return target?.state.bundle.project.meta.title || null
+                        })()
+                  return openImageImportSession(cur, {
+                    tabId: t.id,
+                    kind,
+                    presetId: t.state.bundle.project.presetId,
+                    currentTargetTitle: curTarget
+                  })
+                })
+              }}
+              onOpenFigureBatch={(initial) => {
+                setFigureBatch((cur) => {
+                  const curTarget =
+                    cur === null ? null : (wsRef.current.tabs.find((x) => x.id === cur.tabId)?.state.bundle.project.meta.title || null)
+                  return openFigureRedrawSession(cur, {
+                    tabId: t.id,
+                    initial: initial ?? {},
+                    currentTargetTitle: curTarget
+                  })
+                })
+              }}
             />
           ))}
       </div>
@@ -156,6 +281,77 @@ export function App() {
           }}
         />
       )}
+      {imageImport !== null && (
+        <ImageImportDialog
+          kind={imageImport.kind}
+          presetId={importTarget.tab?.state.bundle.project.presetId ?? imageImport.presetId}
+          minimized={imageImport.minimized}
+          onMinimize={() => setImageImport((s) => (s === null ? null : minimizeImageImportSession(s)))}
+          targetTitle={importTargetTitle}
+          targetFellBack={importTarget.fellBack}
+          reopenHint={imageImport.reopenHint}
+          onSessionUpdate={(patch) => setImageImport((s) => (s === null ? null : updateImageImportSession(s, patch)))}
+          onCancel={() => setImageImport(null)}
+          onImport={(blocks, assets, report) => {
+            const target = importTarget.tab
+            if (target === null) return
+            const afterBlockId = findBlock(target.state.bundle.project.blocks, target.state.selectedBlockId)?.id ?? null
+            dispatch({ type: 'activate', id: target.id })
+            dispatch({ type: 'doc', id: target.id, action: { type: 'insert-blocks', blocks, assets, afterBlockId } })
+            setImportReport({ tabId: target.id, report })
+            setImageImport(null)
+          }}
+        />
+      )}
+      {figureBatch !== null && (
+        <FigureBatchDialog
+          key={figureBatch.sessionKey}
+          blocks={batchTab?.state.bundle.project.blocks ?? []}
+          assets={batchTab?.state.bundle.assets ?? {}}
+          questionNumbers={batchQuestionNumbers}
+          dispatch={dispatchBatch}
+          initial={figureBatch.initial}
+          minimized={figureBatch.minimized}
+          onMinimize={() => setFigureBatch((s) => (s === null ? null : minimizeFigureRedrawSession(s)))}
+          targetTitle={batchTargetTitle}
+          targetMissing={batchTab === null}
+          reopenHint={figureBatch.reopenHint}
+          onSessionUpdate={(patch) => setFigureBatch((s) => (s === null ? null : updateFigureRedrawSession(s, patch)))}
+          onClose={() => setFigureBatch(null)}
+        />
+      )}
+      <div className="wb-toast-stack">
+        {imageImport !== null &&
+          imageImport.minimized &&
+          !imageImport.noticeDismissed &&
+          imageImport.receivedNonce > 0 &&
+          imageImport.lastArrivalKind !== null && (
+            <WorkBuddyReadyNotice
+              kind={imageImport.kind}
+              arrivalKind={imageImport.lastArrivalKind}
+              summary={imageImport.receivedSummary}
+              redrawProgress={imageImport.redrawProgress}
+              targetTitle={importTargetTitle}
+              onOpen={() => setImageImport((s) => (s === null ? null : restoreImageImportSession(s)))}
+              onDismiss={() => setImageImport((s) => (s === null ? null : dismissImageImportNotice(s)))}
+            />
+          )}
+        {figureBatch !== null &&
+          figureBatch.minimized &&
+          !figureBatch.noticeDismissed &&
+          figureBatch.receivedNonce > 0 && (
+            <WorkBuddyReadyNotice
+              kind="questions"
+              arrivalKind="redraw"
+              summary={null}
+              redrawProgress={figureBatch.redrawProgress}
+              targetTitle={batchTargetTitle}
+              actionLabel="查看并应用"
+              onOpen={() => setFigureBatch((s) => (s === null ? null : restoreFigureRedrawSession(s)))}
+              onDismiss={() => setFigureBatch((s) => (s === null ? null : dismissFigureRedrawNotice(s)))}
+            />
+          )}
+      </div>
     </div>
   )
 }
@@ -179,6 +375,8 @@ function TabEditor(props: {
   onError: (message: string) => void
   exportOpen: boolean
   onExportOpenChange: (open: boolean) => void
+  onOpenImageImport: (kind: ImageImportKind) => void
+  onOpenFigureBatch: (initial?: FigureBatchInitial) => void
 }) {
   const { tab, active, workspaceDispatch, files, ...rest } = props
   const id = tab.id
